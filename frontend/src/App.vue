@@ -85,7 +85,7 @@
         <header class="topbar">
           <div>
             <div class="crumb">{{ user.roleLabel }} / {{ currentMenuTitle }}</div>
-            <h2>{{ isBasicPath ? currentMenuTitle : overview?.title || '角色首页' }}</h2>
+            <h2>{{ isManagedModulePath ? currentMenuTitle : overview?.title || '角色首页' }}</h2>
           </div>
           <div class="user-box">
             <el-tag :type="roleTagType">{{ user.primaryRole }}</el-tag>
@@ -104,6 +104,7 @@
         />
 
         <BasicDataPanel v-if="isBasicPath && user" :path="currentPath" :role="user.primaryRole" />
+        <QuestionBankPanel v-else-if="isQuestionBankPath && user" :role="user.primaryRole" />
 
         <template v-else>
         <section class="overview-grid">
@@ -187,6 +188,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import BasicDataPanel from './components/BasicDataPanel.vue';
+import QuestionBankPanel from './components/QuestionBankPanel.vue';
 import {
   fetchCurrentUser,
   fetchDemoUsers,
@@ -225,6 +227,10 @@ const healthState = computed(() => {
 const currentMenuTitle = computed(() => menus.value.find((item) => item.path === currentPath.value)?.title || '角色首页');
 
 const isBasicPath = computed(() => currentPath.value.startsWith('/basic/'));
+
+const isQuestionBankPath = computed(() => currentPath.value === '/question-bank');
+
+const isManagedModulePath = computed(() => isBasicPath.value || isQuestionBankPath.value);
 
 const roleTagType = computed(() => {
   if (user.value?.primaryRole === 'ADMIN') return 'danger';

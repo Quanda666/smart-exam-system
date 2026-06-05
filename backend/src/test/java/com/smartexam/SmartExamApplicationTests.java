@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -170,6 +171,87 @@ class SmartExamApplicationTests {
                                 "grade", "2024级",
                                 "status", 1
                         ))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    void teacherShouldManageQuestionBank() throws Exception {
+        String token = loginAndExtractToken("teacher1", "teacher123");
+
+        MvcResult createResult = mockMvc.perform(post("/api/questions")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "subjectId", 1,
+                                "knowledgePointId", 1,
+                                "questionType", "SINGLE_CHOICE",
+                                "difficulty", "EASY",
+                                "stem", "阶段4测试单选题：Java Map 的主要用途是？",
+                                "correctAnswer", "B",
+                                "analysis", "Map 用于存储键值对。",
+                                "defaultScore", 5,
+                                "status", 0,
+                                "options", List.of(
+                                        Map.of("optionLabel", "A", "optionContent", "存储单个字符串", "correct", false),
+                                        Map.of("optionLabel", "B", "optionContent", "存储键值对", "correct", true),
+                                        Map.of("optionLabel", "C", "optionContent", "只存储整数", "correct", false)
+                                )
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.questionType").value("SINGLE_CHOICE"))
+                .andExpect(jsonPath("$.data.options[1].optionLabel").value("B"))
+                .andReturn();
+
+        Long questionId = objectMapper.readTree(createResult.getResponse().getContentAsString()).path("data").path("id").asLong();
+
+        mockMvc.perform(get("/api/questions")
+                        .header("Authorization", "Bearer " + token)
+                        .param("questionType", "SINGLE_CHOICE")
+                        .param("difficulty", "EASY")
+                        .param("status", "0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        mockMvc.perform(put("/api/questions/" + questionId + "/status")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("status", 1))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value(1));
+
+        mockMvc.perform(put("/api/questions/" + questionId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "subjectId", 1,
+                                "knowledgePointId", 1,
+                                "questionType", "FILL_BLANK",
+                                "difficulty", "MEDIUM",
+                                "stem", "阶段4测试填空题：事务的四个特性简称为____。",
+                                "correctAnswer", "ACID",
+                                "analysis", "事务特性包含原子性、一致性、隔离性、持久性。",
+                                "defaultScore", 6,
+                                "status", 1,
+                                "options", List.of()
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.questionType").value("FILL_BLANK"))
+                .andExpect(jsonPath("$.data.correctAnswer").value("ACID"));
+
+        mockMvc.perform(delete("/api/questions/" + questionId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.deleted").value(true));
+    }
+
+    @Test
+    void studentShouldNotAccessQuestionBankManagement() throws Exception {
+        String token = loginAndExtractToken("student1", "student123");
+
+        mockMvc.perform(get("/api/questions")
+                        .header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }

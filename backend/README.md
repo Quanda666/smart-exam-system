@@ -1,12 +1,12 @@
 # 后端服务
 
-本目录为智慧在线考试与学习反馈系统后端服务，当前已进入阶段 3：基础资料管理。
+本目录为智慧在线考试与学习反馈系统后端服务，当前已进入阶段 4：题库管理。
 
 ## 环境要求
 
 - JDK 17+
 - Maven 3.8+
-- MySQL 8，可选；未启动数据库时后端仍可通过内置演示数据完成阶段 2 登录验证和阶段 3 基础资料演示，健康接口会返回数据库未连接状态。
+- MySQL 8，可选；未启动数据库时后端仍可通过内置演示数据完成阶段 2 登录验证、阶段 3 基础资料演示和阶段 4 题库演示，健康接口会返回数据库未连接状态。
 
 ## 启动命令
 
@@ -51,6 +51,12 @@ scripts\run-backend.cmd
 | POST | /api/basic/notices | 新增公告，ADMIN、TEACHER 可访问 |
 | PUT | /api/basic/notices/{id} | 修改公告，ADMIN、TEACHER 可访问 |
 | DELETE | /api/basic/notices/{id} | 删除公告，ADMIN、TEACHER 可访问 |
+| GET | /api/questions/summary | 题库统计，ADMIN、TEACHER 可访问 |
+| GET | /api/questions | 题目列表，支持关键词、科目、知识点、题型、难度、状态筛选 |
+| POST | /api/questions | 新增题目，ADMIN、TEACHER 可访问 |
+| PUT | /api/questions/{id} | 修改题目，ADMIN、TEACHER 可访问 |
+| PUT | /api/questions/{id}/status | 发布或撤回题目，ADMIN、TEACHER 可访问 |
+| DELETE | /api/questions/{id} | 删除题目，ADMIN、TEACHER 可访问 |
 
 ## 演示账号
 
@@ -75,4 +81,4 @@ scripts\run-backend.cmd
 
 ## 阶段说明
 
-阶段 3 已在阶段 2 轻量 Token 会话、登录、退出、当前用户、角色菜单和角色工作台基础上，新增班级、科目、知识点和公告的基础资料接口。后续阶段可基于这些基础资料进入题库管理。
+阶段 4 已在阶段 3 基础资料基础上，新增题库管理接口，支持题目列表筛选、新增、编辑、发布撤回、删除、选项维护和学生越权拒绝。后续阶段可基于已发布题目进入试卷管理和规则组卷。

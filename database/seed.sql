@@ -57,6 +57,26 @@ INSERT INTO edu_knowledge_point (subject_id, parent_id, point_name, sort_order, 
 SELECT id, NULL, '事务与ACID', 2, 1 FROM edu_subject WHERE subject_name = '数据库系统'
 ON DUPLICATE KEY UPDATE sort_order = VALUES(sort_order), status = VALUES(status);
 
+INSERT INTO question (subject_id, knowledge_point_id, question_type, difficulty, stem, correct_answer, analysis, default_score, status, created_by)
+SELECT s.id, kp.id, 'SINGLE_CHOICE', 'EASY', 'Java 中用于存储键值对的数据结构通常是？', 'B', 'Map 接口用于存储键值对数据。', 5.00, 1, u.id
+FROM edu_subject s
+JOIN edu_knowledge_point kp ON kp.subject_id = s.id AND kp.point_name = '集合框架'
+JOIN sys_user u ON u.username = 'teacher1'
+WHERE s.subject_name = 'Java程序设计'
+  AND NOT EXISTS (SELECT 1 FROM question q WHERE q.stem = 'Java 中用于存储键值对的数据结构通常是？' AND q.deleted = 0);
+
+INSERT INTO question_option (question_id, option_label, option_content, is_correct, sort_order)
+SELECT q.id, 'A', 'List', 0, 1 FROM question q WHERE q.stem = 'Java 中用于存储键值对的数据结构通常是？'
+ON DUPLICATE KEY UPDATE option_content = VALUES(option_content), is_correct = VALUES(is_correct), sort_order = VALUES(sort_order);
+
+INSERT INTO question_option (question_id, option_label, option_content, is_correct, sort_order)
+SELECT q.id, 'B', 'Map', 1, 2 FROM question q WHERE q.stem = 'Java 中用于存储键值对的数据结构通常是？'
+ON DUPLICATE KEY UPDATE option_content = VALUES(option_content), is_correct = VALUES(is_correct), sort_order = VALUES(sort_order);
+
+INSERT INTO question_option (question_id, option_label, option_content, is_correct, sort_order)
+SELECT q.id, 'C', 'Set', 0, 3 FROM question q WHERE q.stem = 'Java 中用于存储键值对的数据结构通常是？'
+ON DUPLICATE KEY UPDATE option_content = VALUES(option_content), is_correct = VALUES(is_correct), sort_order = VALUES(sort_order);
+
 INSERT INTO notice (title, content, publisher_id, status, publish_time)
 SELECT '在线考试系统阶段3公告', '基础资料管理已启用，可维护班级、科目、知识点和公告数据。', id, 1, NOW()
 FROM sys_user WHERE username = 'admin'

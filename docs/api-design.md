@@ -1,6 +1,6 @@
 # 接口设计记录
 
-本文件用于持续记录在线考试系统接口设计。当前已完成阶段 3 基础资料管理接口。
+本文件用于持续记录在线考试系统接口设计。当前已完成阶段 4 题库管理接口。
 
 ## 通用响应结构
 
@@ -56,6 +56,58 @@
 | POST | /api/basic/notices | 新增或发布公告 | ADMIN、TEACHER |
 | PUT | /api/basic/notices/{id} | 修改公告 | ADMIN、TEACHER |
 | DELETE | /api/basic/notices/{id} | 删除公告 | ADMIN、TEACHER |
+
+## 阶段 4 题库接口
+
+| 方法 | 路径 | 说明 | 权限 |
+|---|---|---|---|
+| GET | /api/questions/summary | 获取题目总数、发布数、草稿数、题型和难度统计 | ADMIN、TEACHER |
+| GET | /api/questions | 查询题目列表，支持 keyword、subjectId、knowledgePointId、questionType、difficulty、status | ADMIN、TEACHER |
+| POST | /api/questions | 新增题目，支持单选、多选、判断、填空、主观题 | ADMIN、TEACHER |
+| PUT | /api/questions/{id} | 修改题目主体和选项 | ADMIN、TEACHER |
+| PUT | /api/questions/{id}/status | 发布或撤回题目，status 为 1 或 0 | ADMIN、TEACHER |
+| DELETE | /api/questions/{id} | 删除题目，当前为逻辑删除 | ADMIN、TEACHER |
+| GET | /api/questions/student-deny-check | 学生越权验证接口 | ADMIN、TEACHER |
+
+## 阶段 4 请求示例
+
+新增单选题：
+
+```json
+{
+  "subjectId": 1,
+  "knowledgePointId": 1,
+  "questionType": "SINGLE_CHOICE",
+  "difficulty": "EASY",
+  "stem": "Java 中用于存储键值对的数据结构通常是？",
+  "correctAnswer": "B",
+  "analysis": "Map 接口用于存储键值对数据。",
+  "defaultScore": 5,
+  "status": 1,
+  "options": [
+    { "optionLabel": "A", "optionContent": "List", "correct": false },
+    { "optionLabel": "B", "optionContent": "Map", "correct": true },
+    { "optionLabel": "C", "optionContent": "Set", "correct": false }
+  ]
+}
+```
+
+新增填空题：
+
+```json
+{
+  "subjectId": 2,
+  "knowledgePointId": 4,
+  "questionType": "FILL_BLANK",
+  "difficulty": "MEDIUM",
+  "stem": "事务的四个特性简称为____。",
+  "correctAnswer": "ACID",
+  "analysis": "事务特性包含原子性、一致性、隔离性和持久性。",
+  "defaultScore": 6,
+  "status": 0,
+  "options": []
+}
+```
 
 ## 阶段 3 请求示例
 
@@ -120,11 +172,13 @@
 4. 班级新增、修改、删除仅管理员可操作；教师可查看班级用于考试任务发布前准备。
 5. 科目、知识点和公告由管理员或教师维护；学生只读科目、知识点和公告。
 6. 演示密码不再以明文写入数据库，种子数据使用带盐 SHA-256 摘要保存。
+7. 题库管理接口仅管理员和教师可访问；学生端后续只能在考试或成绩发布后按业务规则查看必要题目信息，不能直接访问题库维护接口。
+8. 客观题必须包含选项并设置正确答案：单选和判断只能有一个正确选项，多选至少两个正确选项；填空题和主观题必须填写参考答案。
 
 ## 后续接口分组
 
 - 用户与权限接口
-- 题库接口
+- 题库接口（阶段 4 已完成基础维护能力，后续组卷阶段继续复用）
 - 试卷接口
 - 考试任务接口
 - 学生答题接口

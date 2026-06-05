@@ -92,6 +92,9 @@ jobs:
           curl -fsS http://127.0.0.1:8080/api/basic/summary -H "Authorization: Bearer $TOKEN" | grep '"subjects"'
           curl -fsS http://127.0.0.1:8080/api/basic/classes -H "Authorization: Bearer $TOKEN" | grep '23本科计科1班'
           curl -fsS -X POST http://127.0.0.1:8080/api/basic/notices -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"title":"Actions阶段3公告","content":"云端验证阶段3基础资料接口","status":1}' | grep 'Actions阶段3公告'
+          curl -fsS http://127.0.0.1:8080/api/questions/summary -H "Authorization: Bearer $TOKEN" | grep '"total"'
+          curl -fsS http://127.0.0.1:8080/api/questions -H "Authorization: Bearer $TOKEN" | grep 'Java 中用于存储键值对的数据结构通常是？'
+          curl -fsS -X POST http://127.0.0.1:8080/api/questions -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"subjectId":1,"knowledgePointId":1,"questionType":"SINGLE_CHOICE","difficulty":"EASY","stem":"Actions阶段4题库验证题","correctAnswer":"B","analysis":"用于云端验证题库新增接口。","defaultScore":5,"status":1,"options":[{"optionLabel":"A","optionContent":"错误项","correct":false},{"optionLabel":"B","optionContent":"正确项","correct":true}]}' | grep 'Actions阶段4题库验证题'
           STUDENT_STATUS=$(curl -s -o /tmp/student-forbidden.json -w '%{http_code}' http://127.0.0.1:8080/api/student/overview -H "Authorization: Bearer $TOKEN")
           test "$STUDENT_STATUS" = "403"
           grep '"code":"FORBIDDEN"' /tmp/student-forbidden.json

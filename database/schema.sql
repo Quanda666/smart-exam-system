@@ -105,6 +105,40 @@ CREATE TABLE IF NOT EXISTS edu_knowledge_point (
   UNIQUE KEY uk_edu_knowledge_point_subject_name (subject_id, point_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='知识点表';
 
+CREATE TABLE IF NOT EXISTS question (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '题目ID',
+  subject_id BIGINT NOT NULL COMMENT '科目ID',
+  knowledge_point_id BIGINT NULL COMMENT '知识点ID',
+  question_type VARCHAR(32) NOT NULL COMMENT '题型：SINGLE_CHOICE/MULTIPLE_CHOICE/TRUE_FALSE/FILL_BLANK/SUBJECTIVE',
+  difficulty VARCHAR(32) NOT NULL COMMENT '难度：EASY/MEDIUM/HARD',
+  stem TEXT NOT NULL COMMENT '题干',
+  correct_answer TEXT NULL COMMENT '参考答案',
+  analysis TEXT NULL COMMENT '题目解析',
+  default_score DECIMAL(8,2) NOT NULL DEFAULT 5.00 COMMENT '默认分值',
+  status TINYINT NOT NULL DEFAULT 0 COMMENT '状态：1发布，0草稿',
+  created_by BIGINT NULL COMMENT '创建人ID',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除',
+  KEY idx_question_subject_id (subject_id),
+  KEY idx_question_knowledge_point_id (knowledge_point_id),
+  KEY idx_question_type (question_type),
+  KEY idx_question_difficulty (difficulty),
+  KEY idx_question_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='题目表';
+
+CREATE TABLE IF NOT EXISTS question_option (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '题目选项ID',
+  question_id BIGINT NOT NULL COMMENT '题目ID',
+  option_label VARCHAR(16) NOT NULL COMMENT '选项标识，如A/B/C/D',
+  option_content TEXT NOT NULL COMMENT '选项内容',
+  is_correct TINYINT NOT NULL DEFAULT 0 COMMENT '是否正确：1是，0否',
+  sort_order INT NOT NULL DEFAULT 0 COMMENT '排序号',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  UNIQUE KEY uk_question_option_label (question_id, option_label),
+  KEY idx_question_option_question_id (question_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='题目选项表';
+
 CREATE TABLE IF NOT EXISTS notice (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '公告ID',
   title VARCHAR(128) NOT NULL COMMENT '公告标题',

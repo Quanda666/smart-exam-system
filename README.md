@@ -27,7 +27,7 @@
 
 ## 当前阶段
 
-当前已完成阶段 3：基础资料管理。
+当前已完成阶段 4：题库管理。
 
 本阶段已完成：
 
@@ -35,10 +35,12 @@
 2. 后端轻量 Token 会话与角色访问控制。
 3. 管理员、教师、学生三类角色专属工作台接口。
 4. 班级、科目、知识点、公告的基础资料接口。
-5. 前端登录页、演示账号选择、登录状态保存、角色菜单和角色首页雏形。
-6. 前端基础资料管理页面，支持列表、筛选、新增、编辑、删除。
-7. 数据库新增学生档案表、教师档案表、公告表，并将演示账号密码改为带盐 SHA-256 摘要。
-8. 后端测试和前端生产构建验证。
+5. 题库管理接口，支持单选、多选、判断、填空、主观题维护、筛选、发布撤回和删除。
+6. 前端登录页、演示账号选择、登录状态保存、角色菜单和角色首页雏形。
+7. 前端基础资料管理页面，支持列表、筛选、新增、编辑、删除。
+8. 前端题库管理页面，支持多条件筛选、动态题型表单、选项维护、发布撤回。
+9. 数据库新增学生档案表、教师档案表、公告表、题目表、题目选项表，并将演示账号密码改为带盐 SHA-256 摘要。
+10. 后端测试和前端生产构建验证。
 
 ## 目录结构
 
@@ -90,6 +92,12 @@ GET  http://localhost:8080/api/basic/classes
 GET  http://localhost:8080/api/basic/subjects
 GET  http://localhost:8080/api/basic/knowledge-points
 GET  http://localhost:8080/api/basic/notices
+GET  http://localhost:8080/api/questions/summary
+GET  http://localhost:8080/api/questions
+POST http://localhost:8080/api/questions
+PUT  http://localhost:8080/api/questions/{id}
+PUT  http://localhost:8080/api/questions/{id}/status
+DELETE http://localhost:8080/api/questions/{id}
 ```
 
 ## 前端快速启动
@@ -124,8 +132,8 @@ http://127.0.0.1:3000
 
 数据库脚本位于 [`database`](database) 目录：
 
-- [`database/schema.sql`](database/schema.sql)：创建数据库、用户角色表、学生档案表、教师档案表、基础资料表、公告表和 AI 预留表。
-- [`database/seed.sql`](database/seed.sql)：写入演示角色、账号、档案、科目、班级、知识点、公告和 AI 提示词模板。
+- [`database/schema.sql`](database/schema.sql)：创建数据库、用户角色表、学生档案表、教师档案表、基础资料表、公告表、题目表、题目选项表和 AI 预留表。
+- [`database/seed.sql`](database/seed.sql)：写入演示角色、账号、档案、科目、班级、知识点、公告、题库题目和 AI 提示词模板。
 
 建议数据库名：
 
