@@ -77,6 +77,43 @@ INSERT INTO question_option (question_id, option_label, option_content, is_corre
 SELECT q.id, 'C', 'Set', 0, 3 FROM question q WHERE q.stem = 'Java 中用于存储键值对的数据结构通常是？'
 ON DUPLICATE KEY UPDATE option_content = VALUES(option_content), is_correct = VALUES(is_correct), sort_order = VALUES(sort_order);
 
+INSERT INTO question (subject_id, knowledge_point_id, question_type, difficulty, stem, correct_answer, analysis, default_score, status, created_by)
+SELECT s.id, kp.id, 'TRUE_FALSE', 'EASY', 'Java 中 HashMap 允许使用键值对保存数据。', 'A', 'HashMap 是 Map 接口常见实现，支持键值对存储。', 5.00, 1, u.id
+FROM edu_subject s
+JOIN edu_knowledge_point kp ON kp.subject_id = s.id AND kp.point_name = '集合框架'
+JOIN sys_user u ON u.username = 'teacher1'
+WHERE s.subject_name = 'Java程序设计'
+  AND NOT EXISTS (SELECT 1 FROM question q WHERE q.stem = 'Java 中 HashMap 允许使用键值对保存数据。' AND q.deleted = 0);
+
+INSERT INTO question_option (question_id, option_label, option_content, is_correct, sort_order)
+SELECT q.id, 'A', '正确', 1, 1 FROM question q WHERE q.stem = 'Java 中 HashMap 允许使用键值对保存数据。'
+ON DUPLICATE KEY UPDATE option_content = VALUES(option_content), is_correct = VALUES(is_correct), sort_order = VALUES(sort_order);
+
+INSERT INTO question_option (question_id, option_label, option_content, is_correct, sort_order)
+SELECT q.id, 'B', '错误', 0, 2 FROM question q WHERE q.stem = 'Java 中 HashMap 允许使用键值对保存数据。'
+ON DUPLICATE KEY UPDATE option_content = VALUES(option_content), is_correct = VALUES(is_correct), sort_order = VALUES(sort_order);
+
+INSERT INTO paper (subject_id, paper_name, description, total_score, status, created_by)
+SELECT s.id, 'Java程序设计阶段5演示试卷', '用于演示手动组卷和规则组卷的阶段5试卷。', 10.00, 0, u.id
+FROM edu_subject s
+JOIN sys_user u ON u.username = 'teacher1'
+WHERE s.subject_name = 'Java程序设计'
+ON DUPLICATE KEY UPDATE description = VALUES(description), total_score = VALUES(total_score), status = VALUES(status), created_by = VALUES(created_by);
+
+INSERT INTO paper_question (paper_id, question_id, score, sort_order)
+SELECT p.id, q.id, 5.00, 1
+FROM paper p
+JOIN question q ON q.stem = 'Java 中用于存储键值对的数据结构通常是？'
+WHERE p.paper_name = 'Java程序设计阶段5演示试卷'
+ON DUPLICATE KEY UPDATE score = VALUES(score), sort_order = VALUES(sort_order);
+
+INSERT INTO paper_question (paper_id, question_id, score, sort_order)
+SELECT p.id, q.id, 5.00, 2
+FROM paper p
+JOIN question q ON q.stem = 'Java 中 HashMap 允许使用键值对保存数据。'
+WHERE p.paper_name = 'Java程序设计阶段5演示试卷'
+ON DUPLICATE KEY UPDATE score = VALUES(score), sort_order = VALUES(sort_order);
+
 INSERT INTO notice (title, content, publisher_id, status, publish_time)
 SELECT '在线考试系统阶段3公告', '基础资料管理已启用，可维护班级、科目、知识点和公告数据。', id, 1, NOW()
 FROM sys_user WHERE username = 'admin'

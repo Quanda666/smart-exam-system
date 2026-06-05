@@ -139,6 +139,35 @@ CREATE TABLE IF NOT EXISTS question_option (
   KEY idx_question_option_question_id (question_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='题目选项表';
 
+CREATE TABLE IF NOT EXISTS paper (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '试卷ID',
+  subject_id BIGINT NOT NULL COMMENT '科目ID',
+  paper_name VARCHAR(128) NOT NULL COMMENT '试卷名称',
+  description VARCHAR(512) NULL COMMENT '试卷说明',
+  total_score DECIMAL(8,2) NOT NULL DEFAULT 0.00 COMMENT '试卷总分',
+  status TINYINT NOT NULL DEFAULT 0 COMMENT '状态：1发布，0草稿',
+  created_by BIGINT NULL COMMENT '创建人ID',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除',
+  UNIQUE KEY uk_paper_name (paper_name),
+  KEY idx_paper_subject_id (subject_id),
+  KEY idx_paper_status (status),
+  KEY idx_paper_created_by (created_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='试卷表';
+
+CREATE TABLE IF NOT EXISTS paper_question (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '试卷题目ID',
+  paper_id BIGINT NOT NULL COMMENT '试卷ID',
+  question_id BIGINT NOT NULL COMMENT '题目ID',
+  score DECIMAL(8,2) NOT NULL DEFAULT 5.00 COMMENT '本卷题目分值',
+  sort_order INT NOT NULL DEFAULT 0 COMMENT '题目顺序',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  UNIQUE KEY uk_paper_question (paper_id, question_id),
+  KEY idx_paper_question_paper_id (paper_id),
+  KEY idx_paper_question_question_id (question_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='试卷题目关联表';
+
 CREATE TABLE IF NOT EXISTS notice (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '公告ID',
   title VARCHAR(128) NOT NULL COMMENT '公告标题',

@@ -24,7 +24,7 @@ public class MenuService {
 
     public Map<String, List<String>> rolePageMap() {
         Map<String, List<String>> data = new LinkedHashMap<>();
-        data.put("ADMIN", List.of("/admin", "/basic/classes", "/basic/subjects", "/basic/knowledge-points", "/basic/notices", "/question-bank", "/system/users", "/system/roles", "/monitor/logs", "/exam/analysis"));
+        data.put("ADMIN", List.of("/admin", "/basic/classes", "/basic/subjects", "/basic/knowledge-points", "/basic/notices", "/question-bank", "/papers", "/system/users", "/system/roles", "/monitor/logs", "/exam/analysis"));
         data.put("TEACHER", List.of("/teacher", "/basic/subjects", "/basic/knowledge-points", "/basic/notices", "/question-bank", "/papers", "/exam-tasks", "/reviews", "/teacher/analysis"));
         data.put("STUDENT", List.of("/student", "/basic/notices", "/student/exams", "/student/results", "/student/wrong-questions"));
         return data;
@@ -43,7 +43,7 @@ public class MenuService {
                 new MenuItem("系统日志", "/monitor/logs", "Document", List.of("ADMIN")),
                 new MenuItem("全局成绩分析", "/exam/analysis", "PieChart", List.of("ADMIN")),
                 new MenuItem("教师首页", "/teacher", "Notebook", List.of("TEACHER")),
-                new MenuItem("试卷管理", "/papers", "Files", List.of("TEACHER")),
+                new MenuItem("试卷管理", "/papers", "Files", List.of("ADMIN", "TEACHER")),
                 new MenuItem("考试任务", "/exam-tasks", "Calendar", List.of("TEACHER")),
                 new MenuItem("阅卷管理", "/reviews", "EditPen", List.of("TEACHER")),
                 new MenuItem("教师成绩分析", "/teacher/analysis", "TrendCharts", List.of("TEACHER")),

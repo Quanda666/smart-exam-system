@@ -256,6 +256,104 @@ class SmartExamApplicationTests {
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }
 
+    @Test
+    void teacherShouldManagePaperAndGenerateByRules() throws Exception {
+        String token = loginAndExtractToken("teacher1", "teacher123");
+        Long firstQuestionId = createPublishedQuestion(token, "阶段5手动组卷单选题", "SINGLE_CHOICE");
+        Long secondQuestionId = createPublishedQuestion(token, "阶段5规则组卷单选题", "SINGLE_CHOICE");
+
+        MvcResult createPaperResult = mockMvc.perform(post("/api/papers")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "subjectId", 1,
+                                "paperName", "阶段5手动组卷测试卷",
+                                "description", "阶段5接口测试试卷",
+                                "status", 0,
+                                "questions", List.of(
+                                        Map.of("questionId", firstQuestionId, "score", 5, "sortOrder", 1),
+                                        Map.of("questionId", secondQuestionId, "score", 6, "sortOrder", 2)
+                                )
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.paperName").value("阶段5手动组卷测试卷"))
+                .andExpect(jsonPath("$.data.questionCount").value(2))
+                .andReturn();
+
+        Long paperId = objectMapper.readTree(createPaperResult.getResponse().getContentAsString()).path("data").path("id").asLong();
+
+        mockMvc.perform(get("/api/papers/" + paperId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.questions[0].questionId").value(firstQuestionId));
+
+        mockMvc.perform(put("/api/papers/" + paperId + "/status")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("status", 1))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value(1));
+
+        mockMvc.perform(post("/api/papers/generate")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "subjectId", 1,
+                                "paperName", "阶段5规则组卷测试卷",
+                                "description", "按题型和难度自动抽题",
+                                "status", 0,
+                                "rules", List.of(Map.of(
+                                        "questionType", "SINGLE_CHOICE",
+                                        "difficulty", "EASY",
+                                        "count", 1,
+                                        "score", 5
+                                ))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.questionCount").value(1));
+
+        mockMvc.perform(delete("/api/papers/" + paperId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.deleted").value(true));
+    }
+
+    @Test
+    void studentShouldNotAccessPaperManagement() throws Exception {
+        String token = loginAndExtractToken("student1", "student123");
+
+        mockMvc.perform(get("/api/papers")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    private Long createPublishedQuestion(String token, String stem, String questionType) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/questions")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "subjectId", 1,
+                                "knowledgePointId", 1,
+                                "questionType", questionType,
+                                "difficulty", "EASY",
+                                "stem", stem,
+                                "correctAnswer", "B",
+                                "analysis", "阶段5试卷测试题目。",
+                                "defaultScore", 5,
+                                "status", 1,
+                                "options", List.of(
+                                        Map.of("optionLabel", "A", "optionContent", "错误项", "correct", false),
+                                        Map.of("optionLabel", "B", "optionContent", "正确项", "correct", true)
+                                )
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).path("data").path("id").asLong();
+    }
+
     private String loginAndExtractToken(String username, String password) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
