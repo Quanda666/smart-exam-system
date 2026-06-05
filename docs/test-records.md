@@ -13,6 +13,7 @@
 | T1-005 | 项目结构检查 | 递归查看目录结构 | 基础目录和文件存在 | 已确认 `backend`、`frontend`、`database`、`docs`、`scripts`、`README.md`、`.gitignore`、`LICENSE` 等基础结构存在 |
 | T1-006 | 前端构建 | 在 `frontend` 目录执行 `npm run build` | 类型检查通过并生成生产构建产物 | 构建通过；出现 Vite chunk 体积警告，阶段 1 可接受，后续按路由拆包优化 |
 | T1-007 | 本地辅助脚本 | 检查 `scripts` 目录 | 存在环境检查、前端启动、后端启动脚本 | 已创建 `check-env.cmd`、`run-frontend.cmd`、`run-backend.cmd` 和 `scripts/README.md` |
+| T1-008 | Git 提交与远程推送 | 初始化 Git 仓库并推送到 GitHub | 本地提交成功，远程仓库存在阶段 1 成果 | 已提交 `4774fbe chore: 初始化阶段1项目骨架`，并推送到 `https://github.com/Quanda666/smart-exam-system.git` 的 `main` 分支 |
 
 ## 阶段 1 环境检查记录
 
@@ -37,4 +38,4 @@
 2. 准备 MySQL：安装本地 MySQL，或启动 Docker Desktop 后使用容器运行 MySQL。
 3. 准备 MySQL 后执行 `database/schema.sql` 与 `database/seed.sql`。
 4. 再次访问 `/api/health`，确认数据库连接从 `connected=false` 变为 `connected=true`。
-5. 初始化 Git 仓库或连接 GitHub 仓库，提交阶段 1 成果。
+5. GitHub 阶段 1 成果已推送；后续继续按阶段提交。
