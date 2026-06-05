@@ -168,6 +168,65 @@ CREATE TABLE IF NOT EXISTS paper_question (
   KEY idx_paper_question_question_id (question_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='试卷题目关联表';
 
+CREATE TABLE IF NOT EXISTS exam (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '考试任务ID',
+  paper_id BIGINT NOT NULL COMMENT '试卷ID',
+  exam_name VARCHAR(128) NOT NULL COMMENT '考试名称',
+  description VARCHAR(512) NULL COMMENT '考试说明',
+  start_time DATETIME NOT NULL COMMENT '开始时间',
+  end_time DATETIME NOT NULL COMMENT '结束时间',
+  duration_minutes INT NOT NULL COMMENT '考试时长（分钟）',
+  status TINYINT NOT NULL DEFAULT 0 COMMENT '状态：0草稿，1已发布，2已结束',
+  created_by BIGINT NULL COMMENT '创建人ID',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除',
+  KEY idx_exam_paper_id (paper_id),
+  KEY idx_exam_status (status),
+  KEY idx_exam_start_time (start_time),
+  KEY idx_exam_end_time (end_time),
+  KEY idx_exam_created_by (created_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='考试任务表';
+
+CREATE TABLE IF NOT EXISTS exam_class (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '关联ID',
+  exam_id BIGINT NOT NULL COMMENT '考试任务ID',
+  class_id BIGINT NOT NULL COMMENT '班级ID',
+  UNIQUE KEY uk_exam_class (exam_id, class_id),
+  KEY idx_exam_class_exam_id (exam_id),
+  KEY idx_exam_class_class_id (class_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='考试班级关联表';
+
+CREATE TABLE IF NOT EXISTS exam_attempt (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '考试记录ID',
+  exam_id BIGINT NOT NULL COMMENT '考试任务ID',
+  user_id BIGINT NOT NULL COMMENT '学生用户ID',
+  start_time DATETIME NULL COMMENT '学生开始答题时间',
+  submit_time DATETIME NULL COMMENT '学生提交时间',
+  score DECIMAL(8,2) NULL COMMENT '最终得分',
+  status TINYINT NOT NULL DEFAULT 0 COMMENT '状态：0待开始，1进行中，2已提交，3已超时，4待批阅，5已完成',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  UNIQUE KEY uk_exam_attempt_user (exam_id, user_id),
+  KEY idx_exam_attempt_exam_id (exam_id),
+  KEY idx_exam_attempt_user_id (user_id),
+  KEY idx_exam_attempt_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='学生考试记录表';
+
+CREATE TABLE IF NOT EXISTS answer_record (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '答案记录ID',
+  attempt_id BIGINT NOT NULL COMMENT '考试记录ID',
+  question_id BIGINT NOT NULL COMMENT '题目ID',
+  answer_content TEXT NULL COMMENT '学生答案',
+  score DECIMAL(8,2) NULL COMMENT '本题得分',
+  is_correct TINYINT NULL COMMENT '是否正确：1是，0否',
+  review_status TINYINT NOT NULL DEFAULT 0 COMMENT '批阅状态：0待批阅，1已批阅',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  KEY idx_answer_record_attempt_id (attempt_id),
+  KEY idx_answer_record_question_id (question_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='学生答案记录表';
+
 CREATE TABLE IF NOT EXISTS notice (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '公告ID',
   title VARCHAR(128) NOT NULL COMMENT '公告标题',
