@@ -51,6 +51,34 @@ CREATE TABLE IF NOT EXISTS edu_class (
   UNIQUE KEY uk_edu_class_name (class_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='班级表';
 
+CREATE TABLE IF NOT EXISTS student_profile (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '学生档案ID',
+  user_id BIGINT NOT NULL COMMENT '用户ID',
+  student_no VARCHAR(64) NOT NULL COMMENT '学号',
+  class_id BIGINT NULL COMMENT '班级ID',
+  status TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1启用，0停用',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除',
+  UNIQUE KEY uk_student_profile_user_id (user_id),
+  UNIQUE KEY uk_student_profile_student_no (student_no),
+  KEY idx_student_profile_class_id (class_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='学生档案表';
+
+CREATE TABLE IF NOT EXISTS teacher_profile (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '教师档案ID',
+  user_id BIGINT NOT NULL COMMENT '用户ID',
+  teacher_no VARCHAR(64) NOT NULL COMMENT '工号',
+  title VARCHAR(64) NULL COMMENT '职称',
+  introduction VARCHAR(512) NULL COMMENT '简介',
+  status TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1启用，0停用',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除',
+  UNIQUE KEY uk_teacher_profile_user_id (user_id),
+  UNIQUE KEY uk_teacher_profile_teacher_no (teacher_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='教师档案表';
+
 CREATE TABLE IF NOT EXISTS edu_subject (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '科目ID',
   subject_name VARCHAR(128) NOT NULL COMMENT '科目名称',
@@ -73,8 +101,25 @@ CREATE TABLE IF NOT EXISTS edu_knowledge_point (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除',
   KEY idx_edu_knowledge_point_subject_id (subject_id),
-  KEY idx_edu_knowledge_point_parent_id (parent_id)
+  KEY idx_edu_knowledge_point_parent_id (parent_id),
+  UNIQUE KEY uk_edu_knowledge_point_subject_name (subject_id, point_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='知识点表';
+
+CREATE TABLE IF NOT EXISTS notice (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '公告ID',
+  title VARCHAR(128) NOT NULL COMMENT '公告标题',
+  content TEXT NOT NULL COMMENT '公告内容',
+  publisher_id BIGINT NULL COMMENT '发布人ID',
+  status TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1发布，0草稿或停用',
+  publish_time DATETIME NULL COMMENT '发布时间',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0未删除，1已删除',
+  UNIQUE KEY uk_notice_title (title),
+  KEY idx_notice_status (status),
+  KEY idx_notice_publish_time (publish_time),
+  KEY idx_notice_publisher_id (publisher_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='公告表';
 
 CREATE TABLE IF NOT EXISTS ai_provider_config (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT 'AI配置ID',

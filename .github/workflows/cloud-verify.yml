@@ -82,6 +82,19 @@ jobs:
           echo "$HEALTH_JSON"
           echo "$HEALTH_JSON" | grep '"connected":true'
           curl -fsS http://127.0.0.1:8080/api/ai/status | grep '"mode":"MOCK"'
+          curl -fsS http://127.0.0.1:8080/api/auth/demo-users | grep '"username":"admin"'
+          LOGIN_JSON=$(curl -fsS -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin123"}')
+          echo "$LOGIN_JSON" | grep '"primaryRole":"ADMIN"'
+          TOKEN=$(echo "$LOGIN_JSON" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+          test -n "$TOKEN"
+          curl -fsS http://127.0.0.1:8080/api/auth/me -H "Authorization: Bearer $TOKEN" | grep '"username":"admin"'
+          curl -fsS http://127.0.0.1:8080/api/admin/overview -H "Authorization: Bearer $TOKEN" | grep '"role":"ADMIN"'
+          curl -fsS http://127.0.0.1:8080/api/basic/summary -H "Authorization: Bearer $TOKEN" | grep '"subjects"'
+          curl -fsS http://127.0.0.1:8080/api/basic/classes -H "Authorization: Bearer $TOKEN" | grep '23本科计科1班'
+          curl -fsS -X POST http://127.0.0.1:8080/api/basic/notices -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"title":"Actions阶段3公告","content":"云端验证阶段3基础资料接口","status":1}' | grep 'Actions阶段3公告'
+          STUDENT_STATUS=$(curl -s -o /tmp/student-forbidden.json -w '%{http_code}' http://127.0.0.1:8080/api/student/overview -H "Authorization: Bearer $TOKEN")
+          test "$STUDENT_STATUS" = "403"
+          grep '"code":"FORBIDDEN"' /tmp/student-forbidden.json
 
       - name: Frontend build
         working-directory: frontend

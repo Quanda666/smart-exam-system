@@ -20,22 +20,25 @@
 | 层次 | 技术 |
 |---|---|
 | 前端 | Vue 3、Vite、TypeScript、Element Plus、ECharts |
-| 后端 | Java 17、Spring Boot 3、Spring Security 或 Sa Token、MyBatis Plus |
+| 后端 | Java 17、Spring Boot 3、轻量 Token 认证，后续可扩展 Spring Security 或 Sa Token |
 | 数据库 | MySQL 8 |
 | AI 接入 | OpenAI 兼容接口适配层，可配置 Base URL、模型名、API Key 与模拟响应 |
-| 协作 | Git、GitHub、阶段记录、测试记录 |
+| 协作 | Git、GitHub、GitHub Actions、阶段记录、测试记录 |
 
 ## 当前阶段
 
-当前处于阶段 1：前后端基础骨架与数据库初始化准备。
+当前已完成阶段 3：基础资料管理。
 
-本阶段目标：
+本阶段已完成：
 
-1. 创建仓库基础目录和说明文档。
-2. 创建后端 Spring Boot 最小骨架。
-3. 创建前端 Vue 最小骨架。
-4. 准备数据库初始化脚本。
-5. 预留 AI 配置读取与模拟响应入口。
+1. 后端登录接口、退出接口、当前用户接口、角色菜单接口。
+2. 后端轻量 Token 会话与角色访问控制。
+3. 管理员、教师、学生三类角色专属工作台接口。
+4. 班级、科目、知识点、公告的基础资料接口。
+5. 前端登录页、演示账号选择、登录状态保存、角色菜单和角色首页雏形。
+6. 前端基础资料管理页面，支持列表、筛选、新增、编辑、删除。
+7. 数据库新增学生档案表、教师档案表、公告表，并将演示账号密码改为带盐 SHA-256 摘要。
+8. 后端测试和前端生产构建验证。
 
 ## 目录结构
 
@@ -45,6 +48,7 @@ smart-exam-system
 ├─ frontend                   # 前端 Vue 项目
 ├─ database                   # 数据库脚本与说明
 ├─ docs                       # 接口、数据库、AI、测试等文档
+├─ scripts                    # Windows 本地辅助脚本
 ├─ 第七组-在线考试系统项目主控文档.md
 ├─ README.md
 ├─ .gitignore
@@ -58,22 +62,34 @@ cd backend
 mvn spring-boot:run
 ```
 
+Windows 本地可在项目根目录使用：
+
+```cmd
+scripts\run-backend.cmd
+```
+
 后端默认地址：
 
 ```text
 http://localhost:8080
 ```
 
-健康检查接口：
+核心接口：
 
 ```text
-GET http://localhost:8080/api/health
-```
-
-AI 状态接口：
-
-```text
-GET http://localhost:8080/api/ai/status
+GET  http://localhost:8080/api/health
+GET  http://localhost:8080/api/ai/status
+GET  http://localhost:8080/api/auth/demo-users
+POST http://localhost:8080/api/auth/login
+GET  http://localhost:8080/api/auth/me
+GET  http://localhost:8080/api/admin/overview
+GET  http://localhost:8080/api/teacher/overview
+GET  http://localhost:8080/api/student/overview
+GET  http://localhost:8080/api/basic/summary
+GET  http://localhost:8080/api/basic/classes
+GET  http://localhost:8080/api/basic/subjects
+GET  http://localhost:8080/api/basic/knowledge-points
+GET  http://localhost:8080/api/basic/notices
 ```
 
 ## 前端快速启动
@@ -84,18 +100,32 @@ npm install
 npm run dev
 ```
 
+Windows 本地可在项目根目录使用：
+
+```cmd
+scripts\run-frontend.cmd
+```
+
 前端默认地址：
 
 ```text
 http://127.0.0.1:3000
 ```
 
+## 演示账号
+
+| 角色 | 账号 | 密码 | 默认入口 |
+|---|---|---|---|
+| 管理员 | admin | admin123 | /admin |
+| 教师 | teacher1 | teacher123 | /teacher |
+| 学生 | student1 | student123 | /student |
+
 ## 数据库初始化
 
-数据库脚本位于 database 目录：
+数据库脚本位于 [`database`](database) 目录：
 
-- schema.sql：创建数据库和阶段 1 基础表。
-- seed.sql：写入演示角色、账号、科目、班级和 AI 提示词模板。
+- [`database/schema.sql`](database/schema.sql)：创建数据库、用户角色表、学生档案表、教师档案表、基础资料表、公告表和 AI 预留表。
+- [`database/seed.sql`](database/seed.sql)：写入演示角色、账号、档案、科目、班级、知识点、公告和 AI 提示词模板。
 
 建议数据库名：
 
@@ -150,4 +180,4 @@ AI_MOCK_ENABLED=true
 
 ## 主控文档
 
-所有后续开发以《第七组-在线考试系统项目主控文档.md》为主线推进，每完成一个阶段都应同步记录进度、验证结果和可写入实训报告的内容。
+所有后续开发以 [`第七组-在线考试系统项目主控文档.md`](第七组-在线考试系统项目主控文档.md) 为主线推进，每完成一个阶段都应同步记录进度、验证结果和可写入实训报告的内容。

@@ -1,17 +1,23 @@
 # 后端服务
 
-本目录为智慧在线考试与学习反馈系统后端服务，阶段 1 先提供最小 Spring Boot 骨架。
+本目录为智慧在线考试与学习反馈系统后端服务，当前已进入阶段 3：基础资料管理。
 
 ## 环境要求
 
 - JDK 17+
 - Maven 3.8+
-- MySQL 8，可选，阶段 1 未启动数据库时后端仍应能启动，健康接口会返回数据库未连接状态。
+- MySQL 8，可选；未启动数据库时后端仍可通过内置演示数据完成阶段 2 登录验证和阶段 3 基础资料演示，健康接口会返回数据库未连接状态。
 
 ## 启动命令
 
 ```bash
 mvn spring-boot:run
+```
+
+Windows 本地也可在项目根目录使用：
+
+```cmd
+scripts\run-backend.cmd
 ```
 
 ## 默认接口
@@ -20,6 +26,39 @@ mvn spring-boot:run
 |---|---|---|
 | GET | /api/health | 健康检查，包含应用、时间和数据库连通状态 |
 | GET | /api/ai/status | AI 配置状态，返回模拟模式、模型名、Base URL 和密钥配置状态，不返回明文密钥 |
+| GET | /api/auth/demo-users | 获取演示账号 |
+| POST | /api/auth/login | 登录并返回 Token、用户信息和角色菜单 |
+| GET | /api/auth/me | 获取当前用户信息，需要 Token |
+| GET | /api/auth/menus | 获取当前用户菜单，需要 Token |
+| POST | /api/auth/logout | 退出登录，需要 Token |
+| GET | /api/admin/overview | 管理员工作台，需要 ADMIN 角色 |
+| GET | /api/teacher/overview | 教师工作台，需要 TEACHER 角色 |
+| GET | /api/student/overview | 学生首页，需要 STUDENT 角色 |
+| GET | /api/basic/summary | 基础资料统计，需要登录 |
+| GET | /api/basic/classes | 班级列表，ADMIN、TEACHER 可访问 |
+| POST | /api/basic/classes | 新增班级，仅 ADMIN |
+| PUT | /api/basic/classes/{id} | 修改班级，仅 ADMIN |
+| DELETE | /api/basic/classes/{id} | 删除班级，仅 ADMIN |
+| GET | /api/basic/subjects | 科目列表，三类角色可访问 |
+| POST | /api/basic/subjects | 新增科目，ADMIN、TEACHER 可访问 |
+| PUT | /api/basic/subjects/{id} | 修改科目，ADMIN、TEACHER 可访问 |
+| DELETE | /api/basic/subjects/{id} | 删除科目，ADMIN、TEACHER 可访问 |
+| GET | /api/basic/knowledge-points | 知识点列表，三类角色可访问 |
+| POST | /api/basic/knowledge-points | 新增知识点，ADMIN、TEACHER 可访问 |
+| PUT | /api/basic/knowledge-points/{id} | 修改知识点，ADMIN、TEACHER 可访问 |
+| DELETE | /api/basic/knowledge-points/{id} | 删除知识点，ADMIN、TEACHER 可访问 |
+| GET | /api/basic/notices | 公告列表，三类角色可访问 |
+| POST | /api/basic/notices | 新增公告，ADMIN、TEACHER 可访问 |
+| PUT | /api/basic/notices/{id} | 修改公告，ADMIN、TEACHER 可访问 |
+| DELETE | /api/basic/notices/{id} | 删除公告，ADMIN、TEACHER 可访问 |
+
+## 演示账号
+
+| 角色 | 账号 | 密码 |
+|---|---|---|
+| 管理员 | admin | admin123 |
+| 教师 | teacher1 | teacher123 |
+| 学生 | student1 | student123 |
 
 ## 环境变量
 
@@ -36,4 +75,4 @@ mvn spring-boot:run
 
 ## 阶段说明
 
-阶段 1 不实现完整业务，只完成项目可启动、接口可访问、数据库连接可检查、AI 配置可读取。
+阶段 3 已在阶段 2 轻量 Token 会话、登录、退出、当前用户、角色菜单和角色工作台基础上，新增班级、科目、知识点和公告的基础资料接口。后续阶段可基于这些基础资料进入题库管理。
