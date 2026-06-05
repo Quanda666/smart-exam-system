@@ -27,7 +27,7 @@
 
 ## 当前阶段
 
-当前已完成阶段 4：题库管理。
+当前已完成阶段 5：试卷管理与规则组卷。
 
 本阶段已完成：
 
@@ -36,11 +36,13 @@
 3. 管理员、教师、学生三类角色专属工作台接口。
 4. 班级、科目、知识点、公告的基础资料接口。
 5. 题库管理接口，支持单选、多选、判断、填空、主观题维护、筛选、发布撤回和删除。
-6. 前端登录页、演示账号选择、登录状态保存、角色菜单和角色首页雏形。
-7. 前端基础资料管理页面，支持列表、筛选、新增、编辑、删除。
-8. 前端题库管理页面，支持多条件筛选、动态题型表单、选项维护、发布撤回。
-9. 数据库新增学生档案表、教师档案表、公告表、题目表、题目选项表，并将演示账号密码改为带盐 SHA-256 摘要。
-10. 后端测试和前端生产构建验证。
+6. 试卷管理接口，支持手动组卷、规则组卷、试卷预览、发布撤回。
+7. 前端登录页、演示账号选择、登录状态保存、角色菜单和角色首页雏形。
+8. 前端基础资料管理页面，支持列表、筛选、新增、编辑、删除。
+9. 前端题库管理页面，支持多条件筛选、动态题型表单、选项维护、发布撤回。
+10. 前端试卷管理页面，支持手动选题组卷和按规则自动组卷。
+11. 数据库新增学生档案表、教师档案表、公告表、题目表、题目选项表、试卷表、试卷题目关联表，并将演示账号密码改为带盐 SHA-256 摘要。
+12. 后端测试和前端生产构建验证。
 
 ## 目录结构
 
@@ -98,6 +100,13 @@ POST http://localhost:8080/api/questions
 PUT  http://localhost:8080/api/questions/{id}
 PUT  http://localhost:8080/api/questions/{id}/status
 DELETE http://localhost:8080/api/questions/{id}
+GET  http://localhost:8080/api/papers/summary
+GET  http://localhost:8080/api/papers
+POST http://localhost:8080/api/papers
+POST http://localhost:8080/api/papers/generate
+GET  http://localhost:8080/api/papers/{id}
+PUT  http://localhost:8080/api/papers/{id}
+DELETE http://localhost:8080/api/papers/{id}
 ```
 
 ## 前端快速启动
@@ -132,8 +141,8 @@ http://127.0.0.1:3000
 
 数据库脚本位于 [`database`](database) 目录：
 
-- [`database/schema.sql`](database/schema.sql)：创建数据库、用户角色表、学生档案表、教师档案表、基础资料表、公告表、题目表、题目选项表和 AI 预留表。
-- [`database/seed.sql`](database/seed.sql)：写入演示角色、账号、档案、科目、班级、知识点、公告、题库题目和 AI 提示词模板。
+- [`database/schema.sql`](database/schema.sql)：创建数据库、用户角色表、学生档案表、教师档案表、基础资料表、公告表、题目表、题目选项表、试卷表、试卷题目关联表和 AI 预留表。
+- [`database/seed.sql`](database/seed.sql)：写入演示角色、账号、档案、科目、班级、知识点、公告、题库题目、演示试卷和 AI 提示词模板。
 
 建议数据库名：
 

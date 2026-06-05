@@ -1,6 +1,6 @@
 # 接口设计记录
 
-本文件用于持续记录在线考试系统接口设计。当前已完成阶段 4 题库管理接口。
+本文件用于持续记录在线考试系统接口设计。当前已完成阶段 5 试卷管理与规则组卷。
 
 ## 通用响应结构
 
@@ -68,6 +68,40 @@
 | PUT | /api/questions/{id}/status | 发布或撤回题目，status 为 1 或 0 | ADMIN、TEACHER |
 | DELETE | /api/questions/{id} | 删除题目，当前为逻辑删除 | ADMIN、TEACHER |
 | GET | /api/questions/student-deny-check | 学生越权验证接口 | ADMIN、TEACHER |
+
+## 阶段 5 试卷接口
+
+| 方法 | 路径 | 说明 | 权限 |
+|---|---|---|---|
+| GET | /api/papers/summary | 获取试卷总数、发布数、草稿数和累计题量统计 | ADMIN、TEACHER |
+| GET | /api/papers | 查询试卷列表，支持 keyword、subjectId、status | ADMIN、TEACHER |
+| GET | /api/papers/{id} | 获取单份试卷详情，包含题目列表 | ADMIN、TEACHER |
+| POST | /api/papers | 手动组卷创建试卷 | ADMIN、TEACHER |
+| POST | /api/papers/generate | 按规则自动组卷并创建试卷 | ADMIN、TEACHER |
+| PUT | /api/papers/{id} | 修改试卷题目、分值和基础信息 | ADMIN、TEACHER |
+| PUT | /api/papers/{id}/status | 发布或撤回试卷，status 为 1 或 0 | ADMIN、TEACHER |
+| DELETE | /api/papers/{id} | 删除试卷，当前为逻辑删除 | ADMIN、TEACHER |
+
+## 阶段 5 请求示例
+
+规则组卷：
+
+```json
+{
+  "subjectId": 1,
+  "paperName": "Java程序设计自动组卷",
+  "description": "按题型和难度自动抽题",
+  "status": 0,
+  "rules": [
+    {
+      "questionType": "SINGLE_CHOICE",
+      "difficulty": "EASY",
+      "count": 1,
+      "score": 5
+    }
+  ]
+}
+```
 
 ## 阶段 4 请求示例
 
@@ -179,7 +213,7 @@
 
 - 用户与权限接口
 - 题库接口（阶段 4 已完成基础维护能力，后续组卷阶段继续复用）
-- 试卷接口
+- 试卷接口（阶段 5 已完成基础维护与组卷能力）
 - 考试任务接口
 - 学生答题接口
 - 阅卷接口

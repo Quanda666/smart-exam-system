@@ -1,12 +1,12 @@
 # 后端服务
 
-本目录为智慧在线考试与学习反馈系统后端服务，当前已进入阶段 4：题库管理。
+本目录为智慧在线考试与学习反馈系统后端服务，当前已进入阶段 5：试卷管理与规则组卷。
 
 ## 环境要求
 
 - JDK 17+
 - Maven 3.8+
-- MySQL 8，可选；未启动数据库时后端仍可通过内置演示数据完成阶段 2 登录验证、阶段 3 基础资料演示和阶段 4 题库演示，健康接口会返回数据库未连接状态。
+- MySQL 8，可选；未启动数据库时后端仍可通过内置演示数据完成阶段 2 登录验证、阶段 3 基础资料演示、阶段 4 题库演示和阶段 5 试卷演示，健康接口会返回数据库未连接状态。
 
 ## 启动命令
 
@@ -57,6 +57,13 @@ scripts\run-backend.cmd
 | PUT | /api/questions/{id} | 修改题目，ADMIN、TEACHER 可访问 |
 | PUT | /api/questions/{id}/status | 发布或撤回题目，ADMIN、TEACHER 可访问 |
 | DELETE | /api/questions/{id} | 删除题目，ADMIN、TEACHER 可访问 |
+| GET | /api/papers/summary | 试卷统计，ADMIN、TEACHER 可访问 |
+| GET | /api/papers | 试卷列表，支持关键词、科目、状态筛选 |
+| POST | /api/papers | 手动组卷创建试卷 |
+| POST | /api/papers/generate | 规则组卷创建试卷 |
+| GET | /api/papers/{id} | 获取试卷详情，含题目列表 |
+| PUT | /api/papers/{id} | 更新试卷题目、分值和基础信息 |
+| DELETE | /api/papers/{id} | 删除试卷，ADMIN、TEACHER 可访问 |
 
 ## 演示账号
 
@@ -81,4 +88,4 @@ scripts\run-backend.cmd
 
 ## 阶段说明
 
-阶段 4 已在阶段 3 基础资料基础上，新增题库管理接口，支持题目列表筛选、新增、编辑、发布撤回、删除、选项维护和学生越权拒绝。后续阶段可基于已发布题目进入试卷管理和规则组卷。
+阶段 5 已在阶段 4 题库管理基础上，新增试卷管理接口，支持手动组卷、规则组卷、试卷预览、发布撤回和删除。后续阶段可基于已发布试卷进入考试任务发布。
