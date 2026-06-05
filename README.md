@@ -103,6 +103,24 @@ http://127.0.0.1:3000
 smart_exam_system
 ```
 
+## 云端验证与部署
+
+为了减少对本地 Docker Desktop 和本地 MySQL 的依赖，项目已补充云端优先验证方案，详见 [`docs/cloud-deployment.md`](docs/cloud-deployment.md)。
+
+当前推荐优先级：
+
+1. 使用 GitHub Actions 的 MySQL 服务容器完成自动化验证。
+2. 使用 Railway 部署后端和 MySQL，作为接近真实环境的演示方案。
+3. 使用 Render、Koyeb、Fly.io 或 GitHub Codespaces 作为补充方案。
+
+相关配置：
+
+- [`backend/Dockerfile`](backend/Dockerfile)
+- [`frontend/Dockerfile`](frontend/Dockerfile)
+- [`frontend/nginx.conf`](frontend/nginx.conf)
+- [`docker-compose.yml`](docker-compose.yml)
+- [`.github/workflows/cloud-verify.yml`](.github/workflows/cloud-verify.yml)
+
 ## 辅助脚本
 
 Windows 环境可使用 [`scripts`](scripts) 目录下的脚本进行环境检查和启动：

@@ -16,6 +16,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Docker compose local state
+mysql-data/
+
 # Environment and local config
 .env
 .env.*

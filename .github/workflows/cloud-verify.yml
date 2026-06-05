@@ -1,0 +1,90 @@
+name: Cloud verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: smart_exam_system
+          TZ: Asia/Shanghai
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install MySQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mysql-client
+
+      - name: Initialize database
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -uroot -proot < database/schema.sql
+          mysql -h 127.0.0.1 -P 3306 -uroot -proot < database/seed.sql
+
+      - name: Backend tests
+        working-directory: backend
+        env:
+          MYSQL_URL: jdbc:mysql://127.0.0.1:3306/smart_exam_system?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+          MYSQL_USERNAME: root
+          MYSQL_PASSWORD: root
+          AI_MOCK_ENABLED: true
+        run: mvn -B test
+
+      - name: Start backend and verify APIs
+        working-directory: backend
+        env:
+          MYSQL_URL: jdbc:mysql://127.0.0.1:3306/smart_exam_system?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+          MYSQL_USERNAME: root
+          MYSQL_PASSWORD: root
+          AI_MOCK_ENABLED: true
+        run: |
+          nohup mvn -B spring-boot:run > backend.log 2>&1 &
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:8080/api/health; then
+              break
+            fi
+            sleep 3
+          done
+          HEALTH_JSON=$(curl -fsS http://127.0.0.1:8080/api/health)
+          echo "$HEALTH_JSON"
+          echo "$HEALTH_JSON" | grep '"connected":true'
+          curl -fsS http://127.0.0.1:8080/api/ai/status | grep '"mode":"MOCK"'
+
+      - name: Frontend build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
