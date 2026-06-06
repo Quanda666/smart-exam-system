@@ -227,6 +227,29 @@ CREATE TABLE IF NOT EXISTS answer_record (
   KEY idx_answer_record_question_id (question_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='学生答案记录表';
 
+CREATE TABLE IF NOT EXISTS review_record (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '批阅ID',
+  answer_record_id BIGINT NOT NULL COMMENT '答案记录ID',
+  reviewer_id BIGINT NOT NULL COMMENT '批阅教师ID',
+  score DECIMAL(8,2) NOT NULL COMMENT '得分',
+  comment TEXT NULL COMMENT '评语',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  UNIQUE KEY uk_review_answer (answer_record_id),
+  KEY idx_review_reviewer_id (reviewer_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='主观题批阅记录表';
+
+CREATE TABLE IF NOT EXISTS wrong_question_book (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '错题记录ID',
+  user_id BIGINT NOT NULL COMMENT '学生用户ID',
+  question_id BIGINT NOT NULL COMMENT '题目ID',
+  attempt_id BIGINT NOT NULL COMMENT '考试记录ID',
+  wrong_count INT NOT NULL DEFAULT 1 COMMENT '错误次数',
+  last_wrong_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '最近错误时间',
+  UNIQUE KEY uk_wrong_question_user_question (user_id, question_id),
+  KEY idx_wrong_question_user_id (user_id),
+  KEY idx_wrong_question_question_id (question_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='错题本';
+
 CREATE TABLE IF NOT EXISTS notice (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '公告ID',
   title VARCHAR(128) NOT NULL COMMENT '公告标题',

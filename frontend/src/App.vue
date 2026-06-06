@@ -106,6 +106,7 @@
         <BasicDataPanel v-if="isBasicPath && user" :path="currentPath" :role="user.primaryRole" />
         <QuestionBankPanel v-else-if="isQuestionBankPath && user" :role="user.primaryRole" />
         <PaperPanel v-else-if="isPaperPath && user" :role="user.primaryRole" />
+        <ReviewPanel v-else-if="isReviewPath && user" :role="user.primaryRole" />
 
         <template v-else>
         <section class="overview-grid">
@@ -191,6 +192,7 @@ import { ElMessage } from 'element-plus';
 import BasicDataPanel from './components/BasicDataPanel.vue';
 import QuestionBankPanel from './components/QuestionBankPanel.vue';
 import PaperPanel from './components/PaperPanel.vue';
+import ReviewPanel from './components/ReviewPanel.vue';
 import {
   fetchCurrentUser,
   fetchDemoUsers,
@@ -233,8 +235,9 @@ const isBasicPath = computed(() => currentPath.value.startsWith('/basic/'));
 const isQuestionBankPath = computed(() => currentPath.value === '/question-bank');
 
 const isPaperPath = computed(() => currentPath.value === '/papers');
+const isReviewPath = computed(() => currentPath.value === '/reviews');
 
-const isManagedModulePath = computed(() => isBasicPath.value || isQuestionBankPath.value || isPaperPath.value);
+const isManagedModulePath = computed(() => isBasicPath.value || isQuestionBankPath.value || isPaperPath.value || isReviewPath.value);
 
 const roleTagType = computed(() => {
   if (user.value?.primaryRole === 'ADMIN') return 'danger';
