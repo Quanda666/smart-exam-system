@@ -250,6 +250,27 @@ CREATE TABLE IF NOT EXISTS wrong_question_book (
   KEY idx_wrong_question_question_id (question_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='错题本';
 
+CREATE TABLE IF NOT EXISTS cheat_event (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '事件ID',
+  attempt_id BIGINT NOT NULL COMMENT '考试记录ID',
+  event_type VARCHAR(64) NOT NULL COMMENT '事件类型: SWITCH_TAB, LOSE_FOCUS, PASTE',
+  event_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '事件时间',
+  extra_info TEXT NULL COMMENT '附加信息',
+  KEY idx_cheat_event_attempt_id (attempt_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='考试异常事件表';
+
+CREATE TABLE IF NOT EXISTS operation_log (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '日志ID',
+  user_id BIGINT NULL COMMENT '操作用户ID',
+  username VARCHAR(64) NULL COMMENT '用户名',
+  operation VARCHAR(128) NOT NULL COMMENT '操作描述',
+  details TEXT NULL COMMENT '详细信息',
+  ip_address VARCHAR(64) NULL COMMENT 'IP地址',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  KEY idx_operation_log_user_id (user_id),
+  KEY idx_operation_log_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统操作日志表';
+
 CREATE TABLE IF NOT EXISTS notice (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '公告ID',
   title VARCHAR(128) NOT NULL COMMENT '公告标题',
