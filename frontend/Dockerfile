@@ -8,8 +8,10 @@ WORKDIR /app
 # Copy package files
 COPY package.json package-lock.json* ./
 
-# Clean install dependencies
-RUN npm ci --omit=dev --ignore-scripts || npm install --production
+# Install ALL dependencies — vite/vue-tsc build tools live in devDependencies,
+# so --omit=dev would break `npm run build`. node_modules stays in this build
+# stage and never reaches the nginx runner image.
+RUN npm ci --ignore-scripts || npm install --ignore-scripts
 
 # Copy source and build
 COPY . ./

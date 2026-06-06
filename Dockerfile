@@ -5,9 +5,11 @@
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
 
-# Copy package files and install dependencies with clean install
+# Copy package files and install ALL dependencies (build tools like vite/vue-tsc
+# live in devDependencies, so we must NOT use --omit=dev here). This is a build
+# stage only — the final runner image (Stage 3) never includes node_modules.
 COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm ci --omit=dev --ignore-scripts || npm install --production
+RUN npm ci --ignore-scripts || npm install --ignore-scripts
 
 # Copy source and build (Vue output goes to dist/)
 COPY frontend/ ./
@@ -59,5 +61,7 @@ ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOut
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:${PORT:-8080}/api/health || exit 1
 
-# Execute the jar with optimized JVM settings
-CMD java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -jar app.jar
+# Execute the jar with optimized JVM settings.
+# exec form + `exec` makes java PID 1 so it receives SIGTERM for graceful shutdown;
+# wrapped in sh -c so $JAVA_OPTS still expands.
+CMD ["sh", "-c", "exec java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -jar app.jar"]
