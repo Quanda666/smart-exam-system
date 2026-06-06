@@ -67,6 +67,56 @@ public class AnalysisService {
         return data;
     }
 
+    public Map<String, Object> teacherOverview(Long teacherId) {
+        JdbcTemplate jt = requireJdbcTemplate();
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("examCount", longValue(jt.queryForObject(
+                "SELECT COUNT(*) FROM exam WHERE deleted = 0 AND created_by = ?", Long.class, teacherId)));
+        data.put("paperCount", longValue(jt.queryForObject(
+                "SELECT COUNT(*) FROM paper WHERE deleted = 0 AND created_by = ?", Long.class, teacherId)));
+        data.put("questionCount", longValue(jt.queryForObject(
+                "SELECT COUNT(*) FROM question WHERE deleted = 0 AND created_by = ?", Long.class, teacherId)));
+        data.put("attemptCount", longValue(jt.queryForObject(
+                "SELECT COUNT(*) FROM exam_attempt ea JOIN exam e ON e.id = ea.exam_id WHERE e.created_by = ? AND e.deleted = 0",
+                Long.class, teacherId)));
+        data.put("completedCount", longValue(jt.queryForObject(
+                "SELECT COUNT(*) FROM exam_attempt ea JOIN exam e ON e.id = ea.exam_id WHERE e.created_by = ? AND e.deleted = 0 AND ea.status = 5",
+                Long.class, teacherId)));
+
+        Double avg = jt.queryForObject(
+                "SELECT COALESCE(AVG(ea.score), 0) FROM exam_attempt ea JOIN exam e ON e.id = ea.exam_id WHERE e.created_by = ? AND e.deleted = 0 AND ea.status = 5 AND ea.score IS NOT NULL",
+                Double.class, teacherId);
+        data.put("averageScore", avg == null ? 0d : Math.round(avg * 100.0) / 100.0);
+
+        data.put("subjectStats", jt.queryForList("""
+                SELECT s.subject_name AS subjectName, COUNT(DISTINCT e.id) AS examCount,
+                       COUNT(ea.id) AS attemptCount, COALESCE(ROUND(AVG(ea.score), 2), 0) AS avgScore
+                FROM exam e
+                JOIN paper p ON p.id = e.paper_id
+                JOIN edu_subject s ON s.id = p.subject_id
+                LEFT JOIN exam_attempt ea ON ea.exam_id = e.id AND ea.status = 5
+                WHERE e.created_by = ? AND e.deleted = 0
+                GROUP BY s.id, s.subject_name
+                ORDER BY s.id
+                """, teacherId));
+
+        data.put("scoreDistribution", jt.queryForMap("""
+                SELECT COALESCE(SUM(CASE WHEN ea.score < 60 THEN 1 ELSE 0 END), 0) AS belowSixty,
+                       COALESCE(SUM(CASE WHEN ea.score >= 60 AND ea.score < 70 THEN 1 ELSE 0 END), 0) AS sixtyToSeventy,
+                       COALESCE(SUM(CASE WHEN ea.score >= 70 AND ea.score < 80 THEN 1 ELSE 0 END), 0) AS seventyToEighty,
+                       COALESCE(SUM(CASE WHEN ea.score >= 80 AND ea.score < 90 THEN 1 ELSE 0 END), 0) AS eightyToNinety,
+                       COALESCE(SUM(CASE WHEN ea.score >= 90 THEN 1 ELSE 0 END), 0) AS ninetyToHundred
+                FROM exam_attempt ea JOIN exam e ON e.id = ea.exam_id
+                WHERE e.created_by = ? AND e.deleted = 0 AND ea.status = 5 AND ea.score IS NOT NULL
+                """, teacherId));
+
+        return data;
+    }
+
+    private long longValue(Long value) {
+        return value == null ? 0L : value;
+    }
+
     private long count(JdbcTemplate jt, String sql) {
         Long value = jt.queryForObject(sql, Long.class);
         return value == null ? 0L : value;

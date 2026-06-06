@@ -152,7 +152,7 @@
         <SystemLog v-else-if="isLogPath && user" />
         <ExamAnalysis v-else-if="isAnalysisPath && user" />
         <ExamManagement v-else-if="isExamTaskPath && user" />
-        <ExamAnalysis v-else-if="isTeacherAnalysisPath && user" />
+        <ExamAnalysis v-else-if="isTeacherAnalysisPath && user" scope="teacher" />
         <StudentPanel v-else-if="isStudentModulePath && user" :path="currentPath" />
 
         <template v-else>
@@ -221,19 +221,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, defineAsyncComponent, onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import BasicDataPanel from './components/BasicDataPanel.vue';
-import QuestionBankPanel from './components/QuestionBankPanel.vue';
-import PaperPanel from './components/PaperPanel.vue';
-import ReviewPanel from './components/ReviewPanel.vue';
-import ExamTaking from './components/ExamTaking.vue';
-import StudentPanel from './components/StudentPanel.vue';
-import UserManagement from './components/UserManagement.vue';
-import RoleManagement from './components/RoleManagement.vue';
-import SystemLog from './components/SystemLog.vue';
-import ExamAnalysis from './components/ExamAnalysis.vue';
-import ExamManagement from './components/ExamManagement.vue';
+const BasicDataPanel = defineAsyncComponent(() => import('./components/BasicDataPanel.vue'));
+const QuestionBankPanel = defineAsyncComponent(() => import('./components/QuestionBankPanel.vue'));
+const PaperPanel = defineAsyncComponent(() => import('./components/PaperPanel.vue'));
+const ReviewPanel = defineAsyncComponent(() => import('./components/ReviewPanel.vue'));
+const ExamTaking = defineAsyncComponent(() => import('./components/ExamTaking.vue'));
+const StudentPanel = defineAsyncComponent(() => import('./components/StudentPanel.vue'));
+const UserManagement = defineAsyncComponent(() => import('./components/UserManagement.vue'));
+const RoleManagement = defineAsyncComponent(() => import('./components/RoleManagement.vue'));
+const SystemLog = defineAsyncComponent(() => import('./components/SystemLog.vue'));
+const ExamAnalysis = defineAsyncComponent(() => import('./components/ExamAnalysis.vue'));
+const ExamManagement = defineAsyncComponent(() => import('./components/ExamManagement.vue'));
 import {
   fetchCurrentUser,
   fetchRegisterOptions,

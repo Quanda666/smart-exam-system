@@ -108,3 +108,7 @@ export function listOperationLogs() {
 export function fetchAnalysisOverview() {
   return getJson<AnalysisOverview>('/api/analysis/overview');
 }
+
+export function fetchTeacherAnalysis() {
+  return getJson<AnalysisOverview>('/api/analysis/teacher');
+}

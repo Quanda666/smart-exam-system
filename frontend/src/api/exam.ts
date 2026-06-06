@@ -1,4 +1,4 @@
-import { getJson, postJson } from './request';
+import { deleteJson, getJson, postJson, putJson } from './request';
 import type { PaperInfo, PaperQuestionInfo } from './paper';
 import type { QuestionOption } from './question';
 
@@ -64,6 +64,26 @@ export function listStudentExams() {
 
 export function createExam(payload: ExamPayload) {
   return postJson<ExamInfo, ExamPayload>('/api/exams', payload);
+}
+
+export interface ExamUpdatePayload {
+  examName: string;
+  description: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+}
+
+export function updateExam(id: number, payload: ExamUpdatePayload) {
+  return putJson<ExamInfo, ExamUpdatePayload>(`/api/exams/${id}`, payload);
+}
+
+export function deleteExam(id: number) {
+  return deleteJson<{ id: number; deleted: boolean }>(`/api/exams/${id}`);
+}
+
+export function closeExam(id: number) {
+  return putJson<{ id: number }>(`/api/exams/${id}/close`);
 }
 
 export function startExam(attemptId: number) {

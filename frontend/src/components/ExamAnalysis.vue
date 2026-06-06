@@ -1,29 +1,29 @@
 <template>
   <section v-loading="loading" class="exam-analysis">
     <div class="summary-grid">
-      <div class="summary-card"><span>用户数</span><strong>{{ overview?.userCount ?? 0 }}</strong></div>
-      <div class="summary-card"><span>题目数</span><strong>{{ overview?.questionCount ?? 0 }}</strong></div>
-      <div class="summary-card"><span>试卷数</span><strong>{{ overview?.paperCount ?? 0 }}</strong></div>
-      <div class="summary-card"><span>考试数</span><strong>{{ overview?.examCount ?? 0 }}</strong></div>
+      <div v-if="!isTeacher" class="summary-card"><span>用户数</span><strong>{{ overview?.userCount ?? 0 }}</strong></div>
+      <div class="summary-card"><span>{{ isTeacher ? '我的题目' : '题目数' }}</span><strong>{{ overview?.questionCount ?? 0 }}</strong></div>
+      <div class="summary-card"><span>{{ isTeacher ? '我的试卷' : '试卷数' }}</span><strong>{{ overview?.paperCount ?? 0 }}</strong></div>
+      <div class="summary-card"><span>{{ isTeacher ? '我的考试' : '考试数' }}</span><strong>{{ overview?.examCount ?? 0 }}</strong></div>
       <div class="summary-card"><span>参考人次</span><strong>{{ overview?.attemptCount ?? 0 }}</strong></div>
       <div class="summary-card"><span>已完成</span><strong>{{ overview?.completedCount ?? 0 }}</strong></div>
       <div class="summary-card"><span>平均分</span><strong class="text-primary">{{ overview?.averageScore ?? 0 }}</strong></div>
     </div>
 
-    <div class="chart-row">
+    <div :class="['chart-row', { 'chart-row--single': isTeacher }]">
       <el-card shadow="never" class="chart-card">
         <template #header>分数段分布（已完成考试）</template>
         <div v-show="hasScoreData" ref="scoreChartRef" class="chart"></div>
         <el-empty v-if="!loading && !hasScoreData" description="暂无已完成的考试成绩" :image-size="80" />
       </el-card>
-      <el-card shadow="never" class="chart-card">
+      <el-card v-if="!isTeacher" shadow="never" class="chart-card">
         <template #header>角色用户分布</template>
         <div ref="roleChartRef" class="chart"></div>
       </el-card>
     </div>
 
     <el-card shadow="never">
-      <template #header>各科目考试与平均分</template>
+      <template #header>{{ isTeacher ? '我的各科考试与平均分' : '各科目考试与平均分' }}</template>
       <el-table :data="overview?.subjectStats || []" border>
         <el-table-column prop="subjectName" label="科目" min-width="160" />
         <el-table-column prop="examCount" label="考试数" width="120" />
@@ -41,7 +41,10 @@
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import * as echarts from 'echarts';
-import { fetchAnalysisOverview, type AnalysisOverview } from '../api/admin';
+import { fetchAnalysisOverview, fetchTeacherAnalysis, type AnalysisOverview } from '../api/admin';
+
+const props = defineProps<{ scope?: 'global' | 'teacher' }>();
+const isTeacher = computed(() => props.scope === 'teacher');
 
 const overview = ref<AnalysisOverview | null>(null);
 const loading = ref(false);
@@ -58,10 +61,13 @@ onMounted(load);
 async function load() {
   loading.value = true;
   try {
-    overview.value = (await fetchAnalysisOverview()).data;
+    const response = isTeacher.value ? await fetchTeacherAnalysis() : await fetchAnalysisOverview();
+    overview.value = response.data;
     await nextTick();
     renderScoreChart();
-    renderRoleChart();
+    if (!isTeacher.value) {
+      renderRoleChart();
+    }
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '成绩分析加载失败');
   } finally {
@@ -142,6 +148,9 @@ function renderRoleChart() {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+}
+.chart-row--single {
+  grid-template-columns: 1fr;
 }
 .chart {
   width: 100%;

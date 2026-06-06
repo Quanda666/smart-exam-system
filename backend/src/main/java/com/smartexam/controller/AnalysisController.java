@@ -1,6 +1,7 @@
 package com.smartexam.controller;
 
 import com.smartexam.common.ApiResponse;
+import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.service.AnalysisService;
 import com.smartexam.service.RoleAccessService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,5 +26,11 @@ public class AnalysisController {
     public ApiResponse<Map<String, Object>> overview() {
         roleAccessService.requireAnyRole("ADMIN", "TEACHER");
         return ApiResponse.ok(analysisService.overview());
+    }
+
+    @GetMapping("/teacher")
+    public ApiResponse<Map<String, Object>> teacherOverview() {
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        return ApiResponse.ok(analysisService.teacherOverview(user.getId()));
     }
 }

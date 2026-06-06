@@ -2,6 +2,7 @@ package com.smartexam.service;
 
 import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.dto.exam.ExamRequest;
+import com.smartexam.dto.exam.ExamUpdateRequest;
 import com.smartexam.exception.DatabaseUnavailableException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -46,7 +47,7 @@ public class ExamService {
             JOIN exam e ON e.id = a.exam_id
             JOIN paper p ON p.id = e.paper_id
             JOIN edu_subject s ON s.id = p.subject_id
-            WHERE a.user_id = ?
+            WHERE a.user_id = ? AND e.deleted = 0
             ORDER BY e.start_time DESC
             """, user.getId());
     }
@@ -170,6 +171,49 @@ public class ExamService {
         jdbcTemplate.update("UPDATE exam_attempt SET score = ?, status = ? WHERE id = ?", totalScore, finalStatus, attemptId);
         
         return Map.of("success", true, "message", "交卷成功", "score", totalScore, "status", finalStatus);
+    }
+
+    public Map<String, Object> updateExam(Long id, ExamUpdateRequest request, AuthUser user) {
+        if (request.getStartTime().isAfter(request.getEndTime())) {
+            throw new IllegalArgumentException("开始时间不能晚于结束时间");
+        }
+        requireOwnedExam(id, user);
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        jdbcTemplate.update("""
+                UPDATE exam SET exam_name = ?, description = ?, start_time = ?, end_time = ?, duration_minutes = ?
+                WHERE id = ? AND deleted = 0
+                """, request.getExamName(), request.getDescription(), request.getStartTime(),
+                request.getEndTime(), request.getDurationMinutes(), id);
+        return getExamById(id);
+    }
+
+    public void deleteExam(Long id, AuthUser user) {
+        requireOwnedExam(id, user);
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        jdbcTemplate.update("UPDATE exam SET deleted = 1 WHERE id = ? AND deleted = 0", id);
+        jdbcTemplate.update("DELETE FROM exam_attempt WHERE exam_id = ? AND status = 0", id);
+    }
+
+    public void closeExam(Long id, AuthUser user) {
+        requireOwnedExam(id, user);
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        jdbcTemplate.update("UPDATE exam SET end_time = NOW() WHERE id = ? AND deleted = 0", id);
+    }
+
+    private void requireOwnedExam(Long id, AuthUser user) {
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT created_by FROM exam WHERE id = ? AND deleted = 0", id);
+        if (rows.isEmpty()) {
+            throw new IllegalArgumentException("考试不存在");
+        }
+        if (user.hasRole("ADMIN")) {
+            return;
+        }
+        Object createdBy = rows.get(0).get("created_by");
+        if (createdBy == null || !createdBy.toString().equals(String.valueOf(user.getId()))) {
+            throw new IllegalArgumentException("只能操作本人创建的考试");
+        }
     }
 
     private JdbcTemplate requireJdbcTemplate() {
