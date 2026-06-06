@@ -1,5 +1,6 @@
 package com.smartexam.service;
 
+import com.smartexam.auth.LoginAttemptGuard;
 import com.smartexam.auth.TokenSession;
 import com.smartexam.auth.TokenStore;
 import com.smartexam.exception.DatabaseUnavailableException;
@@ -28,24 +29,33 @@ public class AuthService {
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
     private final TokenStore tokenStore;
     private final MenuService menuService;
+    private final LoginAttemptGuard loginAttemptGuard;
 
-    public AuthService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider, TokenStore tokenStore, MenuService menuService) {
+    public AuthService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider, TokenStore tokenStore, MenuService menuService,
+                       LoginAttemptGuard loginAttemptGuard) {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
         this.tokenStore = tokenStore;
         this.menuService = menuService;
+        this.loginAttemptGuard = loginAttemptGuard;
     }
 
     public LoginResponse login(LoginRequest request) {
-        Map<String, Object> userRow = findUserRow(request.getUsername());
+        String username = request.getUsername();
+        loginAttemptGuard.assertNotLocked(username);
+
+        Map<String, Object> userRow = findUserRow(username);
         if (userRow == null) {
+            loginAttemptGuard.recordFailure(username);
             throw new IllegalArgumentException("账号或密码错误");
         }
 
         String passwordHash = stringValue(userRow.get("password_hash"));
         if (!PasswordHashUtil.matches(request.getPassword(), passwordHash)) {
+            loginAttemptGuard.recordFailure(username);
             throw new IllegalArgumentException("账号或密码错误");
         }
 
+        loginAttemptGuard.recordSuccess(username);
         AuthUser user = buildAuthUser(userRow);
         TokenSession session = tokenStore.create(user);
         List<MenuItem> menus = menuService.menusFor(user);
@@ -62,18 +72,20 @@ public class AuthService {
         validateRegisterRequest(request, username, realName, roleType);
         ensureUsernameAvailable(jdbcTemplate, username);
         Long roleId = findRoleId(jdbcTemplate, roleType);
+        int initialStatus = "STUDENT".equals(roleType) ? 1 : 0; // 教师账号需管理员审核后启用
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement("""
                     INSERT INTO sys_user (username, password_hash, real_name, phone, email, status)
-                    VALUES (?, ?, ?, ?, ?, 1)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """, Statement.RETURN_GENERATED_KEYS);
             statement.setString(1, username);
             statement.setString(2, PasswordHashUtil.encode(request.getPassword()));
             statement.setString(3, realName);
             statement.setString(4, blankToNull(request.getPhone()));
             statement.setString(5, blankToNull(request.getEmail()));
+            statement.setInt(6, initialStatus);
             return statement;
         }, keyHolder);
 
@@ -97,10 +109,14 @@ public class AuthService {
                     """, userId, trim(request.getTeacherNo()), blankToNull(request.getTitle()), blankToNull(request.getIntroduction()));
         }
 
-        LoginRequest loginRequest = new LoginRequest();
-        loginRequest.setUsername(username);
-        loginRequest.setPassword(request.getPassword());
-        return login(loginRequest);
+        if ("STUDENT".equals(roleType)) {
+            LoginRequest loginRequest = new LoginRequest();
+            loginRequest.setUsername(username);
+            loginRequest.setPassword(request.getPassword());
+            return login(loginRequest);
+        }
+        // 教师账号需管理员审核启用后才能登录，此处不自动登录，返回空响应（token 为 null）
+        return new LoginResponse();
     }
 
     public Map<String, Object> registerOptions() {

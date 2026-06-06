@@ -408,9 +408,13 @@ async function handleRegister() {
   registerLoading.value = true;
   try {
     const response = await register(payload);
-    if (response.data.token) {
-      setToken(response.data.token);
+    if (!response.data.token) {
+      // 教师账号需管理员审核启用，注册后不自动登录
+      ElMessage.success('注册成功！教师账号需管理员审核启用后方可登录');
+      isRegisterMode.value = false;
+      return;
     }
+    setToken(response.data.token);
     user.value = response.data.user;
     menus.value = response.data.menus;
     navigateTo(resolveLandingPath(response.data.defaultPath), 'replace');
