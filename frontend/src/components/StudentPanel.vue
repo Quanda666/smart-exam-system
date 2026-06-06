@@ -67,7 +67,16 @@ import * as echarts from 'echarts';
 import ExamList from './ExamList.vue';
 import ExamTaking from './ExamTaking.vue';
 
-const activeTab = ref('exams');
+const props = defineProps<{ path?: string }>();
+
+function tabFromPath(path?: string) {
+  if (!path) return 'exams';
+  if (path.includes('results')) return 'grades';
+  if (path.includes('wrong-questions')) return 'wrong-questions';
+  return 'exams';
+}
+
+const activeTab = ref(tabFromPath(props.path));
 const grades = ref<GradeInfo[]>([]);
 const wrongQuestions = ref<WrongQuestion[]>([]);
 const masteryData = ref<Record<string, number>>({});
@@ -89,6 +98,13 @@ watch(activeTab, (newTab) => {
       break;
   }
 });
+
+watch(
+  () => props.path,
+  (path) => {
+    activeTab.value = tabFromPath(path);
+  }
+);
 
 async function loadGrades() {
   if (grades.value.length > 0) return;

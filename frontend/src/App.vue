@@ -153,7 +153,7 @@
         <ExamAnalysis v-else-if="isAnalysisPath && user" />
         <ExamManagement v-else-if="isExamTaskPath && user" />
         <ExamAnalysis v-else-if="isTeacherAnalysisPath && user" />
-        <StudentPanel v-else-if="user?.primaryRole === 'STUDENT'" />
+        <StudentPanel v-else-if="isStudentModulePath && user" :path="currentPath" />
 
         <template v-else>
         <section class="overview-grid">
@@ -299,8 +299,9 @@ const isLogPath = computed(() => currentPath.value === '/monitor/logs');
 const isAnalysisPath = computed(() => currentPath.value === '/exam/analysis');
 const isExamTaskPath = computed(() => currentPath.value === '/exam-tasks');
 const isTeacherAnalysisPath = computed(() => currentPath.value === '/teacher/analysis');
+const isStudentModulePath = computed(() => ['/student/exams', '/student/results', '/student/wrong-questions'].includes(currentPath.value));
 
-const isManagedModulePath = computed(() => isBasicPath.value || isQuestionBankPath.value || isPaperPath.value || isReviewPath.value || isUserPath.value || isRolePath.value || isLogPath.value || isAnalysisPath.value || isExamTaskPath.value || isTeacherAnalysisPath.value);
+const isManagedModulePath = computed(() => isBasicPath.value || isQuestionBankPath.value || isPaperPath.value || isReviewPath.value || isUserPath.value || isRolePath.value || isLogPath.value || isAnalysisPath.value || isExamTaskPath.value || isTeacherAnalysisPath.value || isStudentModulePath.value);
 
 const roleTagType = computed(() => {
   if (user.value?.primaryRole === 'ADMIN') return 'danger';
