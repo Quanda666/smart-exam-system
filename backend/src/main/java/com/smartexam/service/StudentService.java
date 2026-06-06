@@ -79,7 +79,8 @@ public class StudentService {
             FROM answer_record ar 
             JOIN exam_attempt ea ON ar.attempt_id = ea.id 
             JOIN question q ON ar.question_id = q.id 
-            JOIN paper_question pq ON q.id = pq.question_id AND ea.exam_id = pq.paper_id
+            JOIN exam e ON e.id = ea.exam_id
+            JOIN paper_question pq ON pq.question_id = q.id AND pq.paper_id = e.paper_id
             JOIN edu_knowledge_point kp ON q.knowledge_point_id = kp.id 
             WHERE ea.user_id = ? AND q.knowledge_point_id IS NOT NULL
             GROUP BY q.knowledge_point_id, kp.point_name

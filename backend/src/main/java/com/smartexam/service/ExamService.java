@@ -66,7 +66,11 @@ public class ExamService {
             jdbcTemplate.update("INSERT INTO exam_class (exam_id, class_id) VALUES (?, ?)", examId, classId);
         }
         
-        List<Long> studentIds = jdbcTemplate.queryForList("SELECT user_id FROM student_profile WHERE class_id IN (?)", Long.class, request.getClassIds());
+        java.util.Set<Long> studentIds = new java.util.LinkedHashSet<>();
+        for (Long classId : request.getClassIds()) {
+            studentIds.addAll(jdbcTemplate.queryForList(
+                    "SELECT user_id FROM student_profile WHERE class_id = ? AND deleted = 0", Long.class, classId));
+        }
         for (Long studentId : studentIds) {
             jdbcTemplate.update("INSERT INTO exam_attempt (exam_id, user_id, status) VALUES (?, ?, 0)", examId, studentId);
         }
@@ -143,7 +147,12 @@ public class ExamService {
             if (List.of("SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE").contains(questionType)) {
                 isCorrect = answer != null && answer.equalsIgnoreCase(correctAnswer);
                 if(isCorrect) {
-                    Map<String,Object> pq = jdbcTemplate.queryForMap("SELECT score FROM paper_question pq JOIN exam_attempt ea ON ea.exam_id=pq.paper_id WHERE ea.id=? AND pq.question_id = ?", attemptId, questionId);
+                    Map<String,Object> pq = jdbcTemplate.queryForMap("""
+                            SELECT pq.score FROM paper_question pq
+                            JOIN exam e ON e.paper_id = pq.paper_id
+                            JOIN exam_attempt ea ON ea.exam_id = e.id
+                            WHERE ea.id = ? AND pq.question_id = ?
+                            """, attemptId, questionId);
                     score = (BigDecimal)pq.get("score");
                 }
                 reviewStatus = 1;

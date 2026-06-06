@@ -151,6 +151,8 @@
         <RoleManagement v-else-if="isRolePath && user" />
         <SystemLog v-else-if="isLogPath && user" />
         <ExamAnalysis v-else-if="isAnalysisPath && user" />
+        <ExamManagement v-else-if="isExamTaskPath && user" />
+        <ExamAnalysis v-else-if="isTeacherAnalysisPath && user" />
         <StudentPanel v-else-if="user?.primaryRole === 'STUDENT'" />
 
         <template v-else>
@@ -231,6 +233,7 @@ import UserManagement from './components/UserManagement.vue';
 import RoleManagement from './components/RoleManagement.vue';
 import SystemLog from './components/SystemLog.vue';
 import ExamAnalysis from './components/ExamAnalysis.vue';
+import ExamManagement from './components/ExamManagement.vue';
 import {
   fetchCurrentUser,
   fetchRegisterOptions,
@@ -294,8 +297,10 @@ const isUserPath = computed(() => currentPath.value === '/system/users');
 const isRolePath = computed(() => currentPath.value === '/system/roles');
 const isLogPath = computed(() => currentPath.value === '/monitor/logs');
 const isAnalysisPath = computed(() => currentPath.value === '/exam/analysis');
+const isExamTaskPath = computed(() => currentPath.value === '/exam-tasks');
+const isTeacherAnalysisPath = computed(() => currentPath.value === '/teacher/analysis');
 
-const isManagedModulePath = computed(() => isBasicPath.value || isQuestionBankPath.value || isPaperPath.value || isReviewPath.value || isUserPath.value || isRolePath.value || isLogPath.value || isAnalysisPath.value);
+const isManagedModulePath = computed(() => isBasicPath.value || isQuestionBankPath.value || isPaperPath.value || isReviewPath.value || isUserPath.value || isRolePath.value || isLogPath.value || isAnalysisPath.value || isExamTaskPath.value || isTeacherAnalysisPath.value);
 
 const roleTagType = computed(() => {
   if (user.value?.primaryRole === 'ADMIN') return 'danger';
