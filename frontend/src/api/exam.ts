@@ -48,6 +48,8 @@ export interface ExamDetail extends PaperInfo {
   examName: string;
   durationMinutes: number;
   questions: Array<PaperQuestionInfo & { options: QuestionOption[] }>;
+  remainingSeconds?: number;
+  draftAnswers?: string | null;
 }
 
 export function listTeacherExams(query?: { keyword?: string; status?: number | null }) {
@@ -94,5 +96,12 @@ export function submitExam(attemptId: number, payload: AnswerPayload) {
   return postJson<{ success: boolean; message: string; score: number; status: number }, AnswerPayload>(
     `/api/exams/attempt/${attemptId}/submit`,
     payload
+  );
+}
+
+export function saveExamDraft(attemptId: number, answersJson: string) {
+  return postJson<{ saved: boolean }, { answers: string }>(
+    `/api/exams/attempt/${attemptId}/save`,
+    { answers: answersJson }
   );
 }

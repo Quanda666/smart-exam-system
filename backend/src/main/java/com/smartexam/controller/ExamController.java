@@ -3,6 +3,7 @@ package com.smartexam.controller;
 import com.smartexam.common.ApiResponse;
 import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.dto.exam.AnswerRequest;
+import com.smartexam.dto.exam.DraftRequest;
 import com.smartexam.dto.exam.ExamRequest;
 import com.smartexam.dto.exam.ExamUpdateRequest;
 import com.smartexam.service.ExamService;
@@ -82,5 +83,12 @@ public class ExamController {
     public ApiResponse<Map<String, Object>> submitExam(@PathVariable Long attemptId, @Valid @RequestBody AnswerRequest request) {
         AuthUser user = roleAccessService.requireRole("STUDENT");
         return ApiResponse.ok(examService.submitExam(attemptId, request.getAnswers(), user));
+    }
+
+    @PostMapping("/attempt/{attemptId}/save")
+    public ApiResponse<Map<String, Object>> saveDraft(@PathVariable Long attemptId, @RequestBody DraftRequest request) {
+        AuthUser user = roleAccessService.requireRole("STUDENT");
+        examService.saveDraft(attemptId, request.getAnswers(), user);
+        return ApiResponse.ok(Map.of("saved", true));
     }
 }

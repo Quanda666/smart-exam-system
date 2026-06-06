@@ -304,6 +304,17 @@ CREATE TABLE IF NOT EXISTS operation_log (
   KEY idx_oplog_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作日志';
 
+-- ---------- 答题草稿（自动暂存，支持刷新/断线后恢复作答） ----------
+
+CREATE TABLE IF NOT EXISTS exam_answer_draft (
+  id         BIGINT   NOT NULL AUTO_INCREMENT,
+  attempt_id BIGINT   NOT NULL,
+  answers    TEXT     COMMENT '前端答案 JSON 快照',
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_draft_attempt (attempt_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='答题草稿（自动暂存）';
+
 -- ---------- AI 预留（当前后端未直接读写，按主控文档预置结构） ----------
 
 CREATE TABLE IF NOT EXISTS ai_provider_config (

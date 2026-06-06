@@ -60,7 +60,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { startExam, submitExam, type ExamDetail } from '../api/exam';
+import { startExam, submitExam, saveExamDraft, type ExamDetail } from '../api/exam';
 import type { PaperQuestionInfo as QuestionInExam } from '../api/paper';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { AlarmClock } from '@element-plus/icons-vue';
@@ -76,6 +76,7 @@ const currentQuestionIndex = ref(0);
 const answers = ref<Record<number, any>>({});
 const timeLeft = ref(0);
 let timer: any;
+let autoSaveTimer: any;
 
 const currentQuestion = computed(() => examDetails.value?.questions[currentQuestionIndex.value]);
 
@@ -89,8 +90,20 @@ onMounted(async () => {
   try {
     const response = await startExam(props.attemptId);
     examDetails.value = response.data;
-    timeLeft.value = (examDetails.value?.durationMinutes || 0) * 60;
+    // 恢复已暂存的草稿答案（刷新/断线重进后不丢作答）
+    if (response.data.draftAnswers) {
+      try {
+        answers.value = JSON.parse(response.data.draftAnswers);
+      } catch (e) {
+        // 草稿解析失败则忽略，按空白开始
+      }
+    }
+    // 优先使用服务端剩余时间（基于开始时间计算），刷新不重置、也无法靠刷新刷时长
+    timeLeft.value = response.data.remainingSeconds != null
+      ? response.data.remainingSeconds
+      : (examDetails.value?.durationMinutes || 0) * 60;
     startTimer();
+    startAutoSave();
   } catch (error) {
     ElMessage.error('进入考试失败，可能考试已结束或您已参加过');
   }
@@ -98,6 +111,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   clearInterval(timer);
+  clearInterval(autoSaveTimer);
 });
 
 const startTimer = () => {
@@ -109,6 +123,14 @@ const startTimer = () => {
       submit(true);
     }
   }, 1000);
+};
+
+const startAutoSave = () => {
+  autoSaveTimer = setInterval(() => {
+    saveExamDraft(props.attemptId, JSON.stringify(answers.value)).catch(() => {
+      // 自动暂存失败静默忽略，不打断答题
+    });
+  }, 20000);
 };
 
 const isObjective = (type: string | undefined) => !!type && ['SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'TRUE_FALSE'].includes(type);
@@ -139,6 +161,7 @@ const confirmSubmit = () => {
 
 const submit = async (autoSubmit: boolean) => {
   clearInterval(timer);
+  clearInterval(autoSaveTimer);
   try {
     const finalAnswers = { ...answers.value };
     // Process checkbox answers
