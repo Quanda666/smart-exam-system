@@ -86,7 +86,11 @@ jobs:
           LOGIN_JSON=$(curl -fsS -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin123"}')
           echo "$LOGIN_JSON" | grep '"primaryRole":"ADMIN"'
           TOKEN=$(echo "$LOGIN_JSON" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
-          test -n "$TOKEN"
+          TCH_LOGIN=$(curl -fsS -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: application/json' -d '{"username":"teacher1","password":"teacher123"}')
+          TCH_TOKEN=$(echo "$TCH_LOGIN" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+          STU_LOGIN=$(curl -fsS -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: application/json' -d '{"username":"student1","password":"student123"}')
+          STU_TOKEN=$(echo "$STU_LOGIN" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+          test -n "$TOKEN" && test -n "$TCH_TOKEN" && test -n "$STU_TOKEN"
           curl -fsS http://127.0.0.1:8080/api/auth/me -H "Authorization: Bearer $TOKEN" | grep '"username":"admin"'
           curl -fsS http://127.0.0.1:8080/api/admin/overview -H "Authorization: Bearer $TOKEN" | grep '"role":"ADMIN"'
           curl -fsS http://127.0.0.1:8080/api/basic/summary -H "Authorization: Bearer $TOKEN" | grep '"subjects"'
@@ -98,6 +102,18 @@ jobs:
           STUDENT_STATUS=$(curl -s -o /tmp/student-forbidden.json -w '%{http_code}' http://127.0.0.1:8080/api/student/overview -H "Authorization: Bearer $TOKEN")
           test "$STUDENT_STATUS" = "403"
           grep '"code":"FORBIDDEN"' /tmp/student-forbidden.json
+          # 阶段5-10接口
+          curl -fsS http://127.0.0.1:8080/api/papers/summary -H "Authorization: Bearer $TCH_TOKEN" | grep '"total"'
+          curl -fsS http://127.0.0.1:8080/api/exams/teacher -H "Authorization: Bearer $TCH_TOKEN"
+          curl -fsS http://127.0.0.1:8080/api/exams/student -H "Authorization: Bearer $STU_TOKEN"
+          curl -fsS http://127.0.0.1:8080/api/reviews/pending -H "Authorization: Bearer $TCH_TOKEN"
+          curl -fsS http://127.0.0.1:8080/api/student/grades -H "Authorization: Bearer $STU_TOKEN"
+          curl -fsS http://127.0.0.1:8080/api/student/wrong-questions -H "Authorization: Bearer $STU_TOKEN"
+          curl -fsS http://127.0.0.1:8080/api/student/mastery -H "Authorization: Bearer $STU_TOKEN"
+          curl -fsS http://127.0.0.1:8080/api/monitor/logs -H "Authorization: Bearer $TOKEN"
+          curl -fsS -X POST http://127.0.0.1:8080/api/ai/generate-question -H "Authorization: Bearer $TCH_TOKEN" -H 'Content-Type: application/json' -d '{"subject":"Java","questionType":"SINGLE_CHOICE","difficulty":"EASY","count":1}'
+          curl -fsS -X POST http://127.0.0.1:8080/api/ai/explain -H "Authorization: Bearer $STU_TOKEN" -H 'Content-Type: application/json' -d '{"text":"HashMap"}'
+          curl -fsS -X POST http://127.0.0.1:8080/api/ai/suggest-review -H "Authorization: Bearer $TCH_TOKEN" -H 'Content-Type: application/json' -d '{"question":"什么是Java？","studentAnswer":"Java是一种编程语言。","correctAnswer":"Java是一种面向对象的编程语言，具有跨平台特性。"}'
 
       - name: Frontend build
         working-directory: frontend
