@@ -342,7 +342,7 @@ async function restoreSession() {
     const response = await fetchCurrentUser();
     user.value = response.data.user;
     menus.value = response.data.menus;
-    navigateTo(response.data.defaultPath, false);
+    navigateTo(resolveLandingPath(response.data.defaultPath), 'replace');
     await loadOverview(user.value.primaryRole);
   } catch (error) {
     clearToken();
@@ -366,7 +366,7 @@ async function handleLogin() {
     }
     user.value = response.data.user;
     menus.value = response.data.menus;
-    navigateTo(response.data.defaultPath, false);
+    navigateTo(resolveLandingPath(response.data.defaultPath), 'replace');
     await loadOverview(response.data.user.primaryRole);
     ElMessage.success(`${response.data.user.roleLabel} ${response.data.user.realName} 登录成功`);
   } catch (error) {
@@ -413,7 +413,7 @@ async function handleRegister() {
     }
     user.value = response.data.user;
     menus.value = response.data.menus;
-    navigateTo(response.data.defaultPath, false);
+    navigateTo(resolveLandingPath(response.data.defaultPath), 'replace');
     await loadOverview(response.data.user.primaryRole);
     ElMessage.success(`${response.data.user.roleLabel} ${response.data.user.realName} 注册并登录成功`);
   } catch (error) {
@@ -447,7 +447,14 @@ function finishExam() {
   // TODO: Refresh exam list
 }
 
-function navigateTo(path: string, updateHistory = true) {
+function resolveLandingPath(defaultPath: string) {
+  const urlPath = window.location.pathname;
+  return menus.value.some((item) => item.path === urlPath) ? urlPath : defaultPath;
+}
+
+type NavigateMode = 'push' | 'replace' | 'silent';
+
+function navigateTo(path: string, mode: NavigateMode = 'push') {
   routeBlockedMessage.value = '';
   if (!user.value) {
     currentPath.value = '/login';
@@ -462,7 +469,11 @@ function navigateTo(path: string, updateHistory = true) {
     currentPath.value = path;
   }
 
-  if (updateHistory) {
+  // push：用户主动跳转，写入历史以支持浏览器后退；replace：会话恢复/登录落地，不堆叠历史；
+  // silent：由 popstate 触发，URL 已是目标值，不再回写 history，避免循环。
+  if (mode === 'push') {
+    window.history.pushState({}, '', currentPath.value);
+  } else if (mode === 'replace') {
     window.history.replaceState({}, '', currentPath.value);
   }
 }
@@ -484,5 +495,11 @@ onMounted(async () => {
     ElMessage.warning(error instanceof Error ? error.message : '公共状态加载失败');
   }
   await restoreSession();
+  // 响应浏览器前进/后退：URL 已由浏览器更新，按当前 path 切换页面（silent 不再回写 history）
+  window.addEventListener('popstate', () => {
+    if (user.value) {
+      navigateTo(window.location.pathname, 'silent');
+    }
+  });
 });
 </script>
