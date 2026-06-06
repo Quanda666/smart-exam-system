@@ -2,6 +2,7 @@ package com.smartexam.service;
 
 import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.dto.review.ReviewRequest;
+import com.smartexam.exception.DatabaseUnavailableException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -21,7 +22,7 @@ public class ReviewService {
     }
 
     public List<Map<String, Object>> getPendingReviews(AuthUser user) {
-        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         return jdbcTemplate.queryForList("""
             SELECT a.id as attemptId, e.exam_name AS examName, u.real_name AS studentName, COUNT(ar.id) AS pendingCount
             FROM exam_attempt a
@@ -35,7 +36,7 @@ public class ReviewService {
     }
 
     public Map<String, Object> getReviewDetails(Long attemptId) {
-        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         Map<String, Object> attemptDetails = jdbcTemplate.queryForMap("""
             SELECT a.id as attemptId, e.exam_name AS examName, u.real_name AS studentName, a.status
             FROM exam_attempt a
@@ -58,7 +59,7 @@ public class ReviewService {
 
     @Transactional
     public Map<String, Object> submitReview(Long attemptId, List<ReviewRequest> reviews, AuthUser reviewer) {
-        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         for (ReviewRequest review : reviews) {
             jdbcTemplate.update("INSERT INTO review_record (answer_record_id, reviewer_id, score, comment) VALUES (?, ?, ?, ?)",
                     review.getAnswerRecordId(), reviewer.getId(), review.getScore(), review.getComment());
@@ -70,5 +71,13 @@ public class ReviewService {
         jdbcTemplate.update("UPDATE exam_attempt SET score = ?, status = 5 WHERE id = ?", totalScore, attemptId);
 
         return Map.of("success", true, "message", "批阅完成");
+    }
+
+    private JdbcTemplate requireJdbcTemplate() {
+        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        if (jdbcTemplate == null) {
+            throw new DatabaseUnavailableException("数据库连接不可用，请检查本地或云端数据源配置");
+        }
+        return jdbcTemplate;
     }
 }

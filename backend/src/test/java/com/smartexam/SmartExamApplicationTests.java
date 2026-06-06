@@ -36,11 +36,11 @@ class SmartExamApplicationTests {
     }
 
     @Test
-    void demoUsersShouldBePublic() throws Exception {
-        mockMvc.perform(get("/api/auth/demo-users"))
+    void registerOptionsShouldBePublic() throws Exception {
+        mockMvc.perform(get("/api/auth/register-options"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data[0].username").value("admin"));
+                .andExpect(jsonPath("$.data.roles[0].value").value("STUDENT"));
     }
 
     @Test
@@ -49,6 +49,26 @@ class SmartExamApplicationTests {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void studentRegisterShouldCreateAccountAndReturnToken() throws Exception {
+        String username = "student_test_" + System.currentTimeMillis();
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", username,
+                                "password", "student123",
+                                "realName", "测试学生",
+                                "roleType", "STUDENT",
+                                "studentNo", "S" + System.currentTimeMillis(),
+                                "classId", 1
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.token").isNotEmpty())
+                .andExpect(jsonPath("$.data.user.username").value(username))
+                .andExpect(jsonPath("$.data.user.primaryRole").value("STUDENT"));
     }
 
     @Test
@@ -85,7 +105,7 @@ class SmartExamApplicationTests {
     @Test
     void adminShouldManageClassData() throws Exception {
         String token = loginAndExtractToken("admin", "admin123");
-        String className = "阶段3演示班级";
+        String className = "2024级软件工程1班";
 
         MvcResult createResult = mockMvc.perform(post("/api/basic/classes")
                         .header("Authorization", "Bearer " + token)
@@ -123,7 +143,7 @@ class SmartExamApplicationTests {
 
     @Test
     void teacherShouldManageSubjectAndKnowledgePoint() throws Exception {
-        String token = loginAndExtractToken("teacher1", "teacher123");
+        String token = registerTeacherAndExtractToken();
         String subjectName = "阶段3测试科目";
 
         MvcResult subjectResult = mockMvc.perform(post("/api/basic/subjects")
@@ -155,7 +175,7 @@ class SmartExamApplicationTests {
 
     @Test
     void studentShouldReadNoticeButCannotCreateClass() throws Exception {
-        String token = loginAndExtractToken("student1", "student123");
+        String token = registerStudentAndExtractToken();
 
         mockMvc.perform(get("/api/basic/notices")
                         .header("Authorization", "Bearer " + token))
@@ -177,7 +197,7 @@ class SmartExamApplicationTests {
 
     @Test
     void teacherShouldManageQuestionBank() throws Exception {
-        String token = loginAndExtractToken("teacher1", "teacher123");
+        String token = registerTeacherAndExtractToken();
 
         MvcResult createResult = mockMvc.perform(post("/api/questions")
                         .header("Authorization", "Bearer " + token)
@@ -248,7 +268,7 @@ class SmartExamApplicationTests {
 
     @Test
     void studentShouldNotAccessQuestionBankManagement() throws Exception {
-        String token = loginAndExtractToken("student1", "student123");
+        String token = registerStudentAndExtractToken();
 
         mockMvc.perform(get("/api/questions")
                         .header("Authorization", "Bearer " + token))
@@ -258,7 +278,7 @@ class SmartExamApplicationTests {
 
     @Test
     void teacherShouldManagePaperAndGenerateByRules() throws Exception {
-        String token = loginAndExtractToken("teacher1", "teacher123");
+        String token = registerTeacherAndExtractToken();
         Long firstQuestionId = createPublishedQuestion(token, "阶段5手动组卷单选题", "SINGLE_CHOICE");
         Long secondQuestionId = createPublishedQuestion(token, "阶段5规则组卷单选题", "SINGLE_CHOICE");
 
@@ -321,7 +341,7 @@ class SmartExamApplicationTests {
 
     @Test
     void studentShouldNotAccessPaperManagement() throws Exception {
-        String token = loginAndExtractToken("student1", "student123");
+        String token = registerStudentAndExtractToken();
 
         mockMvc.perform(get("/api/papers")
                         .header("Authorization", "Bearer " + token))
@@ -352,6 +372,44 @@ class SmartExamApplicationTests {
                 .andExpect(jsonPath("$.success").value(true))
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).path("data").path("id").asLong();
+    }
+
+    private String registerTeacherAndExtractToken() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        MvcResult result = mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", "teacher_" + suffix,
+                                "password", "teacher123",
+                                "realName", "测试教师",
+                                "roleType", "TEACHER",
+                                "teacherNo", "T" + suffix,
+                                "title", "讲师"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andReturn();
+        JsonNode jsonNode = objectMapper.readTree(result.getResponse().getContentAsString());
+        return jsonNode.path("data").path("token").asText();
+    }
+
+    private String registerStudentAndExtractToken() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        MvcResult result = mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", "student_" + suffix,
+                                "password", "student123",
+                                "realName", "测试学生",
+                                "roleType", "STUDENT",
+                                "studentNo", "S" + suffix,
+                                "classId", 1
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andReturn();
+        JsonNode jsonNode = objectMapper.readTree(result.getResponse().getContentAsString());
+        return jsonNode.path("data").path("token").asText();
     }
 
     private String loginAndExtractToken(String username, String password) throws Exception {

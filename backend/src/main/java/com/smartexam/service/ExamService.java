@@ -2,6 +2,7 @@ package com.smartexam.service;
 
 import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.dto.exam.ExamRequest;
+import com.smartexam.exception.DatabaseUnavailableException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -21,8 +22,7 @@ public class ExamService {
     }
 
     public List<Map<String, Object>> listTeacherExams(String keyword, Integer status, AuthUser user) {
-        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
-        // Fallback data can be added here if needed
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         return jdbcTemplate.queryForList("""
                 SELECT e.id, e.exam_name AS examName, e.description, e.start_time AS startTime, e.end_time AS endTime,
                        e.duration_minutes AS durationMinutes, e.status, p.paper_name AS paperName, s.subject_name AS subjectName
@@ -37,8 +37,7 @@ public class ExamService {
     }
 
     public List<Map<String, Object>> listStudentExams(AuthUser user) {
-        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
-        // Fallback data can be added here if needed
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         return jdbcTemplate.queryForList("""
             SELECT a.id as attemptId, e.id AS examId, e.exam_name AS examName, e.description, e.start_time AS startTime,
                    e.end_time AS endTime, e.duration_minutes AS durationMinutes, a.status,
@@ -55,7 +54,7 @@ public class ExamService {
     @Transactional
     public Map<String, Object> createExam(ExamRequest request, AuthUser creator) {
         validateExamRequest(request);
-        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         jdbcTemplate.update("""
                 INSERT INTO exam (paper_id, exam_name, description, start_time, end_time, duration_minutes, created_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -83,13 +82,13 @@ public class ExamService {
     }
 
     public Map<String, Object> getExamById(Long examId) {
-         JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
          return jdbcTemplate.queryForMap("SELECT * FROM exam WHERE id = ?", examId);
     }
 
     @Transactional
     public Map<String, Object> startExam(Long attemptId, AuthUser user) {
-        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         Map<String, Object> attempt = jdbcTemplate.queryForMap("SELECT * FROM exam_attempt WHERE id = ? AND user_id = ?", attemptId, user.getId());
         
         if ((Integer)attempt.get("status") != 0) {
@@ -117,7 +116,7 @@ public class ExamService {
 
     @Transactional
     public Map<String, Object> submitExam(Long attemptId, Map<Long, String> answers, AuthUser user) {
-        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         Map<String, Object> attempt = jdbcTemplate.queryForMap("SELECT * FROM exam_attempt WHERE id = ? AND user_id = ?", attemptId, user.getId());
 
         if ((Integer)attempt.get("status") != 1) {
@@ -162,5 +161,13 @@ public class ExamService {
         jdbcTemplate.update("UPDATE exam_attempt SET score = ?, status = ? WHERE id = ?", totalScore, finalStatus, attemptId);
         
         return Map.of("success", true, "message", "交卷成功", "score", totalScore, "status", finalStatus);
+    }
+
+    private JdbcTemplate requireJdbcTemplate() {
+        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        if (jdbcTemplate == null) {
+            throw new DatabaseUnavailableException("数据库连接不可用，请检查本地或云端数据源配置");
+        }
+        return jdbcTemplate;
     }
 }

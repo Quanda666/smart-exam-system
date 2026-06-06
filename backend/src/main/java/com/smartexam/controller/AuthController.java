@@ -5,6 +5,7 @@ import com.smartexam.common.ApiResponse;
 import com.smartexam.dto.auth.LoginRequest;
 import com.smartexam.dto.auth.LoginResponse;
 import com.smartexam.dto.auth.MenuItem;
+import com.smartexam.dto.auth.RegisterRequest;
 import com.smartexam.service.AuthService;
 import com.smartexam.service.MenuService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,6 +36,16 @@ public class AuthController {
         return ApiResponse.ok("登录成功", authService.login(request));
     }
 
+    @PostMapping("/register")
+    public ApiResponse<LoginResponse> register(@Valid @RequestBody RegisterRequest request) {
+        return ApiResponse.ok("注册成功", authService.register(request));
+    }
+
+    @GetMapping("/register-options")
+    public ApiResponse<Map<String, Object>> registerOptions() {
+        return ApiResponse.ok(authService.registerOptions());
+    }
+
     @GetMapping("/me")
     public ApiResponse<LoginResponse> me() {
         return ApiResponse.ok(authService.buildCurrentResponse(AuthContext.requireSession().getUser()));
@@ -49,11 +60,6 @@ public class AuthController {
     public ApiResponse<Map<String, Object>> logout(HttpServletRequest request) {
         authService.logout(resolveToken(request));
         return ApiResponse.ok("退出成功", Map.of("loggedOut", true));
-    }
-
-    @GetMapping("/demo-users")
-    public ApiResponse<List<Map<String, Object>>> demoUsers() {
-        return ApiResponse.ok(authService.demoUsers());
     }
 
     @GetMapping("/access-matrix")

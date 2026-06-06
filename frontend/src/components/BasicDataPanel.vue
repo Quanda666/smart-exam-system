@@ -413,7 +413,7 @@ function editSubject(row: SubjectInfo) {
 }
 
 async function removeSubject(id: number) {
-  await confirmDelete('确认删除该科目吗？相关演示知识点会同步移除。');
+  await confirmDelete('确认删除该科目吗？相关知识点会同步移除。');
   await deleteSubject(id);
   ElMessage.success('科目已删除');
   await loadSubjects();

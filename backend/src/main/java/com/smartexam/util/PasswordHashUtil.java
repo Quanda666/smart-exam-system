@@ -3,10 +3,24 @@ package com.smartexam.util;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.util.HexFormat;
 
 public final class PasswordHashUtil {
 
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private PasswordHashUtil() {
+    }
+
+    public static String encode(String rawPassword) {
+        if (rawPassword == null || rawPassword.isBlank()) {
+            throw new IllegalArgumentException("密码不能为空");
+        }
+        byte[] saltBytes = new byte[16];
+        SECURE_RANDOM.nextBytes(saltBytes);
+        String salt = HexFormat.of().formatHex(saltBytes);
+        return "sha256$" + salt + "$" + sha256Hex(salt + ":" + rawPassword);
     }
 
     public static boolean matches(String rawPassword, String storedHash) {

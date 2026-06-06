@@ -9,36 +9,20 @@ ON DUPLICATE KEY UPDATE role_name = VALUES(role_name), status = VALUES(status);
 
 INSERT INTO sys_user (username, password_hash, real_name, phone, email, status)
 VALUES
-  ('admin', 'sha256$admin-stage2-salt$c99c4e073f3b4ad0ac1daeeb6628472f62b74cb82a0538e94fa6253f4f93651d', '系统管理员', NULL, 'admin@example.com', 1),
-  ('teacher1', 'sha256$teacher-stage2-salt$5b4278abf3a831fb9f44c1abe28b3a2638753060fae00bfdbfbf8ee9535abeb8', '演示教师一', NULL, 'teacher1@example.com', 1),
-  ('student1', 'sha256$student-stage2-salt$eccad4a3297ed7e56b116c71709eb0df8de81a2a9005cec8335f950a2e36273f', '演示学生一', NULL, 'student1@example.com', 1)
+  ('admin', 'sha256$admin-stage2-salt$c99c4e073f3b4ad0ac1daeeb6628472f62b74cb82a0538e94fa6253f4f93651d', '系统管理员', NULL, 'admin@example.com', 1)
 ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), real_name = VALUES(real_name), status = VALUES(status);
 
 INSERT IGNORE INTO sys_user_role (user_id, role_id)
 SELECT u.id, r.id FROM sys_user u JOIN sys_role r ON u.username = 'admin' AND r.role_code = 'ADMIN';
 
-INSERT IGNORE INTO sys_user_role (user_id, role_id)
-SELECT u.id, r.id FROM sys_user u JOIN sys_role r ON u.username = 'teacher1' AND r.role_code = 'TEACHER';
-
-INSERT IGNORE INTO sys_user_role (user_id, role_id)
-SELECT u.id, r.id FROM sys_user u JOIN sys_role r ON u.username = 'student1' AND r.role_code = 'STUDENT';
-
 INSERT INTO edu_class (class_name, major, grade, status)
 VALUES ('23本科计科1班', '计算机科学与技术', '2023级', 1)
 ON DUPLICATE KEY UPDATE major = VALUES(major), grade = VALUES(grade), status = VALUES(status);
 
-INSERT INTO teacher_profile (user_id, teacher_no, title, introduction, status)
-SELECT id, 'T2024001', '讲师', '负责在线考试系统演示课程的题库、试卷与阅卷。', 1 FROM sys_user WHERE username = 'teacher1'
-ON DUPLICATE KEY UPDATE title = VALUES(title), introduction = VALUES(introduction), status = VALUES(status);
-
-INSERT INTO student_profile (user_id, student_no, class_id, status)
-SELECT u.id, 'S2024001', c.id, 1 FROM sys_user u JOIN edu_class c ON c.class_name = '23本科计科1班' WHERE u.username = 'student1'
-ON DUPLICATE KEY UPDATE class_id = VALUES(class_id), status = VALUES(status);
-
 INSERT INTO edu_subject (subject_name, description, status)
 VALUES
-  ('Java程序设计', '用于演示 Java 基础、集合、线程、面向对象等题目。', 1),
-  ('数据库系统', '用于演示 SQL、事务、索引、数据库设计等题目。', 1)
+  ('Java程序设计', 'Java 基础、集合、线程、面向对象等核心知识点。', 1),
+  ('数据库系统', 'SQL、事务、索引、数据库设计等核心知识点。', 1)
 ON DUPLICATE KEY UPDATE description = VALUES(description), status = VALUES(status);
 
 INSERT INTO edu_knowledge_point (subject_id, parent_id, point_name, sort_order, status)
@@ -61,7 +45,7 @@ INSERT INTO question (subject_id, knowledge_point_id, question_type, difficulty,
 SELECT s.id, kp.id, 'SINGLE_CHOICE', 'EASY', 'Java 中用于存储键值对的数据结构通常是？', 'B', 'Map 接口用于存储键值对数据。', 5.00, 1, u.id
 FROM edu_subject s
 JOIN edu_knowledge_point kp ON kp.subject_id = s.id AND kp.point_name = '集合框架'
-JOIN sys_user u ON u.username = 'teacher1'
+JOIN sys_user u ON u.username = 'admin'
 WHERE s.subject_name = 'Java程序设计'
   AND NOT EXISTS (SELECT 1 FROM question q WHERE q.stem = 'Java 中用于存储键值对的数据结构通常是？' AND q.deleted = 0);
 
@@ -81,7 +65,7 @@ INSERT INTO question (subject_id, knowledge_point_id, question_type, difficulty,
 SELECT s.id, kp.id, 'TRUE_FALSE', 'EASY', 'Java 中 HashMap 允许使用键值对保存数据。', 'A', 'HashMap 是 Map 接口常见实现，支持键值对存储。', 5.00, 1, u.id
 FROM edu_subject s
 JOIN edu_knowledge_point kp ON kp.subject_id = s.id AND kp.point_name = '集合框架'
-JOIN sys_user u ON u.username = 'teacher1'
+JOIN sys_user u ON u.username = 'admin'
 WHERE s.subject_name = 'Java程序设计'
   AND NOT EXISTS (SELECT 1 FROM question q WHERE q.stem = 'Java 中 HashMap 允许使用键值对保存数据。' AND q.deleted = 0);
 
@@ -94,9 +78,9 @@ SELECT q.id, 'B', '错误', 0, 2 FROM question q WHERE q.stem = 'Java 中 HashMa
 ON DUPLICATE KEY UPDATE option_content = VALUES(option_content), is_correct = VALUES(is_correct), sort_order = VALUES(sort_order);
 
 INSERT INTO paper (subject_id, paper_name, description, total_score, status, created_by)
-SELECT s.id, 'Java程序设计阶段5演示试卷', '用于演示手动组卷和规则组卷的阶段5试卷。', 10.00, 0, u.id
+SELECT s.id, 'Java程序设计综合测试卷', 'Java程序设计综合测试卷，覆盖核心知识点。', 10.00, 0, u.id
 FROM edu_subject s
-JOIN sys_user u ON u.username = 'teacher1'
+JOIN sys_user u ON u.username = 'admin'
 WHERE s.subject_name = 'Java程序设计'
 ON DUPLICATE KEY UPDATE description = VALUES(description), total_score = VALUES(total_score), status = VALUES(status), created_by = VALUES(created_by);
 
@@ -104,21 +88,21 @@ INSERT INTO paper_question (paper_id, question_id, score, sort_order)
 SELECT p.id, q.id, 5.00, 1
 FROM paper p
 JOIN question q ON q.stem = 'Java 中用于存储键值对的数据结构通常是？'
-WHERE p.paper_name = 'Java程序设计阶段5演示试卷'
+WHERE p.paper_name = 'Java程序设计综合测试卷'
 ON DUPLICATE KEY UPDATE score = VALUES(score), sort_order = VALUES(sort_order);
 
 INSERT INTO paper_question (paper_id, question_id, score, sort_order)
 SELECT p.id, q.id, 5.00, 2
 FROM paper p
 JOIN question q ON q.stem = 'Java 中 HashMap 允许使用键值对保存数据。'
-WHERE p.paper_name = 'Java程序设计阶段5演示试卷'
+WHERE p.paper_name = 'Java程序设计综合测试卷'
 ON DUPLICATE KEY UPDATE score = VALUES(score), sort_order = VALUES(sort_order);
 
 INSERT INTO exam (paper_id, exam_name, description, start_time, end_time, duration_minutes, status, created_by)
 SELECT p.id, 'Java程序设计期中测试', '覆盖集合、线程、并发等知识点。', '2026-07-01 09:00:00', '2026-07-01 11:00:00', 120, 1, u.id
 FROM paper p
-JOIN sys_user u ON u.username = 'teacher1'
-WHERE p.paper_name = 'Java程序设计阶段5演示试卷'
+JOIN sys_user u ON u.username = 'admin'
+WHERE p.paper_name = 'Java程序设计综合测试卷'
 ON DUPLICATE KEY UPDATE description = VALUES(description), start_time = VALUES(start_time), end_time = VALUES(end_time);
 
 INSERT IGNORE INTO exam_class (exam_id, class_id)

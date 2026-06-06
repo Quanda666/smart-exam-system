@@ -13,8 +13,8 @@ services:
       - --collation-server=utf8mb4_unicode_ci
     volumes:
       - smart-exam-mysql-data:/var/lib/mysql
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      - ./backend/src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./backend/src/main/resources/db/data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
       interval: 10s

@@ -7,6 +7,7 @@ export interface ApiResponse<T> {
 }
 
 const TOKEN_KEY = 'smart_exam_token';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -54,7 +55,7 @@ async function requestJson<T>(url: string, init: RequestInit): Promise<ApiRespon
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const response = await fetch(url, {
+  const response = await fetch(resolveUrl(url), {
     ...init,
     headers
   });
@@ -70,4 +71,11 @@ async function requestJson<T>(url: string, init: RequestInit): Promise<ApiRespon
   }
 
   return payload;
+}
+
+function resolveUrl(url: string) {
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+  return `${API_BASE_URL}${url}`;
 }

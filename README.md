@@ -82,7 +82,8 @@ http://localhost:8080
 ```text
 GET  http://localhost:8080/api/health
 GET  http://localhost:8080/api/ai/status
-GET  http://localhost:8080/api/auth/demo-users
+GET  http://localhost:8080/api/auth/register-options
+POST http://localhost:8080/api/auth/register
 POST http://localhost:8080/api/auth/login
 GET  http://localhost:8080/api/auth/me
 GET  http://localhost:8080/api/admin/overview
@@ -146,20 +147,22 @@ scripts\run-frontend.cmd
 http://127.0.0.1:3000
 ```
 
-## 演示账号
+## 账号初始化与注册
 
-| 角色 | 账号 | 密码 | 默认入口 |
+系统初始化脚本仅保留一个管理员账号用于首次登录和系统维护：
+
+| 角色 | 账号 | 初始密码 | 默认入口 |
 |---|---|---|---|
 | 管理员 | admin | admin123 | /admin |
-| 教师 | teacher1 | teacher123 | /teacher |
-| 学生 | student1 | student123 | /student |
+
+教师和学生账号通过登录页的注册入口创建，不再提供内置教师/学生账号或快速填充账号。生产部署后建议管理员尽快修改初始管理员密码。
 
 ## 数据库初始化
 
 数据库脚本位于 [`database`](database) 目录：
 
 - [`database/schema.sql`](database/schema.sql)：创建了完整的数据库表结构，包括用户、角色、基础资料、题库、试卷、考试、答题、批阅、错题本、防作弊和日志等。
-- [`database/seed.sql`](database/seed.sql)：为所有核心功能写入了可演示的种子数据。
+- [`database/seed.sql`](database/seed.sql)：写入生产初始化所需的基础角色、初始管理员、班级、科目、知识点、题库样例、试卷样例、公告和 AI 提示词模板。
 
 建议数据库名：
 
@@ -174,7 +177,7 @@ smart_exam_system
 当前推荐优先级：
 
 1. 使用 GitHub Actions 的 MySQL 服务容器完成自动化验证。
-2. 使用 Railway 部署后端和 MySQL，作为接近真实环境的演示方案。
+2. 使用 Railway 部署后端和 MySQL，作为接近真实环境的运行方案。
 3. 使用 Render、Koyeb、Fly.io 或 GitHub Codespaces 作为补充方案。
 
 相关配置：

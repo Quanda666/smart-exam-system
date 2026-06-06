@@ -4,6 +4,7 @@ import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.dto.student.ExamResult;
 import com.smartexam.dto.student.GradeInfo;
 import com.smartexam.dto.student.WrongQuestionInfo;
+import com.smartexam.exception.DatabaseUnavailableException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -22,7 +23,7 @@ public class StudentService {
     }
 
     public List<GradeInfo> getGrades(AuthUser user) {
-        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         return jdbcTemplate.query("SELECT ea.id as attemptId, e.exam_name, s.subject_name, ea.score, ea.submit_time, ea.status FROM exam_attempt ea JOIN exam e ON ea.exam_id = e.id JOIN paper p ON e.paper_id = p.id JOIN edu_subject s ON p.subject_id = s.id WHERE ea.user_id = ? AND ea.status = 5 ORDER BY ea.submit_time DESC",
                 (rs, rowNum) -> new GradeInfo(
                         rs.getLong("attemptId"),
@@ -35,7 +36,7 @@ public class StudentService {
     }
 
     public ExamResult getExamResult(Long attemptId, AuthUser user) {
-        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         GradeInfo gradeInfo = jdbcTemplate.queryForObject("SELECT ea.id as attemptId, e.exam_name, s.subject_name, ea.score, ea.submit_time, ea.status FROM exam_attempt ea JOIN exam e ON ea.exam_id = e.id JOIN paper p ON e.paper_id = p.id JOIN edu_subject s ON p.subject_id = s.id WHERE ea.id = ? AND ea.user_id = ?",
                 (rs, rowNum) -> new GradeInfo(
                         rs.getLong("attemptId"),
@@ -52,7 +53,7 @@ public class StudentService {
     }
     
     public List<WrongQuestionInfo> getWrongQuestions(AuthUser user) {
-        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         return jdbcTemplate.query("""
             SELECT w.question_id, q.stem, q.question_type, q.correct_answer, q.analysis, w.wrong_count, w.last_wrong_time 
             FROM wrong_question_book w 
@@ -72,7 +73,7 @@ public class StudentService {
     }
 
     public Map<String, Double> getKnowledgePointMastery(AuthUser user) {
-        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         return jdbcTemplate.query("""
             SELECT kp.point_name, AVG(ar.score / pq.score) as mastery 
             FROM answer_record ar 
@@ -89,5 +90,13 @@ public class StudentService {
             }
             return masteryMap;
         }, user.getId());
+    }
+
+    private JdbcTemplate requireJdbcTemplate() {
+        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        if (jdbcTemplate == null) {
+            throw new DatabaseUnavailableException("数据库连接不可用，请检查本地或云端数据源配置");
+        }
+        return jdbcTemplate;
     }
 }

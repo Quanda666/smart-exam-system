@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: smart-exam-backend
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema.sql
+      data-locations: classpath:db/data.sql
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${MYSQL_URL:jdbc:mysql://localhost:3306/smart_exam_system?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
@@ -17,11 +22,7 @@ spring:
 
 app:
   cors:
-    allowed-origins:
-      - http://localhost:5173
-      - http://127.0.0.1:5173
-      - http://localhost:3000
-      - http://127.0.0.1:3000
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*}
   ai:
     base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
     api-key: ${OPENAI_API_KEY:}

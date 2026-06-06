@@ -28,7 +28,7 @@ public class RoleOverviewController {
                 "管理员工作台",
                 user.getRealName() + "可管理用户、角色、系统日志和全局考试分析。",
                 List.of(
-                        RoleOverviewResponse.card("用户总览", 3, "阶段 2 演示账号覆盖三类角色"),
+                        RoleOverviewResponse.card("用户总览", 3, "系统账号覆盖管理员、教师、学生三类角色"),
                         RoleOverviewResponse.card("基础资料", "已接入", "班级、科目、知识点、公告"),
                         RoleOverviewResponse.card("权限边界", "已启用", "后端接口按角色校验")
                 ),

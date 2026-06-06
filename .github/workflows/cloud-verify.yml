@@ -82,14 +82,16 @@ jobs:
           echo "$HEALTH_JSON"
           echo "$HEALTH_JSON" | grep '"connected":true'
           curl -fsS http://127.0.0.1:8080/api/ai/status | grep '"mode":"MOCK"'
-          curl -fsS http://127.0.0.1:8080/api/auth/demo-users | grep '"username":"admin"'
+          curl -fsS http://127.0.0.1:8080/api/auth/register-options | grep '"value":"STUDENT"'
+          REG_JSON=$(curl -fsS -X POST http://127.0.0.1:8080/api/auth/register -H 'Content-Type: application/json' -d '{"username":"ci_student","password":"student123","realName":"CI学生","roleType":"STUDENT","studentNo":"CI2026001","classId":1}')
+          echo "$REG_JSON" | grep '"primaryRole":"STUDENT"'
+          STU_TOKEN=$(echo "$REG_JSON" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+          TCH_REG_JSON=$(curl -fsS -X POST http://127.0.0.1:8080/api/auth/register -H 'Content-Type: application/json' -d '{"username":"ci_teacher","password":"teacher123","realName":"CI教师","roleType":"TEACHER","teacherNo":"CI-T-001","title":"讲师"}')
+          echo "$TCH_REG_JSON" | grep '"primaryRole":"TEACHER"'
+          TCH_TOKEN=$(echo "$TCH_REG_JSON" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
           LOGIN_JSON=$(curl -fsS -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin123"}')
           echo "$LOGIN_JSON" | grep '"primaryRole":"ADMIN"'
           TOKEN=$(echo "$LOGIN_JSON" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
-          TCH_LOGIN=$(curl -fsS -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: application/json' -d '{"username":"teacher1","password":"teacher123"}')
-          TCH_TOKEN=$(echo "$TCH_LOGIN" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
-          STU_LOGIN=$(curl -fsS -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: application/json' -d '{"username":"student1","password":"student123"}')
-          STU_TOKEN=$(echo "$STU_LOGIN" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
           test -n "$TOKEN" && test -n "$TCH_TOKEN" && test -n "$STU_TOKEN"
           curl -fsS http://127.0.0.1:8080/api/auth/me -H "Authorization: Bearer $TOKEN" | grep '"username":"admin"'
           curl -fsS http://127.0.0.1:8080/api/admin/overview -H "Authorization: Bearer $TOKEN" | grep '"role":"ADMIN"'

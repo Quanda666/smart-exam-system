@@ -1,5 +1,6 @@
 import { getJson, postJson } from './request';
-import type { PaperInfo } from './paper';
+import type { PaperInfo, PaperQuestionInfo } from './paper';
+import type { QuestionOption } from './question';
 
 export interface ExamInfo {
   id: number;
@@ -14,7 +15,7 @@ export interface ExamInfo {
   subjectName?: string;
 }
 
-export interface ExamAttempt {
+export interface StudentExamInfo {
   attemptId: number;
   examId: number;
   examName: string;
@@ -26,6 +27,7 @@ export interface ExamAttempt {
   paperName: string;
   subjectName: string;
   score?: number;
+  submitTime?: string;
 }
 
 export interface ExamPayload {
@@ -43,7 +45,9 @@ export interface AnswerPayload {
 }
 
 export interface ExamDetail extends PaperInfo {
-  // Inherits paper details and questions
+  examName: string;
+  durationMinutes: number;
+  questions: Array<PaperQuestionInfo & { options: QuestionOption[] }>;
 }
 
 export function listTeacherExams(query?: { keyword?: string; status?: number | null }) {
@@ -55,7 +59,7 @@ export function listTeacherExams(query?: { keyword?: string; status?: number | n
 }
 
 export function listStudentExams() {
-  return getJson<ExamAttempt[]>('/api/exams/student');
+  return getJson<StudentExamInfo[]>('/api/exams/student');
 }
 
 export function createExam(payload: ExamPayload) {

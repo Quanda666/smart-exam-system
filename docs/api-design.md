@@ -25,7 +25,8 @@
 
 | 方法 | 路径 | 说明 | 是否需要登录 |
 |---|---|---|---|
-| GET | /api/auth/demo-users | 获取三类演示账号 | 否 |
+| GET | /api/auth/register-options | 获取注册所需选项，如班级列表 | 否 |
+| POST | /api/auth/register | 注册新用户并直接登录 | 否 |
 | POST | /api/auth/login | 账号密码登录，返回 Token、用户信息、角色菜单和默认入口 | 否 |
 | GET | /api/auth/me | 获取当前登录用户、菜单和默认入口 | 是 |
 | GET | /api/auth/menus | 获取当前登录用户菜单 | 是 |

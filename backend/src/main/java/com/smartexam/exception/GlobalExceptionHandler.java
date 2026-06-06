@@ -3,6 +3,8 @@ package com.smartexam.exception;
 import com.smartexam.common.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.CannotGetJdbcConnectionException;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -28,9 +30,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ApiResponse.fail("BAD_REQUEST", ex.getMessage()));
     }
 
+    @ExceptionHandler({DatabaseUnavailableException.class, CannotGetJdbcConnectionException.class, CannotCreateTransactionException.class})
+    public ResponseEntity<ApiResponse<Void>> handleDatabaseUnavailable(Exception ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiResponse.fail("SERVICE_UNAVAILABLE", "数据库连接不可用，请检查本地或云端数据源配置"));
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiResponse<Void>> handleIllegalState(IllegalStateException ex) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.fail("UNAUTHORIZED", ex.getMessage()));
+        return ResponseEntity.badRequest().body(ApiResponse.fail("BAD_REQUEST", ex.getMessage()));
     }
 
     @ExceptionHandler(ForbiddenException.class)

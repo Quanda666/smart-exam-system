@@ -6,7 +6,7 @@
 
 - JDK 17+
 - Maven 3.8+
-- MySQL 8，可选；未启动数据库时后端仍可通过内置演示数据完成阶段 2 到阶段 9 的核心演示，健康接口会返回数据库未连接状态。
+- MySQL 8，必需。后端已切换为生产模式，所有业务数据均来自数据库；未配置数据库时接口会返回数据库连接不可用。
 
 ## 启动命令
 
@@ -26,7 +26,8 @@ scripts\run-backend.cmd
 |---|---|---|
 | GET | /api/health | 健康检查，包含应用、时间和数据库连通状态 |
 | GET | /api/ai/status | AI 配置状态，返回模拟模式、模型名、Base URL 和密钥配置状态，不返回明文密钥 |
-| GET | /api/auth/demo-users | 获取演示账号 |
+| GET | /api/auth/register-options | 获取注册所需角色与班级选项 |
+| POST | /api/auth/register | 注册教师或学生账号并返回 Token、用户信息和角色菜单 |
 | POST | /api/auth/login | 登录并返回 Token、用户信息和角色菜单 |
 | GET | /api/auth/me | 获取当前用户信息，需要 Token |
 | GET | /api/auth/menus | 获取当前用户菜单，需要 Token |
@@ -83,13 +84,15 @@ scripts\run-backend.cmd
 | POST | /api/ai/explain | AI 内容解释 |
 | POST | /api/ai/suggest-review | AI 评分建议 |
 
-## 演示账号
+## 初始管理员与账号注册
 
-| 角色 | 账号 | 密码 |
+数据库初始化脚本仅保留初始管理员账号：
+
+| 角色 | 账号 | 初始密码 |
 |---|---|---|
 | 管理员 | admin | admin123 |
-| 教师 | teacher1 | teacher123 |
-| 学生 | student1 | student123 |
+
+教师和学生账号通过 `/api/auth/register` 或前端注册页面创建。生产部署后建议管理员立即修改初始密码，并按学校/机构流程审核用户信息。
 
 ## 环境变量
 
@@ -99,6 +102,7 @@ scripts\run-backend.cmd
 | MYSQL_URL | jdbc:mysql://localhost:3306/smart_exam_system | 数据库连接地址 |
 | MYSQL_USERNAME | root | 数据库用户名 |
 | MYSQL_PASSWORD | root | 数据库密码 |
+| CORS_ALLOWED_ORIGIN_PATTERNS | http://localhost:*,http://127.0.0.1:* | 允许访问后端的前端域名模式，云部署时配置为前端公网域名 |
 | OPENAI_BASE_URL | https://api.openai.com/v1 | OpenAI 兼容接口地址 |
 | OPENAI_API_KEY | 空 | AI 密钥，不配置时 AI 处于未配置或模拟状态 |
 | OPENAI_MODEL | gpt-4o-mini | 默认模型 |

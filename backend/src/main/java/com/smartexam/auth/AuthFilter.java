@@ -21,7 +21,8 @@ public class AuthFilter extends OncePerRequestFilter {
             "/api/health",
             "/api/ai/status",
             "/api/auth/login",
-            "/api/auth/demo-users"
+            "/api/auth/register",
+            "/api/auth/register-options"
     );
 
     private final TokenStore tokenStore;

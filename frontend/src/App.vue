@@ -2,29 +2,28 @@
   <main class="app-shell">
     <section v-if="!user" class="login-page">
       <div class="login-hero">
-        <div class="hero-badge">第七组 · 阶段 2</div>
-        <h1>登录认证与角色权限</h1>
+        <div class="hero-badge">智慧在线考试系统</div>
+        <h1>欢迎使用</h1>
         <p>
-          本阶段实现管理员、教师、学生三类账号登录，登录后按角色展示不同首页、菜单和可访问接口。
+          在线考试与学习反馈系统，支持题库管理、智能组卷、在线答题、自动评分与错题分析。
         </p>
         <div class="status-strip">
           <span>后端：{{ healthState }}</span>
           <span>AI：{{ ai?.mode || '待检测' }}</span>
-          <span>权限：后端 Token 校验</span>
         </div>
       </div>
 
       <el-card class="login-card" shadow="hover">
         <template #header>
           <div class="card-header">
-            <span>账号登录</span>
-            <el-tag type="success">RBAC</el-tag>
+            <span>{{ isRegisterMode ? '用户注册' : '账号登录' }}</span>
+            <el-button link @click="toggleMode">{{ isRegisterMode ? '返回登录' : '注册账号' }}</el-button>
           </div>
         </template>
 
-        <el-form label-position="top" @submit.prevent="handleLogin">
+        <el-form v-if="!isRegisterMode" label-position="top" @submit.prevent="handleLogin">
           <el-form-item label="登录账号">
-            <el-input v-model="loginForm.username" placeholder="请输入 admin / teacher1 / student1" size="large" />
+            <el-input v-model="loginForm.username" placeholder="请输入用户名" size="large" />
           </el-form-item>
           <el-form-item label="登录密码">
             <el-input
@@ -41,22 +40,64 @@
           </el-button>
         </el-form>
 
-        <div class="demo-users">
-          <div class="section-title">演示账号</div>
-          <button
-            v-for="account in demoUsers"
-            :key="account.username"
-            class="demo-account"
-            type="button"
-            @click="useDemoUser(account)"
-          >
-            <strong>{{ account.roleLabel }}：{{ account.username }}</strong>
-            <span>{{ account.description }}</span>
-          </button>
-        </div>
+        <el-form v-else label-position="top" @submit.prevent="handleRegister">
+          <el-form-item label="用户名">
+            <el-input v-model="registerForm.username" placeholder="请输入用户名（字母或数字）" size="large" />
+          </el-form-item>
+          <el-form-item label="真实姓名">
+            <el-input v-model="registerForm.realName" placeholder="请输入真实姓名" size="large" />
+          </el-form-item>
+          <el-form-item label="密码">
+            <el-input
+              v-model="registerForm.password"
+              placeholder="请输入密码（至少6位）"
+              show-password
+              size="large"
+              type="password"
+            />
+          </el-form-item>
+          <el-form-item label="确认密码">
+            <el-input
+              v-model="registerForm.confirmPassword"
+              placeholder="请再次输入密码"
+              show-password
+              size="large"
+              type="password"
+            />
+          </el-form-item>
+          <el-form-item label="角色类型">
+            <el-radio-group v-model="registerForm.roleType" size="large">
+              <el-radio value="STUDENT">学生</el-radio>
+              <el-radio value="TEACHER">教师</el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item v-if="registerForm.roleType === 'STUDENT'" label="所属班级">
+            <el-select v-model="registerForm.classId" placeholder="请选择班级" size="large" style="width: 100%">
+              <el-option
+                v-for="cls in availableClasses"
+                :key="cls.id"
+                :label="cls.className"
+                :value="cls.id"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item v-if="registerForm.roleType === 'STUDENT'" label="学号">
+            <el-input v-model="registerForm.studentNo" placeholder="请输入学号" size="large" />
+          </el-form-item>
+          <el-form-item v-if="registerForm.roleType === 'TEACHER'" label="工号">
+            <el-input v-model="registerForm.teacherNo" placeholder="请输入工号" size="large" />
+          </el-form-item>
+          <el-form-item v-if="registerForm.roleType === 'TEACHER'" label="职称">
+            <el-input v-model="registerForm.title" placeholder="请输入职称（如：讲师、副教授）" size="large" />
+          </el-form-item>
+          <el-button type="primary" size="large" class="full-button" :loading="registerLoading" @click="handleRegister">
+            注册账号
+          </el-button>
+        </el-form>
       </el-card>
     </section>
 
+    <ExamTaking v-else-if="takingExam" :attempt-id="takingExam.attemptId" @submit-success="finishExam" />
     <section v-else class="workspace">
       <aside class="sidebar">
         <div class="brand">
@@ -107,6 +148,7 @@
         <QuestionBankPanel v-else-if="isQuestionBankPath && user" :role="user.primaryRole" />
         <PaperPanel v-else-if="isPaperPath && user" :role="user.primaryRole" />
         <ReviewPanel v-else-if="isReviewPath && user" :role="user.primaryRole" />
+        <StudentPanel v-else-if="user?.primaryRole === 'STUDENT'" />
 
         <template v-else>
         <section class="overview-grid">
@@ -155,30 +197,17 @@
               <span v-for="item in menus" :key="item.path">{{ item.title }}</span>
             </div>
           </el-card>
-
           <el-card shadow="hover">
             <template #header>
               <div class="card-header">
-                <span>下一阶段关联模块</span>
-                <el-tag type="info">规划</el-tag>
+                <span>系统状态</span>
               </div>
             </template>
-            <ul class="next-list">
-              <li v-for="item in overview?.nextModules || []" :key="item">{{ item }}</li>
-            </ul>
+             <el-descriptions :column="1" border>
+              <el-descriptions-item label="后端服务">{{ healthState }}</el-descriptions-item>
+              <el-descriptions-item label="AI 服务">{{ ai?.mode || '未知' }}</el-descriptions-item>
+            </el-descriptions>
           </el-card>
-        </section>
-
-        <section class="role-test-card">
-          <div>
-            <h3>权限隔离验证</h3>
-            <p>点击下方按钮会请求三个角色专属后端接口，非当前角色接口应返回无权限提示。</p>
-          </div>
-          <div class="role-actions">
-            <el-button @click="testRoleApi('ADMIN')">测管理员接口</el-button>
-            <el-button @click="testRoleApi('TEACHER')">测教师接口</el-button>
-            <el-button @click="testRoleApi('STUDENT')">测学生接口</el-button>
-          </div>
         </section>
         </template>
       </div>
@@ -193,15 +222,18 @@ import BasicDataPanel from './components/BasicDataPanel.vue';
 import QuestionBankPanel from './components/QuestionBankPanel.vue';
 import PaperPanel from './components/PaperPanel.vue';
 import ReviewPanel from './components/ReviewPanel.vue';
+import ExamTaking from './components/ExamTaking.vue';
+import StudentPanel from './components/StudentPanel.vue';
 import {
   fetchCurrentUser,
-  fetchDemoUsers,
+  fetchRegisterOptions,
   fetchRoleOverview,
   login,
   logout,
+  register,
   type AuthUser,
-  type DemoUser,
   type MenuItem,
+  type RegisterRequest,
   type RoleCode,
   type RoleOverview
 } from './api/auth';
@@ -209,19 +241,34 @@ import { clearToken, getToken, setToken } from './api/request';
 import { fetchAiStatus, fetchHealth, type AiStatusData, type HealthData } from './api/system';
 
 const loginForm = reactive({
-  username: 'admin',
-  password: 'admin123'
+  username: '',
+  password: ''
 });
 
+const registerForm = reactive({
+  username: '',
+  realName: '',
+  password: '',
+  confirmPassword: '',
+  roleType: 'STUDENT' as 'STUDENT' | 'TEACHER',
+  classId: null as number | null,
+  studentNo: '',
+  teacherNo: '',
+  title: ''
+});
+
+const isRegisterMode = ref(false);
+const takingExam = ref<{ attemptId: number } | null>(null);
 const loginLoading = ref(false);
+const registerLoading = ref(false);
 const user = ref<AuthUser | null>(null);
 const menus = ref<MenuItem[]>([]);
-const demoUsers = ref<DemoUser[]>([]);
 const overview = ref<RoleOverview | null>(null);
 const currentPath = ref('/login');
 const routeBlockedMessage = ref('');
 const health = ref<HealthData | null>(null);
 const ai = ref<AiStatusData | null>(null);
+const availableClasses = ref<Array<{ id: number; className: string }>>([]);
 
 const healthState = computed(() => {
   if (!health.value) return '待检测';
@@ -246,10 +293,28 @@ const roleTagType = computed(() => {
 });
 
 async function loadPublicData() {
-  const [demoResponse, healthResponse, aiResponse] = await Promise.all([fetchDemoUsers(), fetchHealth(), fetchAiStatus()]);
-  demoUsers.value = demoResponse.data;
+  const [healthResponse, aiResponse] = await Promise.all([fetchHealth(), fetchAiStatus()]);
   health.value = healthResponse.data;
   ai.value = aiResponse.data;
+}
+
+async function loadRegisterOptions() {
+  const response = await fetchRegisterOptions();
+  availableClasses.value = response.data.classes.map((item) => ({
+    id: item.id,
+    className: `${item.className}${item.grade ? `（${item.grade}）` : ''}`
+  }));
+}
+
+async function toggleMode() {
+  isRegisterMode.value = !isRegisterMode.value;
+  if (isRegisterMode.value && availableClasses.value.length === 0) {
+    try {
+      await loadRegisterOptions();
+    } catch (error) {
+      ElMessage.warning(error instanceof Error ? error.message : '注册选项加载失败，请稍后重试');
+    }
+  }
 }
 
 async function restoreSession() {
@@ -294,11 +359,58 @@ async function handleLogin() {
   }
 }
 
+async function handleRegister() {
+  if (!registerForm.username || !registerForm.realName || !registerForm.password || !registerForm.confirmPassword) {
+    ElMessage.warning('请完整填写注册信息');
+    return;
+  }
+  if (registerForm.password !== registerForm.confirmPassword) {
+    ElMessage.warning('两次输入的密码不一致');
+    return;
+  }
+  if (registerForm.roleType === 'STUDENT' && (!registerForm.classId || !registerForm.studentNo)) {
+    ElMessage.warning('学生注册需要选择班级并填写学号');
+    return;
+  }
+  if (registerForm.roleType === 'TEACHER' && !registerForm.teacherNo) {
+    ElMessage.warning('教师注册需要填写工号');
+    return;
+  }
+
+  const payload: RegisterRequest = {
+    username: registerForm.username.trim(),
+    password: registerForm.password,
+    realName: registerForm.realName.trim(),
+    roleType: registerForm.roleType,
+    classId: registerForm.roleType === 'STUDENT' ? registerForm.classId : null,
+    studentNo: registerForm.roleType === 'STUDENT' ? registerForm.studentNo.trim() : undefined,
+    teacherNo: registerForm.roleType === 'TEACHER' ? registerForm.teacherNo.trim() : undefined,
+    title: registerForm.roleType === 'TEACHER' ? registerForm.title.trim() : undefined
+  };
+
+  registerLoading.value = true;
+  try {
+    const response = await register(payload);
+    if (response.data.token) {
+      setToken(response.data.token);
+    }
+    user.value = response.data.user;
+    menus.value = response.data.menus;
+    navigateTo(response.data.defaultPath, false);
+    await loadOverview(response.data.user.primaryRole);
+    ElMessage.success(`${response.data.user.roleLabel} ${response.data.user.realName} 注册并登录成功`);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '注册失败');
+  } finally {
+    registerLoading.value = false;
+  }
+}
+
 async function handleLogout() {
   try {
     await logout();
   } catch (error) {
-    // 即使后端退出失败，前端也清除本地状态，避免残留 token 影响演示。
+    // 即使后端退出失败，前端也清除本地状态，避免残留 token 影响后续登录。
   }
   clearToken();
   user.value = null;
@@ -309,9 +421,13 @@ async function handleLogout() {
   ElMessage.success('已退出登录');
 }
 
-function useDemoUser(account: DemoUser) {
-  loginForm.username = account.username;
-  loginForm.password = account.password;
+function startExam(exam: { attemptId: number }) {
+  takingExam.value = { attemptId: exam.attemptId };
+}
+
+function finishExam() {
+  takingExam.value = null;
+  // TODO: Refresh exam list
 }
 
 function navigateTo(path: string, updateHistory = true) {
@@ -341,15 +457,6 @@ async function loadOverview(role: RoleCode) {
   } catch (error) {
     overview.value = null;
     ElMessage.error(error instanceof Error ? error.message : '角色首页加载失败');
-  }
-}
-
-async function testRoleApi(role: RoleCode) {
-  try {
-    const response = await fetchRoleOverview(role);
-    ElMessage.success(`${response.data.title} 接口访问成功`);
-  } catch (error) {
-    ElMessage.warning(error instanceof Error ? error.message : '接口访问被拒绝');
   }
 }
 

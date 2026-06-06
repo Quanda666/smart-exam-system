@@ -34,12 +34,23 @@ export interface LoginResponse {
   defaultPath: string;
 }
 
-export interface DemoUser {
+export interface RegisterRequest {
   username: string;
   password: string;
-  roleLabel: string;
-  defaultPath: string;
-  description: string;
+  realName: string;
+  roleType: 'STUDENT' | 'TEACHER';
+  studentNo?: string;
+  classId?: number | null;
+  teacherNo?: string;
+  title?: string;
+  introduction?: string;
+  phone?: string;
+  email?: string;
+}
+
+export interface RegisterOptions {
+  roles: Array<{ value: 'STUDENT' | 'TEACHER'; label: string }>;
+  classes: Array<{ id: number; className: string; major?: string; grade?: string }>;
 }
 
 export interface OverviewCard {
@@ -64,16 +75,20 @@ export function logout() {
   return postJson<{ loggedOut: boolean }>('/api/auth/logout');
 }
 
+export function register(payload: RegisterRequest) {
+  return postJson<LoginResponse, RegisterRequest>('/api/auth/register', payload);
+}
+
+export function fetchRegisterOptions() {
+  return getJson<RegisterOptions>('/api/auth/register-options');
+}
+
 export function fetchCurrentUser() {
   return getJson<LoginResponse>('/api/auth/me');
 }
 
 export function fetchMenus() {
   return getJson<MenuItem[]>('/api/auth/menus');
-}
-
-export function fetchDemoUsers() {
-  return getJson<DemoUser[]>('/api/auth/demo-users');
 }
 
 export function fetchRoleOverview(role: RoleCode) {
