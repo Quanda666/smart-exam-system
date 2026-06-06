@@ -271,6 +271,15 @@ CREATE TABLE IF NOT EXISTS operation_log (
   KEY idx_operation_log_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统操作日志表';
 
+CREATE TABLE IF NOT EXISTS ai_review_suggestion (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '建议ID',
+  answer_record_id BIGINT NOT NULL COMMENT '答案记录ID',
+  suggested_score DECIMAL(8,2) NULL COMMENT '建议分数',
+  suggestion TEXT NULL COMMENT '建议评语',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  UNIQUE KEY uk_ai_review_suggestion_answer (answer_record_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI评分建议表';
+
 CREATE TABLE IF NOT EXISTS notice (
   id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '公告ID',
   title VARCHAR(128) NOT NULL COMMENT '公告标题',

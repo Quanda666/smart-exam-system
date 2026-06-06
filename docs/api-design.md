@@ -1,6 +1,6 @@
 # 接口设计记录
 
-本文件用于持续记录在线考试系统接口设计。当前已完成阶段 6 考试任务发布与学生答题。
+本文件用于持续记录在线考试系统接口设计。当前已完成阶段 10 OpenAI 兼容 AI 辅助能力。
 
 ## 通用响应结构
 
@@ -180,6 +180,21 @@
 }
 ```
 
+## 阶段 7-9 接口
+
+| 方法 | 路径 | 说明 | 权限 |
+|---|---|---|---|
+| GET | /api/reviews/pending | 获取待批阅的考试列表 | ADMIN、TEACHER |
+| GET | /api/reviews/attempt/{id} | 获取待批阅的答卷详情 | ADMIN、TEACHER |
+| POST | /api/reviews/attempt/{id} | 提交主观题批阅结果 | ADMIN、TEACHER |
+| GET | /api/student/grades | 学生获取个人成绩列表 | STUDENT |
+| GET | /api/student/exam-result/{id} | 学生获取单次考试结果详情 | STUDENT |
+| GET | /api/student/wrong-questions | 学生获取错题本 | STUDENT |
+| GET | /api/student/mastery | 学生获取知识点掌握度 | STUDENT |
+| POST | /api/monitor/cheat-event | 记录切屏等异常事件 | STUDENT |
+| GET | /api/monitor/cheat-events/{id} | 查看指定考试记录的异常事件 | ADMIN、TEACHER |
+| GET | /api/monitor/logs | 查询系统操作日志 | ADMIN |
+
 ## 阶段 3 请求示例
 
 新增班级：
@@ -253,7 +268,7 @@
 - 试卷接口（阶段 5 已完成基础维护与组卷能力）
 - 考试任务接口（阶段 6 已完成任务创建、学生查询、开始考试、提交答案）
 - 学生答题接口（阶段 6 已完成基础实现）
-- 阅卷接口
-- 成绩分析接口
-- 日志接口
+- 阅卷接口（阶段 7 已完成）
+- 成绩分析接口（阶段 8 已完成学生端）
+- 日志接口（阶段 9 已完成）
 - AI 辅助接口

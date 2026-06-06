@@ -105,6 +105,7 @@
         <el-form-item class="question-form-actions" label="操作">
           <el-button type="primary" @click="saveQuestion">{{ editingQuestionId ? '保存修改' : '新增题目' }}</el-button>
           <el-button @click="resetQuestionForm">重置</el-button>
+          <el-button @click="aiGenerateQuestion" type="success" plain>AI辅助出题</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -185,6 +186,7 @@ import {
   type QuestionPayload,
   type QuestionType
 } from '../api/question';
+import { generateQuestion } from '../api/ai';
 import type { RoleCode } from '../api/auth';
 
 const props = defineProps<{
@@ -488,5 +490,27 @@ function difficultyTag(value: string) {
 
 function statusText(status: number) {
   return status === 1 ? '已发布' : '草稿';
+}
+async function aiGenerateQuestion() {
+  const subject = subjects.value.find(s => s.id === questionForm.subjectId);
+  if (!subject) {
+    ElMessage.warning('请先选择科目');
+    return;
+  }
+  const knowledgePoint = knowledgePoints.value.find(k => k.id === questionForm.knowledgePointId);
+  try {
+    const response = await generateQuestion({
+      subject: subject.subjectName,
+      knowledgePoint: knowledgePoint?.pointName,
+      questionType: questionForm.questionType,
+      difficulty: questionForm.difficulty,
+    });
+    // For simplicity, this example just logs the AI-generated content.
+    // A real implementation would parse this content and fill the form.
+    console.log('AI-generated question content:', response.data);
+    ElMessage.success('AI已生成题目内容，请在控制台查看并手动填充');
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : 'AI辅助出题失败');
+  }
 }
 </script>

@@ -1,12 +1,12 @@
 # 后端服务
 
-本目录为智慧在线考试与学习反馈系统后端服务，当前已进入阶段 6：考试任务发布与学生答题。
+本目录为智慧在线考试与学习反馈系统后端服务，当前已进入阶段 9：防作弊与日志。
 
 ## 环境要求
 
 - JDK 17+
 - Maven 3.8+
-- MySQL 8，可选；未启动数据库时后端仍可通过内置演示数据完成阶段 2 到阶段 6 的核心演示，健康接口会返回数据库未连接状态。
+- MySQL 8，可选；未启动数据库时后端仍可通过内置演示数据完成阶段 2 到阶段 9 的核心演示，健康接口会返回数据库未连接状态。
 
 ## 启动命令
 
@@ -69,6 +69,19 @@ scripts\run-backend.cmd
 | POST | /api/exams | 创建考试任务 |
 | POST | /api/exams/attempt/{id}/start | 学生开始考试 |
 | POST | /api/exams/attempt/{id}/submit | 学生提交答案 |
+| GET | /api/reviews/pending | 获取待批阅列表 |
+| GET | /api/reviews/attempt/{id} | 获取待批阅答卷详情 |
+| POST | /api/reviews/attempt/{id} | 提交主观题批阅 |
+| GET | /api/student/grades | 获取个人成绩列表 |
+| GET | /api/student/exam-result/{id} | 获取单次考试结果 |
+| GET | /api/student/wrong-questions | 获取错题本 |
+| GET | /api/student/mastery | 获取知识点掌握度 |
+| POST | /api/monitor/cheat-event | 记录异常事件 |
+| GET | /api/monitor/cheat-events/{id} | 查看异常事件 |
+| GET | /api/monitor/logs | 查询操作日志 |
+| POST | /api/ai/generate-question | AI 辅助出题 |
+| POST | /api/ai/explain | AI 内容解释 |
+| POST | /api/ai/suggest-review | AI 评分建议 |
 
 ## 演示账号
 
@@ -93,4 +106,4 @@ scripts\run-backend.cmd
 
 ## 阶段说明
 
-阶段 6 已在阶段 5 试卷管理基础上，新增考试任务发布、学生考试列表、开始考试和提交答案功能。后续阶段可进入成绩批阅与分析。
+阶段 10 添加了 AI 辅助能力，包括 AI 辅助出题、AI 内容解释和 AI 评分建议，标志着所有核心功能已开发完成。

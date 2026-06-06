@@ -20,6 +20,11 @@
           <el-table-column prop="questionType" label="题型" />
           <el-table-column prop="wrongCount" label="错误次数" />
           <el-table-column prop="lastWrongTime" label="最近错误时间" />
+          <el-table-column label="操作">
+            <template #default="scope">
+              <el-button @click="aiExplainWrong(scope.row as WrongQuestion)">AI讲解</el-button>
+            </template>
+          </el-table-column>
         </el-table>
       </el-tab-pane>
       <el-tab-pane label="知识点掌握" name="mastery">
@@ -45,6 +50,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { getGrades, getExamResult, getWrongQuestions, getKnowledgePointMastery, GradeInfo, ExamResult, WrongQuestion } from '../api/student';
+import { explainText } from '../api/ai';
+import { ElMessage } from 'element-plus';
 import * as echarts from 'echarts';
 
 const activeTab = ref('grades');
@@ -86,6 +93,14 @@ const initMasteryChart = () => {
       }]
     };
     chart.setOption(option);
+  }
+};
+const aiExplainWrong = async (item: WrongQuestion) => {
+  try {
+    const response = await explainText(item.stem + "\n正确答案: " + item.correctAnswer + "\n解析: " + (item.analysis || '暂无'));
+    ElMessage.info(`AI讲解: ${response.data}`);
+  } catch (error) {
+    ElMessage.error('AI讲解请求失败');
   }
 };
 </script>

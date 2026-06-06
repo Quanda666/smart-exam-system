@@ -27,7 +27,7 @@
 
 ## 当前阶段
 
-当前已完成阶段 6：考试任务发布与学生答题。
+当前已完成阶段 9：防作弊、日志与学生反馈。
 
 本阶段已完成：
 
@@ -38,11 +38,10 @@
 5. 题库管理接口，支持单选、多选、判断、填空、主观题维护、筛选、发布撤回和删除。
 6. 试卷管理接口，支持手动组卷、规则组卷、试卷预览、发布撤回。
 7. 考试任务接口，支持教师创建考试、学生获取考试列表、开始考试和提交答案。
-8. 前端登录页、演示账号选择、登录状态保存、角色菜单和角色首页雏形。
-9. 前端基础资料管理、题库管理、试卷管理页面。
-10. 前端考试任务管理、学生考试中心和在线答题页面。
-11. 数据库新增考试任务、考试班级、学生考试记录和答案记录表。
-12. 后端测试和前端生产构建验证。
+8. 阅卷、成绩、错题本、知识点掌握度、防作弊和日志等相关接口。
+9. 前端实现了完整的教师端（基础资料、题库、试卷、考试任务、阅卷）和学生端（考试中心、在线答题、成绩查询、错题本）核心页面。
+10. 数据库已补充考试、答案、批阅、错题、防作弊和日志相关表。
+11. 后端测试和前端生产构建验证。
 
 ## 目录结构
 
@@ -112,6 +111,19 @@ GET  http://localhost:8080/api/exams/student
 POST http://localhost:8080/api/exams
 POST http://localhost:8080/api/exams/attempt/{id}/start
 POST http://localhost:8080/api/exams/attempt/{id}/submit
+GET  http://localhost:8080/api/reviews/pending
+GET  http://localhost:8080/api/reviews/attempt/{id}
+POST http://localhost:8080/api/reviews/attempt/{id}
+GET  http://localhost:8080/api/student/grades
+GET  http://localhost:8080/api/student/exam-result/{id}
+GET  http://localhost:8080/api/student/wrong-questions
+GET  http://localhost:8080/api/student/mastery
+POST http://localhost:8080/api/monitor/cheat-event
+GET  http://localhost:8080/api/monitor/cheat-events/{id}
+GET  http://localhost:8080/api/monitor/logs
+POST http://localhost:8080/api/ai/generate-question
+POST http://localhost:8080/api/ai/explain
+POST http://localhost:8080/api/ai/suggest-review
 ```
 
 ## 前端快速启动
@@ -146,8 +158,8 @@ http://127.0.0.1:3000
 
 数据库脚本位于 [`database`](database) 目录：
 
-- [`database/schema.sql`](database/schema.sql)：创建数据库、用户角色表、学生档案表、教师档案表、基础资料表、公告表、题目表、题目选项表、试卷表、试卷题目关联表、考试相关表和 AI 预留表。
-- [`database/seed.sql`](database/seed.sql)：写入演示角色、账号、档案、科目、班级、知识点、公告、题库题目、演示试卷、演示考试和 AI 提示词模板。
+- [`database/schema.sql`](database/schema.sql)：创建了完整的数据库表结构，包括用户、角色、基础资料、题库、试卷、考试、答题、批阅、错题本、防作弊和日志等。
+- [`database/seed.sql`](database/seed.sql)：为所有核心功能写入了可演示的种子数据。
 
 建议数据库名：
 
