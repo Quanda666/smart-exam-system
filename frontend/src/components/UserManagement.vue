@@ -23,7 +23,7 @@
         <el-option label="启用" :value="1" />
         <el-option label="停用" :value="0" />
       </el-select>
-      <el-button type="primary" @click="load">查询</el-button>
+      <el-button type="primary" @click="search">查询</el-button>
     </div>
 
     <el-table v-loading="loading" :data="users" border>
@@ -63,6 +63,18 @@
     </el-table>
     <el-empty v-if="!loading && users.length === 0" description="暂无用户" />
 
+    <el-pagination
+      v-if="total > 0"
+      v-model:current-page="page"
+      v-model:page-size="size"
+      :total="total"
+      :page-sizes="[10, 20, 50]"
+      layout="total, sizes, prev, pager, next"
+      class="pager"
+      @current-change="load"
+      @size-change="onSizeChange"
+    />
+
     <el-dialog v-model="resetVisible" title="重置密码" width="400px">
       <el-form label-position="top">
         <el-form-item :label="`为「${resetTarget?.realName || ''}」设置新密码`">
@@ -93,6 +105,9 @@ const users = ref<SystemUser[]>([]);
 const summary = ref<Record<string, number>>({});
 const loading = ref(false);
 const query = reactive<{ keyword: string; role: string; status: number | null }>({ keyword: '', role: '', status: null });
+const page = ref(1);
+const size = ref(10);
+const total = ref(0);
 
 const resetVisible = ref(false);
 const resetTarget = ref<SystemUser | null>(null);
@@ -104,16 +119,27 @@ async function load() {
   loading.value = true;
   try {
     const [userResponse, summaryResponse] = await Promise.all([
-      listUsers({ keyword: query.keyword, role: query.role || undefined, status: query.status }),
+      listUsers({ keyword: query.keyword, role: query.role || undefined, status: query.status, page: page.value, size: size.value }),
       fetchUserSummary()
     ]);
-    users.value = userResponse.data;
+    users.value = userResponse.data.list;
+    total.value = userResponse.data.total;
     summary.value = summaryResponse.data;
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '用户列表加载失败');
   } finally {
     loading.value = false;
   }
+}
+
+function search() {
+  page.value = 1;
+  load();
+}
+
+function onSizeChange() {
+  page.value = 1;
+  load();
 }
 
 function roleLabel(codes?: string) {

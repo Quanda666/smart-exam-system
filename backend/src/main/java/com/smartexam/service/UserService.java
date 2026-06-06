@@ -1,5 +1,6 @@
 package com.smartexam.service;
 
+import com.smartexam.common.PageResult;
 import com.smartexam.exception.DatabaseUnavailableException;
 import com.smartexam.util.PasswordHashUtil;
 import org.springframework.beans.factory.ObjectProvider;
@@ -20,11 +21,23 @@ public class UserService {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
     }
 
-    public List<Map<String, Object>> listUsers(String keyword, String role, Integer status) {
+    public PageResult<Map<String, Object>> listUsers(String keyword, String role, Integer status, int page, int size) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         String kw = blankToNull(keyword);
         String roleCode = blankToNull(role);
-        return jdbcTemplate.queryForList("""
+        Long total = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM sys_user u
+                WHERE u.deleted = 0
+                  AND (? IS NULL OR u.username LIKE CONCAT('%', ?, '%') OR u.real_name LIKE CONCAT('%', ?, '%'))
+                  AND (? IS NULL OR u.status = ?)
+                  AND (? IS NULL OR EXISTS (
+                        SELECT 1 FROM sys_user_role ur2 JOIN sys_role r2 ON r2.id = ur2.role_id
+                         WHERE ur2.user_id = u.id AND r2.role_code = ?))
+                """, Long.class, kw, kw, kw, status, status, roleCode, roleCode);
+        int safeSize = size <= 0 ? 10 : Math.min(size, 200);
+        int safePage = Math.max(1, page);
+        int offset = (safePage - 1) * safeSize;
+        List<Map<String, Object>> list = jdbcTemplate.queryForList("""
                 SELECT u.id, u.username, u.real_name AS realName, u.phone, u.email, u.status,
                        u.created_at AS createdAt, u.updated_at AS updatedAt,
                        (SELECT GROUP_CONCAT(r.role_code ORDER BY r.id SEPARATOR ',')
@@ -43,7 +56,9 @@ public class UserService {
                         SELECT 1 FROM sys_user_role ur2 JOIN sys_role r2 ON r2.id = ur2.role_id
                          WHERE ur2.user_id = u.id AND r2.role_code = ?))
                 ORDER BY u.id DESC
-                """, kw, kw, kw, status, status, roleCode, roleCode);
+                LIMIT %d OFFSET %d
+                """.formatted(safeSize, offset), kw, kw, kw, status, status, roleCode, roleCode);
+        return PageResult.of(list, total == null ? 0 : total, safePage, safeSize);
     }
 
     public Map<String, Object> summary() {

@@ -16,10 +16,19 @@ export interface SystemUser {
   updatedAt?: string;
 }
 
+export interface PageResult<T> {
+  list: T[];
+  total: number;
+  page: number;
+  size: number;
+}
+
 export interface UserQuery {
   keyword?: string;
   role?: string;
   status?: number | null;
+  page?: number;
+  size?: number;
 }
 
 export interface SystemRole {
@@ -73,12 +82,14 @@ function userQueryString(query: UserQuery = {}) {
   if (query.keyword) params.set('keyword', query.keyword);
   if (query.role) params.set('role', query.role);
   if (query.status !== undefined && query.status !== null) params.set('status', String(query.status));
+  if (query.page) params.set('page', String(query.page));
+  if (query.size) params.set('size', String(query.size));
   const value = params.toString();
   return value ? `?${value}` : '';
 }
 
 export function listUsers(query?: UserQuery) {
-  return getJson<SystemUser[]>(`/api/system/users${userQueryString(query)}`);
+  return getJson<PageResult<SystemUser>>(`/api/system/users${userQueryString(query)}`);
 }
 
 export function fetchUserSummary() {

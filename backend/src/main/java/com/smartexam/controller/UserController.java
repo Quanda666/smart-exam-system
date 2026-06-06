@@ -1,6 +1,7 @@
 package com.smartexam.controller;
 
 import com.smartexam.common.ApiResponse;
+import com.smartexam.common.PageResult;
 import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.dto.system.ResetPasswordRequest;
 import com.smartexam.service.OperationLogService;
@@ -34,11 +35,13 @@ public class UserController {
     }
 
     @GetMapping
-    public ApiResponse<List<Map<String, Object>>> list(@RequestParam(required = false) String keyword,
-                                                        @RequestParam(required = false) String role,
-                                                        @RequestParam(required = false) Integer status) {
+    public ApiResponse<PageResult<Map<String, Object>>> list(@RequestParam(required = false) String keyword,
+                                                             @RequestParam(required = false) String role,
+                                                             @RequestParam(required = false) Integer status,
+                                                             @RequestParam(defaultValue = "1") int page,
+                                                             @RequestParam(defaultValue = "10") int size) {
         roleAccessService.requireRole("ADMIN");
-        return ApiResponse.ok(userService.listUsers(keyword, role, status));
+        return ApiResponse.ok(userService.listUsers(keyword, role, status, page, size));
     }
 
     @GetMapping("/summary")
