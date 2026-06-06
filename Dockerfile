@@ -27,6 +27,8 @@ COPY backend/src ./src
 COPY --from=frontend-builder /app/frontend/dist/ /app/backend/src/main/resources/static/
 
 # Package the Spring Boot application (including static frontend web resources)
+# Force copy resources to target classes directory before packaging, ensuring they are included in the JAR.
+RUN mvn resources:resources
 RUN mvn package -DskipTests -B
 
 # Stage 3: Runner
