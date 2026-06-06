@@ -1,14 +1,22 @@
 server:
   port: ${PORT:${SERVER_PORT:8080}}
+  shutdown: graceful
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
+    min-response-size: 1024
 
 spring:
   application:
     name: smart-exam-backend
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   sql:
     init:
-      mode: always
+      mode: ${DB_INIT_MODE:always}
       schema-locations: classpath:db/schema.sql
       data-locations: classpath:db/data.sql
+      continue-on-error: false
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${MYSQL_URL:jdbc:mysql://localhost:3306/smart_exam_system?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
@@ -16,9 +24,17 @@ spring:
     password: ${MYSQL_PASSWORD:root}
     hikari:
       pool-name: smart-exam-hikari
-      minimum-idle: 1
-      maximum-pool-size: 5
-      connection-timeout: 3000
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${DB_IDLE_TIMEOUT:600000}
+      max-lifetime: ${DB_MAX_LIFETIME:1800000}
+      leak-detection-threshold: ${DB_LEAK_DETECTION:60000}
+      connection-test-query: SELECT 1
+      auto-commit: true
+      # Optimizations for cloud database connections
+      keepalive-time: 300000
+      validation-timeout: 5000
 
 app:
   cors:
@@ -29,3 +45,33 @@ app:
     model: ${OPENAI_MODEL:gpt-4o-mini}
     mock-enabled: ${AI_MOCK_ENABLED:true}
     timeout-seconds: ${AI_TIMEOUT_SECONDS:30}
+
+# Logging configuration
+logging:
+  level:
+    root: ${LOG_LEVEL:INFO}
+    com.smartexam: ${APP_LOG_LEVEL:INFO}
+    org.springframework.web: ${SPRING_WEB_LOG_LEVEL:INFO}
+    org.springframework.jdbc: ${SPRING_JDBC_LOG_LEVEL:INFO}
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Management endpoints for health checks
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: ${HEALTH_SHOW_DETAILS:when-authorized}
+      probes:
+        enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+    db:
+      enabled: true

@@ -172,7 +172,7 @@ smart_exam_system
 
 ## 云端验证与部署
 
-为了实现更简单、更低资源消耗的一键部署，项目已将部署架构升级为**一体化单容器部署（前端打包进后端由后端托管）**，详见 [`docs/cloud-deployment.md`](docs/cloud-deployment.md)。
+为了实现更简单、更低资源消耗的一键部署，项目已将部署架构升级为**一体化单容器部署（前端打包进后端由后端托管）**。详细部署文档：[Railway 部署指南](docs/deploy-railway.md)、[Render 部署指南](docs/deploy-render.md)、[外部数据库配置](docs/external-database.md)、[故障排查](docs/troubleshooting.md)。
 
 一键自动部署做法：
 

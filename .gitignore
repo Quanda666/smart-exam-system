@@ -39,9 +39,14 @@ logs/
 .classpath
 .settings/
 
+# Claude Code 本地工具配置（个人/会话级，不入库）
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
+# Windows 保留设备名，误用 `> nul`（应为 /dev/null）会生成此真实文件
+nul
 
 # Build and temporary files
 *.zip
