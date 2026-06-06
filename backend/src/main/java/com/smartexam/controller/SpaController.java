@@ -11,10 +11,14 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class SpaController {
 
+    /**
+     * 捕获一、二级前端 SPA 路由，如 /login, /papers, /basic/classes 等
+     * 并且排除静态资源（如：.js, .css, .png, .ico，即不含 "."）
+     * 同时也排除后台接口 /api/**
+     */
     @GetMapping(value = {
         "/{path:[^\\.]*}",
-        "/*/{path:[^\\.]*}",
-        "/**/{path:[^\\.]*}"
+        "/{path1:[^\\.]*}/{path2:[^\\.]*}"
     })
     public String forward() {
         return "forward:/index.html";
