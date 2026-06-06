@@ -75,9 +75,25 @@ public class QuestionBankService {
         }
     }
 
+    private void requireQuestionOwner(JdbcTemplate jdbcTemplate, Long id, AuthUser user) {
+        List<Map<String, Object>> owners = jdbcTemplate.queryForList(
+                "SELECT created_by FROM question WHERE id = ? AND deleted = 0", id);
+        if (owners.isEmpty()) {
+            throw new IllegalArgumentException("题目不存在");
+        }
+        if (user != null && user.hasRole("ADMIN")) {
+            return;
+        }
+        Object createdBy = owners.get(0).get("created_by");
+        if (user == null || createdBy == null || !createdBy.toString().equals(String.valueOf(user.getId()))) {
+            throw new IllegalArgumentException("只能管理本人创建的题目");
+        }
+    }
+
     public Map<String, Object> updateQuestion(Long id, QuestionRequest request, AuthUser updater) {
         validateQuestion(request);
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        requireQuestionOwner(jdbcTemplate, id, updater);
         try {
             int rows = jdbcTemplate.update("""
                     UPDATE question
@@ -97,8 +113,9 @@ public class QuestionBankService {
         }
     }
 
-    public Map<String, Object> deleteQuestion(Long id) {
+    public Map<String, Object> deleteQuestion(Long id, AuthUser user) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        requireQuestionOwner(jdbcTemplate, id, user);
         int rows = jdbcTemplate.update("UPDATE question SET deleted = 1 WHERE id = ? AND deleted = 0", id);
         if (rows == 0) {
             throw new IllegalArgumentException("题目不存在");
@@ -106,11 +123,12 @@ public class QuestionBankService {
         return Map.of("deleted", true, "id", id);
     }
 
-    public Map<String, Object> updateStatus(Long id, Integer status) {
+    public Map<String, Object> updateStatus(Long id, Integer status, AuthUser user) {
         if (status == null || (status != 0 && status != 1)) {
             throw new IllegalArgumentException("题目状态只能为0或1");
         }
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        requireQuestionOwner(jdbcTemplate, id, user);
         int rows = jdbcTemplate.update("UPDATE question SET status = ? WHERE id = ? AND deleted = 0", status, id);
         if (rows == 0) {
             throw new IllegalArgumentException("题目不存在");

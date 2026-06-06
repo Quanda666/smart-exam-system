@@ -73,7 +73,7 @@ public class OperationLogAspect {
         if (uri.contains("/basic/subjects")) return "科目";
         if (uri.contains("/basic/knowledge-points")) return "知识点";
         if (uri.contains("/basic/notices")) return "公告";
-        if (uri.contains("/question-bank")) return "题目";
+        if (uri.contains("/questions")) return "题目";
         if (uri.contains("/papers")) return "试卷";
         if (uri.contains("/exams")) return "考试";
         if (uri.contains("/reviews")) return "阅卷";

@@ -72,13 +72,13 @@ public class PaperController {
 
     @PutMapping("/{id}/status")
     public ApiResponse<Map<String, Object>> updateStatus(@PathVariable Long id, @RequestBody Map<String, Integer> request) {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok("试卷状态更新成功", paperService.updateStatus(id, request.get("status")));
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        return ApiResponse.ok("试卷状态更新成功", paperService.updateStatus(id, request.get("status"), user));
     }
 
     @DeleteMapping("/{id}")
     public ApiResponse<Map<String, Object>> deletePaper(@PathVariable Long id) {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok("试卷删除成功", paperService.deletePaper(id));
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        return ApiResponse.ok("试卷删除成功", paperService.deletePaper(id, user));
     }
 }

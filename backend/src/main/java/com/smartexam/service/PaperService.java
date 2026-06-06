@@ -89,10 +89,26 @@ public class PaperService {
         }
     }
 
+    private void requirePaperOwner(JdbcTemplate jdbcTemplate, Long id, AuthUser user) {
+        List<Map<String, Object>> owners = jdbcTemplate.queryForList(
+                "SELECT created_by FROM paper WHERE id = ? AND deleted = 0", id);
+        if (owners.isEmpty()) {
+            throw new IllegalArgumentException("试卷不存在");
+        }
+        if (user != null && user.hasRole("ADMIN")) {
+            return;
+        }
+        Object createdBy = owners.get(0).get("created_by");
+        if (user == null || createdBy == null || !createdBy.toString().equals(String.valueOf(user.getId()))) {
+            throw new IllegalArgumentException("只能管理本人创建的试卷");
+        }
+    }
+
     public Map<String, Object> updatePaper(Long id, PaperRequest request, AuthUser updater) {
         validatePaperRequest(request);
         BigDecimal totalScore = totalScore(request.getQuestions());
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        requirePaperOwner(jdbcTemplate, id, updater);
         try {
             int rows = jdbcTemplate.update("""
                     UPDATE paper
@@ -110,11 +126,12 @@ public class PaperService {
         }
     }
 
-    public Map<String, Object> updateStatus(Long id, Integer status) {
+    public Map<String, Object> updateStatus(Long id, Integer status, AuthUser user) {
         if (status == null || (status != 0 && status != 1)) {
             throw new IllegalArgumentException("试卷状态只能为0或1");
         }
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        requirePaperOwner(jdbcTemplate, id, user);
         int rows = jdbcTemplate.update("UPDATE paper SET status = ? WHERE id = ? AND deleted = 0", status, id);
         if (rows == 0) {
             throw new IllegalArgumentException("试卷不存在");
@@ -122,8 +139,9 @@ public class PaperService {
         return getPaperById(id);
     }
 
-    public Map<String, Object> deletePaper(Long id) {
+    public Map<String, Object> deletePaper(Long id, AuthUser user) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        requirePaperOwner(jdbcTemplate, id, user);
         int rows = jdbcTemplate.update("UPDATE paper SET deleted = 1 WHERE id = ? AND deleted = 0", id);
         if (rows == 0) {
             throw new IllegalArgumentException("试卷不存在");

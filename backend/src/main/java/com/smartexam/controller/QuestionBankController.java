@@ -63,14 +63,14 @@ public class QuestionBankController {
 
     @PutMapping("/{id}/status")
     public ApiResponse<Map<String, Object>> updateStatus(@PathVariable Long id, @RequestBody Map<String, Integer> request) {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok("题目状态更新成功", questionBankService.updateStatus(id, request.get("status")));
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        return ApiResponse.ok("题目状态更新成功", questionBankService.updateStatus(id, request.get("status"), user));
     }
 
     @DeleteMapping("/{id}")
     public ApiResponse<Map<String, Object>> deleteQuestion(@PathVariable Long id) {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok("题目删除成功", questionBankService.deleteQuestion(id));
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        return ApiResponse.ok("题目删除成功", questionBankService.deleteQuestion(id, user));
     }
 
     @GetMapping("/student-deny-check")
