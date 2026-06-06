@@ -172,21 +172,21 @@ smart_exam_system
 
 ## 云端验证与部署
 
-为了减少对本地 Docker Desktop 和本地 MySQL 的依赖，项目已补充云端优先验证方案，详见 [`docs/cloud-deployment.md`](docs/cloud-deployment.md)。
+为了实现更简单、更低资源消耗的一键部署，项目已将部署架构升级为**一体化单容器部署（前端打包进后端由后端托管）**，详见 [`docs/cloud-deployment.md`](docs/cloud-deployment.md)。
 
-当前推荐优先级：
+一键自动部署做法：
 
-1. 使用 GitHub Actions 的 MySQL 服务容器完成自动化验证。
-2. 使用 Railway 部署后端和 MySQL，作为接近真实环境的运行方案。
-3. 使用 Render、Koyeb、Fly.io 或 GitHub Codespaces 作为补充方案。
+1. 用 Railway 连接 GitHub 仓库。
+2. Railway 会自动检测并读取根目录下的 [`Dockerfile`](Dockerfile) 进行多阶段构建（前端 Vue 构建后直接打包入后端 Jar 中运行）。
+3. 在 Railway 上另外创建一个空 MySQL 数据库，并根据文档初始化库名 `smart_exam_system`。
+4. 在 Web 服务上绑定公网域名并添加 MySQL 连接串等环境变量，系统即自动运行并上线。
 
 相关配置：
 
-- [`backend/Dockerfile`](backend/Dockerfile)
-- [`frontend/Dockerfile`](frontend/Dockerfile)
-- [`frontend/nginx.conf`](frontend/nginx.conf)
-- [`docker-compose.yml`](docker-compose.yml)
+- 根目录多阶段构建描述文件：[`Dockerfile`](Dockerfile)
+- 自动 SPA 路由重定向：[`backend/src/main/java/com/smartexam/controller/SpaController.java`](backend/src/main/java/com/smartexam/controller/SpaController.java)
 - [`.github/workflows/cloud-verify.yml`](.github/workflows/cloud-verify.yml)
+- [`docker-compose.yml`](docker-compose.yml)
 
 ## 辅助脚本
 
