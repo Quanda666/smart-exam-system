@@ -8,6 +8,7 @@ import com.smartexam.dto.auth.MenuItem;
 import com.smartexam.dto.auth.RegisterRequest;
 import com.smartexam.service.AuthService;
 import com.smartexam.service.MenuService;
+import com.smartexam.service.OperationLogService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,15 +26,20 @@ public class AuthController {
 
     private final AuthService authService;
     private final MenuService menuService;
+    private final OperationLogService operationLogService;
 
-    public AuthController(AuthService authService, MenuService menuService) {
+    public AuthController(AuthService authService, MenuService menuService, OperationLogService operationLogService) {
         this.authService = authService;
         this.menuService = menuService;
+        this.operationLogService = operationLogService;
     }
 
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ApiResponse.ok("登录成功", authService.login(request));
+        LoginResponse response = authService.login(request);
+        operationLogService.record(response.getUser().getId(), response.getUser().getRealName(),
+                "登录系统", "认证", "角色：" + response.getUser().getRoleLabel());
+        return ApiResponse.ok("登录成功", response);
     }
 
     @PostMapping("/register")

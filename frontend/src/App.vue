@@ -117,7 +117,6 @@
             @click="navigateTo(item.path)"
           >
             <span>{{ item.title }}</span>
-            <small>{{ item.path }}</small>
           </button>
         </nav>
       </aside>
@@ -148,6 +147,10 @@
         <QuestionBankPanel v-else-if="isQuestionBankPath && user" :role="user.primaryRole" />
         <PaperPanel v-else-if="isPaperPath && user" :role="user.primaryRole" />
         <ReviewPanel v-else-if="isReviewPath && user" :role="user.primaryRole" />
+        <UserManagement v-else-if="isUserPath && user" />
+        <RoleManagement v-else-if="isRolePath && user" />
+        <SystemLog v-else-if="isLogPath && user" />
+        <ExamAnalysis v-else-if="isAnalysisPath && user" />
         <StudentPanel v-else-if="user?.primaryRole === 'STUDENT'" />
 
         <template v-else>
@@ -224,6 +227,10 @@ import PaperPanel from './components/PaperPanel.vue';
 import ReviewPanel from './components/ReviewPanel.vue';
 import ExamTaking from './components/ExamTaking.vue';
 import StudentPanel from './components/StudentPanel.vue';
+import UserManagement from './components/UserManagement.vue';
+import RoleManagement from './components/RoleManagement.vue';
+import SystemLog from './components/SystemLog.vue';
+import ExamAnalysis from './components/ExamAnalysis.vue';
 import {
   fetchCurrentUser,
   fetchRegisterOptions,
@@ -283,8 +290,12 @@ const isQuestionBankPath = computed(() => currentPath.value === '/question-bank'
 
 const isPaperPath = computed(() => currentPath.value === '/papers');
 const isReviewPath = computed(() => currentPath.value === '/reviews');
+const isUserPath = computed(() => currentPath.value === '/system/users');
+const isRolePath = computed(() => currentPath.value === '/system/roles');
+const isLogPath = computed(() => currentPath.value === '/monitor/logs');
+const isAnalysisPath = computed(() => currentPath.value === '/exam/analysis');
 
-const isManagedModulePath = computed(() => isBasicPath.value || isQuestionBankPath.value || isPaperPath.value || isReviewPath.value);
+const isManagedModulePath = computed(() => isBasicPath.value || isQuestionBankPath.value || isPaperPath.value || isReviewPath.value || isUserPath.value || isRolePath.value || isLogPath.value || isAnalysisPath.value);
 
 const roleTagType = computed(() => {
   if (user.value?.primaryRole === 'ADMIN') return 'danger';
