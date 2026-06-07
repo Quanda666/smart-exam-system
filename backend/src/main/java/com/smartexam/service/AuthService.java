@@ -17,8 +17,10 @@ import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,13 +32,15 @@ public class AuthService {
     private final TokenStore tokenStore;
     private final MenuService menuService;
     private final LoginAttemptGuard loginAttemptGuard;
+    private final EmailService emailService;
 
     public AuthService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider, TokenStore tokenStore, MenuService menuService,
-                       LoginAttemptGuard loginAttemptGuard) {
+                       LoginAttemptGuard loginAttemptGuard, EmailService emailService) {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
         this.tokenStore = tokenStore;
         this.menuService = menuService;
         this.loginAttemptGuard = loginAttemptGuard;
+        this.emailService = emailService;
     }
 
     public LoginResponse login(LoginRequest request) {
@@ -158,6 +162,141 @@ public class AuthService {
         }
         jdbcTemplate.update("UPDATE sys_user SET password_hash = ? WHERE id = ?",
                 PasswordHashUtil.encode(newPassword), userId);
+    }
+
+    // ===== 邮箱验证码相关 =====
+
+    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final int CODE_EXPIRE_MINUTES = 5;
+    private static final int DAILY_SEND_LIMIT = 5;
+    private static final int RESEND_SECONDS = 60;
+
+    /** 发送登录验证码（无需登录态，但需邮箱已绑定） */
+    public void sendLoginCode(String email) {
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        // 检查邮箱是否已绑定
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE email = ? AND email_verified = 1 AND deleted = 0", Integer.class, email);
+        if (count == null || count == 0) {
+            throw new IllegalArgumentException("该邮箱未绑定任何账号");
+        }
+        sendCode(jdbcTemplate, email, "LOGIN");
+    }
+
+    /** 发送绑定邮箱验证码（需登录态） */
+    public void sendBindCode(String email, Long currentUserId) {
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        // 检查邮箱是否已被其他人绑定
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE email = ? AND email_verified = 1 AND id != ? AND deleted = 0",
+                Integer.class, email, currentUserId);
+        if (count != null && count > 0) {
+            throw new IllegalArgumentException("该邮箱已被其他账号绑定");
+        }
+        sendCode(jdbcTemplate, email, "BIND");
+    }
+
+    private void sendCode(JdbcTemplate jdbcTemplate, String email, String purpose) {
+        // 频率限制：60秒内不可重复发送
+        Integer recent = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM email_verification WHERE email = ? AND purpose = ? AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND)",
+                Integer.class, email, purpose, RESEND_SECONDS);
+        if (recent != null && recent > 0) {
+            throw new IllegalArgumentException("验证码已发送，请" + RESEND_SECONDS + "秒后再试");
+        }
+
+        // 每日上限检查
+        Integer todayCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM email_verification WHERE email = ? AND purpose = ? AND created_at > CURDATE()",
+                Integer.class, email, purpose);
+        if (todayCount != null && todayCount >= DAILY_SEND_LIMIT) {
+            throw new IllegalArgumentException("今日发送次数已达上限（" + DAILY_SEND_LIMIT + "次），请明天再试");
+        }
+
+        // 生成6位验证码
+        String code = String.format("%06d", RANDOM.nextInt(1_000_000));
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(CODE_EXPIRE_MINUTES);
+
+        // 保存验证码
+        jdbcTemplate.update(
+                "INSERT INTO email_verification (email, code, purpose, expires_at) VALUES (?, ?, ?, ?)",
+                email, code, purpose, expiresAt.toString().replace('T', ' ').substring(0, 19));
+
+        // 发送邮件
+        boolean sent = emailService.sendVerificationCode(email, code);
+        if (!sent) {
+            throw new IllegalStateException("邮件发送失败，请稍后再试");
+        }
+    }
+
+    /** 验证码登录 */
+    public LoginResponse loginByCode(String email, String code) {
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        verifyCode(jdbcTemplate, email, code, "LOGIN");
+
+        // 查找用户
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, username, password_hash, real_name, status FROM sys_user WHERE email = ? AND email_verified = 1 AND deleted = 0",
+                email);
+        if (rows.isEmpty()) {
+            throw new IllegalArgumentException("邮箱未绑定任何账号");
+        }
+        Map<String, Object> userRow = rows.get(0);
+        if (intValue(userRow.get("status")) == 0) {
+            throw new IllegalArgumentException("账号已被禁用，请联系管理员");
+        }
+
+        AuthUser authUser = buildAuthUser(userRow);
+        TokenSession session = tokenStore.create(authUser);
+        List<MenuItem> menus = menuService.menusFor(authUser);
+        return new LoginResponse(session.getToken(), session.getExpiresAt(), authUser, menus, authUser.getDefaultPath());
+    }
+
+    /** 绑定/更换邮箱 */
+    public void bindEmail(Long userId, String email, String code) {
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        verifyCode(jdbcTemplate, email, code, "BIND");
+
+        jdbcTemplate.update(
+                "UPDATE sys_user SET email = ?, email_verified = 1 WHERE id = ? AND deleted = 0",
+                email, userId);
+    }
+
+    /** 更新个人资料 */
+    public void updateProfile(Long userId, String realName, String phone) {
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        jdbcTemplate.update(
+                "UPDATE sys_user SET real_name = ?, phone = ? WHERE id = ? AND deleted = 0",
+                realName, blankToNull(phone), userId);
+    }
+
+    private void verifyCode(JdbcTemplate jdbcTemplate, String email, String code, String purpose) {
+        List<Map<String, Object>> codes = jdbcTemplate.queryForList(
+                "SELECT code, used, expires_at FROM email_verification WHERE email = ? AND purpose = ? ORDER BY created_at DESC LIMIT 1",
+                email, purpose);
+        if (codes.isEmpty()) {
+            throw new IllegalArgumentException("请先发送验证码");
+        }
+        Map<String, Object> row = codes.get(0);
+        if (intValue(row.get("used")) == 1) {
+            throw new IllegalArgumentException("验证码已使用");
+        }
+        String storedCode = (String) row.get("code");
+        if (!storedCode.equals(code)) {
+            throw new IllegalArgumentException("验证码不正确");
+        }
+        // 检查过期
+        Object expiresAt = row.get("expires_at");
+        if (expiresAt != null) {
+            LocalDateTime expireTime = expiresAt instanceof LocalDateTime ? (LocalDateTime) expiresAt
+                    : LocalDateTime.parse(expiresAt.toString().replace('T', ' ').substring(0, 19));
+            if (LocalDateTime.now().isAfter(expireTime)) {
+                throw new IllegalArgumentException("验证码已过期，请重新发送");
+            }
+        }
+        // 标记已使用
+        jdbcTemplate.update("UPDATE email_verification SET used = 1 WHERE email = ? AND code = ? AND purpose = ?",
+                email, code, purpose);
     }
 
     private AuthUser buildAuthUser(Map<String, Object> userRow) {

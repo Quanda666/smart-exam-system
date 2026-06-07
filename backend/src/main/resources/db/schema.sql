@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS sys_user (
   real_name     VARCHAR(64)  NOT NULL COMMENT '真实姓名',
   phone         VARCHAR(32)  DEFAULT NULL,
   email         VARCHAR(128) DEFAULT NULL,
+  email_verified TINYINT     NOT NULL DEFAULT 0 COMMENT '邮箱是否已验证 0未验证 1已验证',
   status        TINYINT      NOT NULL DEFAULT 1 COMMENT '1启用 0禁用',
   deleted       TINYINT      NOT NULL DEFAULT 0 COMMENT '0正常 1已删除',
   created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -370,3 +371,24 @@ CREATE TABLE IF NOT EXISTS ai_usage_log (
   PRIMARY KEY (id),
   KEY idx_ai_log_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 调用日志（预留）';
+
+-- ---------- V2.0: 邮箱验证 ----------
+
+-- sys_user 新增邮箱验证状态字段（如列已存在则忽略，兼容已有数据库）
+-- ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS email_verified TINYINT NOT NULL DEFAULT 0 COMMENT '邮箱是否已验证 0未验证 1已验证';
+
+-- 实际使用以下语句（MySQL 不支持 IF NOT EXISTS 列）：
+-- ALTER TABLE sys_user ADD COLUMN email_verified TINYINT NOT NULL DEFAULT 0 COMMENT '邮箱是否已验证 0未验证 1已验证';
+
+CREATE TABLE IF NOT EXISTS email_verification (
+  id         BIGINT       NOT NULL AUTO_INCREMENT,
+  email      VARCHAR(128) NOT NULL COMMENT '目标邮箱',
+  code       VARCHAR(16)  NOT NULL COMMENT '验证码',
+  purpose    VARCHAR(32)  NOT NULL COMMENT '用途 LOGIN/BIND',
+  used       TINYINT      NOT NULL DEFAULT 0 COMMENT '0未使用 1已使用',
+  expires_at DATETIME     NOT NULL COMMENT '过期时间',
+  created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_ev_email_purpose (email, purpose, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='邮箱验证码';
+

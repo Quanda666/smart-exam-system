@@ -2,11 +2,16 @@ package com.smartexam.controller;
 
 import com.smartexam.auth.AuthContext;
 import com.smartexam.common.ApiResponse;
+import com.smartexam.dto.auth.BindEmailRequest;
 import com.smartexam.dto.auth.ChangePasswordRequest;
+import com.smartexam.dto.auth.LoginByCodeRequest;
 import com.smartexam.dto.auth.LoginRequest;
 import com.smartexam.dto.auth.LoginResponse;
 import com.smartexam.dto.auth.MenuItem;
 import com.smartexam.dto.auth.RegisterRequest;
+import com.smartexam.dto.auth.SendBindCodeRequest;
+import com.smartexam.dto.auth.SendLoginCodeRequest;
+import com.smartexam.dto.auth.UpdateProfileRequest;
 import com.smartexam.service.AuthService;
 import com.smartexam.service.MenuService;
 import com.smartexam.service.OperationLogService;
@@ -75,6 +80,45 @@ public class AuthController {
         AuthUser user = AuthContext.requireSession().getUser();
         authService.changePassword(user.getId(), request.getOldPassword(), request.getNewPassword());
         return ApiResponse.ok("密码修改成功", Map.of("changed", true));
+    }
+
+    // ===== 邮箱验证码相关 =====
+
+    @PostMapping("/send-login-code")
+    public ApiResponse<Map<String, Object>> sendLoginCode(@Valid @RequestBody SendLoginCodeRequest request) {
+        authService.sendLoginCode(request.getEmail());
+        return ApiResponse.ok("验证码已发送", Map.of("sent", true));
+    }
+
+    @PostMapping("/login-by-code")
+    public ApiResponse<LoginResponse> loginByCode(@Valid @RequestBody LoginByCodeRequest request) {
+        LoginResponse response = authService.loginByCode(request.getEmail(), request.getCode());
+        operationLogService.record(response.getUser().getId(), response.getUser().getRealName(),
+                "验证码登录", "认证", "邮箱: " + request.getEmail());
+        return ApiResponse.ok("登录成功", response);
+    }
+
+    @PostMapping("/send-bind-code")
+    public ApiResponse<Map<String, Object>> sendBindCode(@Valid @RequestBody SendBindCodeRequest request) {
+        AuthUser user = AuthContext.requireSession().getUser();
+        authService.sendBindCode(request.getEmail(), user.getId());
+        return ApiResponse.ok("验证码已发送", Map.of("sent", true));
+    }
+
+    @PostMapping("/bind-email")
+    public ApiResponse<Map<String, Object>> bindEmail(@Valid @RequestBody BindEmailRequest request) {
+        AuthUser user = AuthContext.requireSession().getUser();
+        authService.bindEmail(user.getId(), request.getEmail(), request.getCode());
+        return ApiResponse.ok("邮箱绑定成功", Map.of("bound", true, "email", request.getEmail()));
+    }
+
+    // ===== 个人资料 =====
+
+    @PutMapping("/profile")
+    public ApiResponse<Map<String, Object>> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
+        AuthUser user = AuthContext.requireSession().getUser();
+        authService.updateProfile(user.getId(), request.getRealName(), request.getPhone());
+        return ApiResponse.ok("个人资料已更新", Map.of("updated", true));
     }
 
     @GetMapping("/access-matrix")
