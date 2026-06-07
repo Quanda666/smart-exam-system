@@ -37,6 +37,8 @@ public class UserService {
         int safeSize = size <= 0 ? 10 : Math.min(size, 200);
         int safePage = Math.max(1, page);
         int offset = (safePage - 1) * safeSize;
+        // 注意：分页参数用占位符 ? 传入，绝不能对含 LIKE '%' 的 SQL 调用 String.formatted，
+        // 否则 '%' 后的字符会被当成格式转换符，抛 UnknownFormatConversionException: Conversion = '''。
         List<Map<String, Object>> list = jdbcTemplate.queryForList("""
                 SELECT u.id, u.username, u.real_name AS realName, u.phone, u.email, u.status,
                        u.created_at AS createdAt, u.updated_at AS updatedAt,
@@ -56,8 +58,8 @@ public class UserService {
                         SELECT 1 FROM sys_user_role ur2 JOIN sys_role r2 ON r2.id = ur2.role_id
                          WHERE ur2.user_id = u.id AND r2.role_code = ?))
                 ORDER BY u.id DESC
-                LIMIT %d OFFSET %d
-                """.formatted(safeSize, offset), kw, kw, kw, status, status, roleCode, roleCode);
+                LIMIT ? OFFSET ?
+                """, kw, kw, kw, status, status, roleCode, roleCode, safeSize, offset);
         return PageResult.of(list, total == null ? 0 : total, safePage, safeSize);
     }
 

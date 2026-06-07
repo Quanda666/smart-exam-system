@@ -33,6 +33,9 @@ spring:
       leak-detection-threshold: ${DB_LEAK_DETECTION:60000}
       connection-test-query: SELECT 1
       auto-commit: true
+      # 每个新连接把会话时区设为 +08:00，使 CURRENT_TIMESTAMP/NOW() 产出北京时间（操作日志等）。
+      # 用数值偏移而非 'Asia/Shanghai' 命名时区，避免依赖 MySQL 时区表（云端 MySQL 常未加载）。
+      connection-init-sql: "${DB_SESSION_TIME_ZONE:SET time_zone = '+08:00'}"
       # Optimizations for cloud database connections
       keepalive-time: 300000
       validation-timeout: 5000
