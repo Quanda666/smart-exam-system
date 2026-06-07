@@ -30,10 +30,10 @@ public class OverviewService {
 
         // 教师学科分布
         data.put("teacherSubjects", jt.queryForList("""
-                SELECT s.subject_name AS name, COUNT(tp.user_id) AS value
+                SELECT COALESCE(s.subject_name, '未分配') AS name, COUNT(tp.user_id) AS value
                 FROM teacher_profile tp
                 JOIN sys_user u ON u.id = tp.user_id AND u.deleted = 0
-                JOIN edu_subject s ON s.deleted = 0
+                LEFT JOIN edu_subject s ON s.id = tp.subject_id AND s.deleted = 0
                 GROUP BY s.id, s.subject_name
                 ORDER BY value DESC
                 LIMIT 8
