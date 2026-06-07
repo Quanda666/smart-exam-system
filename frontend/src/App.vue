@@ -76,7 +76,6 @@
             <!-- 底部链接 -->
             <div class="login-links">
               <el-button link type="primary" @click="showRegister = true">注册账号</el-button>
-              <el-button link type="info" @click="showRegister = true">{{ showRegister ? '' : '' }}</el-button>
             </div>
           </div>
         </div>
