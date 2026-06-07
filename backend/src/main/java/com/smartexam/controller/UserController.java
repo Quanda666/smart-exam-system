@@ -3,7 +3,9 @@ package com.smartexam.controller;
 import com.smartexam.common.ApiResponse;
 import com.smartexam.common.PageResult;
 import com.smartexam.dto.auth.AuthUser;
+import com.smartexam.dto.system.CreateUserRequest;
 import com.smartexam.dto.system.ResetPasswordRequest;
+import com.smartexam.dto.system.UpdateUserRequest;
 import com.smartexam.service.OperationLogService;
 import com.smartexam.service.RoleAccessService;
 import com.smartexam.service.UserService;
@@ -11,13 +13,13 @@ import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -48,6 +50,25 @@ public class UserController {
     public ApiResponse<Map<String, Object>> summary() {
         roleAccessService.requireRole("ADMIN");
         return ApiResponse.ok(userService.summary());
+    }
+
+    @PostMapping
+    public ApiResponse<Map<String, Object>> create(@Valid @RequestBody CreateUserRequest request) {
+        AuthUser admin = roleAccessService.requireRole("ADMIN");
+        Map<String, Object> user = userService.createUser(request);
+        operationLogService.record(admin.getId(), admin.getRealName(),
+                "新建用户", "用户#" + user.get("id"), "用户名: " + request.getUsername());
+        return ApiResponse.ok("用户创建成功", user);
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<Map<String, Object>> update(@PathVariable Long id,
+                                                    @Valid @RequestBody UpdateUserRequest request) {
+        AuthUser admin = roleAccessService.requireRole("ADMIN");
+        Map<String, Object> user = userService.updateUser(id, request);
+        operationLogService.record(admin.getId(), admin.getRealName(),
+                "编辑用户", "用户#" + id, "姓名: " + request.getRealName());
+        return ApiResponse.ok("用户信息已更新", user);
     }
 
     @PutMapping("/{id}/status")

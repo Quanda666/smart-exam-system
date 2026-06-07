@@ -1,13 +1,21 @@
 package com.smartexam.service;
 
 import com.smartexam.common.PageResult;
+import com.smartexam.dto.system.CreateUserRequest;
+import com.smartexam.dto.system.UpdateUserRequest;
 import com.smartexam.exception.DatabaseUnavailableException;
 import com.smartexam.util.PasswordHashUtil;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.PreparedStatement;
+import java.sql.Statement;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -125,6 +133,145 @@ public class UserService {
         jdbcTemplate.update("DELETE FROM sys_user_role WHERE user_id = ?", id);
     }
 
+    @Transactional
+    public Map<String, Object> createUser(CreateUserRequest request) {
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        String username = trim(request.getUsername());
+        String realName = trim(request.getRealName());
+        String roleType = request.getRoleType().toUpperCase();
+
+        // Check username availability
+        Integer exists = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE username = ? AND deleted = 0", Integer.class, username);
+        if (exists != null && exists > 0) {
+            throw new IllegalArgumentException("用户名已存在: " + username);
+        }
+
+        // Find role id
+        List<Map<String, Object>> roles = jdbcTemplate.queryForList(
+                "SELECT id FROM sys_role WHERE role_code = ? AND deleted = 0", roleType);
+        if (roles.isEmpty()) {
+            throw new IllegalArgumentException("角色不存在: " + roleType);
+        }
+        Long roleId = ((Number) roles.get(0).get("id")).longValue();
+
+        // Insert user
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(connection -> {
+            PreparedStatement statement = connection.prepareStatement(
+                    "INSERT INTO sys_user (username, password_hash, real_name, phone, email, status) VALUES (?, ?, ?, ?, ?, 1)",
+                    Statement.RETURN_GENERATED_KEYS);
+            statement.setString(1, username);
+            statement.setString(2, PasswordHashUtil.encode(request.getPassword()));
+            statement.setString(3, realName);
+            statement.setString(4, trim(request.getPhone()));
+            statement.setString(5, trim(request.getEmail()));
+            return statement;
+        }, keyHolder);
+
+        Number generatedId = keyHolder.getKey();
+        if (generatedId == null) {
+            throw new IllegalStateException("创建用户失败，无法获取用户ID");
+        }
+        Long userId = generatedId.longValue();
+
+        // Assign role
+        jdbcTemplate.update("INSERT INTO sys_user_role (user_id, role_id) VALUES (?, ?)", userId, roleId);
+
+        // Create profile
+        if ("STUDENT".equals(roleType)) {
+            jdbcTemplate.update(
+                    "INSERT INTO student_profile (user_id, student_no, class_id, status) VALUES (?, ?, ?, 1)",
+                    userId, trim(request.getStudentNo()), request.getClassId());
+        } else if ("TEACHER".equals(roleType)) {
+            jdbcTemplate.update(
+                    "INSERT INTO teacher_profile (user_id, teacher_no, title, status) VALUES (?, ?, ?, 1)",
+                    userId, trim(request.getTeacherNo()), trim(request.getTitle()));
+        }
+
+        return findUserById(userId);
+    }
+
+    @Transactional
+    public Map<String, Object> updateUser(Long id, UpdateUserRequest request) {
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        String realName = trim(request.getRealName());
+        String roleType = request.getRoleType().toUpperCase();
+
+        // Check user exists
+        Integer exists = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE id = ? AND deleted = 0", Integer.class, id);
+        if (exists == null || exists == 0) {
+            throw new IllegalArgumentException("用户不存在");
+        }
+
+        // Update sys_user
+        jdbcTemplate.update(
+                "UPDATE sys_user SET real_name = ?, phone = ?, email = ? WHERE id = ? AND deleted = 0",
+                realName, trim(request.getPhone()), trim(request.getEmail()), id);
+
+        // Update role: remove old, assign new
+        Long newRoleId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_role WHERE role_code = ? AND deleted = 0", Long.class, roleType);
+        if (newRoleId == null) {
+            throw new IllegalArgumentException("角色不存在: " + roleType);
+        }
+
+        jdbcTemplate.update("DELETE FROM sys_user_role WHERE user_id = ?", id);
+        jdbcTemplate.update("INSERT INTO sys_user_role (user_id, role_id) VALUES (?, ?)", id, newRoleId);
+
+        // Update or remove profiles based on new role
+        if ("STUDENT".equals(roleType)) {
+            jdbcTemplate.update("DELETE FROM teacher_profile WHERE user_id = ?", id);
+            int profileRows = jdbcTemplate.update(
+                    "UPDATE student_profile SET student_no = ?, class_id = ? WHERE user_id = ?",
+                    trim(request.getStudentNo()), request.getClassId(), id);
+            if (profileRows == 0) {
+                jdbcTemplate.update(
+                        "INSERT INTO student_profile (user_id, student_no, class_id, status) VALUES (?, ?, ?, 1)",
+                        id, trim(request.getStudentNo()), request.getClassId());
+            }
+        } else if ("TEACHER".equals(roleType)) {
+            jdbcTemplate.update("DELETE FROM student_profile WHERE user_id = ?", id);
+            int profileRows = jdbcTemplate.update(
+                    "UPDATE teacher_profile SET teacher_no = ?, title = ? WHERE user_id = ?",
+                    trim(request.getTeacherNo()), trim(request.getTitle()), id);
+            if (profileRows == 0) {
+                jdbcTemplate.update(
+                        "INSERT INTO teacher_profile (user_id, teacher_no, title, status) VALUES (?, ?, ?, 1)",
+                        id, trim(request.getTeacherNo()), trim(request.getTitle()));
+            }
+        } else {
+            // ADMIN: remove both profiles
+            jdbcTemplate.update("DELETE FROM student_profile WHERE user_id = ?", id);
+            jdbcTemplate.update("DELETE FROM teacher_profile WHERE user_id = ?", id);
+        }
+
+        return findUserById(id);
+    }
+
+    private Map<String, Object> findUserById(Long id) {
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
+                SELECT u.id, u.username, u.real_name AS realName, u.phone, u.email,
+                       u.status, u.created_at AS createdAt, u.updated_at AS updatedAt,
+                       s.student_no AS studentNo, c.class_name AS className, s.class_id AS classId,
+                       t.teacher_no AS teacherNo, t.title,
+                       (SELECT GROUP_CONCAT(r.role_code ORDER BY r.id SEPARATOR ',')
+                        FROM sys_user_role ur JOIN sys_role r ON r.id = ur.role_id
+                        WHERE ur.user_id = u.id) AS roleCodes
+                FROM sys_user u
+                LEFT JOIN student_profile s ON s.user_id = u.id AND s.deleted = 0
+                LEFT JOIN edu_class c ON c.id = s.class_id AND c.deleted = 0
+                LEFT JOIN teacher_profile t ON t.user_id = u.id AND t.deleted = 0
+                WHERE u.id = ? AND u.deleted = 0
+                """, id);
+        if (rows.isEmpty()) {
+            throw new IllegalArgumentException("用户不存在");
+        }
+        return rows.get(0);
+    }
+
     private JdbcTemplate requireJdbcTemplate() {
         JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
         if (jdbcTemplate == null) {
@@ -139,5 +286,9 @@ public class UserService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String trim(String value) {
+        return value == null ? null : value.trim();
     }
 }

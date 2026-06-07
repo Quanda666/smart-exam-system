@@ -1,4 +1,4 @@
-import { deleteJson, getJson, putJson } from './request';
+import { deleteJson, getJson, postJson, putJson } from './request';
 
 export interface SystemUser {
   id: number;
@@ -9,6 +9,7 @@ export interface SystemUser {
   status: number;
   roleCodes?: string;
   studentNo?: string;
+  classId?: number;
   className?: string;
   teacherNo?: string;
   teacherTitle?: string;
@@ -106,6 +107,38 @@ export function resetUserPassword(id: number, newPassword: string) {
 
 export function deleteUser(id: number) {
   return deleteJson(`/api/system/users/${id}`);
+}
+
+export interface CreateUserPayload {
+  username: string;
+  password: string;
+  realName: string;
+  roleType: string;
+  studentNo?: string;
+  classId?: number | null;
+  teacherNo?: string;
+  title?: string;
+  phone?: string;
+  email?: string;
+}
+
+export function createUser(payload: CreateUserPayload) {
+  return postJson('/api/system/users', payload);
+}
+
+export interface UpdateUserPayload {
+  realName: string;
+  roleType: string;
+  studentNo?: string;
+  classId?: number | null;
+  teacherNo?: string;
+  title?: string;
+  phone?: string;
+  email?: string;
+}
+
+export function updateUser(id: number, payload: UpdateUserPayload) {
+  return putJson(`/api/system/users/${id}`, payload);
 }
 
 export function listRoles() {
