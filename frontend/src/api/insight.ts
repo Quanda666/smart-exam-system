@@ -1,4 +1,4 @@
-import { getJson } from './request';
+import { downloadFile, getJson } from './request';
 
 export interface ClassStudent {
   userId: number;
@@ -31,4 +31,12 @@ export function listClassStudents(classId: number) {
 
 export function getStudentInsight(userId: number) {
   return getJson<StudentInsightData>(`/api/insight/students/${userId}`);
+}
+
+export function exportClassStudents(classId: number, className?: string) {
+  return downloadFile(`/api/insight/classes/${classId}/students/export`, `${className || 'class'}-学生名单.csv`);
+}
+
+export function exportStudentScores(userId: number, realName?: string) {
+  return downloadFile(`/api/insight/students/${userId}/export`, `${realName || 'student'}-成绩历史.csv`);
 }

@@ -7,8 +7,10 @@ import com.smartexam.dto.exam.DraftRequest;
 import com.smartexam.dto.exam.ExamRequest;
 import com.smartexam.dto.exam.ExamUpdateRequest;
 import com.smartexam.service.ExamService;
+import com.smartexam.service.ExportService;
 import com.smartexam.service.RoleAccessService;
 import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,10 +29,12 @@ import java.util.Map;
 public class ExamController {
 
     private final ExamService examService;
+    private final ExportService exportService;
     private final RoleAccessService roleAccessService;
 
-    public ExamController(ExamService examService, RoleAccessService roleAccessService) {
+    public ExamController(ExamService examService, ExportService exportService, RoleAccessService roleAccessService) {
         this.examService = examService;
+        this.exportService = exportService;
         this.roleAccessService = roleAccessService;
     }
 
@@ -71,6 +75,12 @@ public class ExamController {
         AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
         examService.closeExam(id, user);
         return ApiResponse.ok("考试已结束", Map.of("id", id));
+    }
+
+    @GetMapping("/{id}/scores/export")
+    public ResponseEntity<byte[]> exportScores(@PathVariable Long id) {
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        return exportService.examScoreSheet(id, user).toDownload();
     }
 
     @PostMapping("/attempt/{attemptId}/start")

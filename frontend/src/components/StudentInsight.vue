@@ -4,6 +4,7 @@
       <el-select v-model="classId" placeholder="请选择班级" filterable style="width: 280px" @change="loadStudents">
         <el-option v-for="cls in classes" :key="cls.id" :label="cls.className" :value="cls.id" />
       </el-select>
+      <el-button v-if="classId" type="success" plain :disabled="students.length === 0" @click="exportRoster">导出名单</el-button>
       <span class="hint">选择班级查看学生名单，点击「成绩详情」查看其历次成绩与趋势</span>
     </div>
 
@@ -30,6 +31,11 @@
 
     <el-drawer v-model="drawerVisible" :title="`${current?.student.realName || ''} · 学情`" size="60%">
       <div v-if="current" v-loading="loadingInsight">
+        <div class="drawer-toolbar">
+          <el-button type="success" plain size="small" :disabled="current.exams.length === 0" @click="exportScores">
+            导出成绩
+          </el-button>
+        </div>
         <el-descriptions :column="2" border>
           <el-descriptions-item label="姓名">{{ current.student.realName }}</el-descriptions-item>
           <el-descriptions-item label="学号">{{ current.student.studentNo || '—' }}</el-descriptions-item>
@@ -64,11 +70,18 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import * as echarts from 'echarts';
 import { listClasses, type ClassInfo } from '../api/basic';
-import { getStudentInsight, listClassStudents, type ClassStudent, type StudentInsightData } from '../api/insight';
+import {
+  exportClassStudents,
+  exportStudentScores,
+  getStudentInsight,
+  listClassStudents,
+  type ClassStudent,
+  type StudentInsightData
+} from '../api/insight';
 
 const classes = ref<ClassInfo[]>([]);
 const classId = ref<number | null>(null);
@@ -77,7 +90,10 @@ const loadingStudents = ref(false);
 const drawerVisible = ref(false);
 const loadingInsight = ref(false);
 const current = ref<StudentInsightData | null>(null);
+const currentUserId = ref<number | null>(null);
 const chartRef = ref<HTMLElement | null>(null);
+
+const selectedClassName = computed(() => classes.value.find((cls) => cls.id === classId.value)?.className);
 
 onMounted(async () => {
   try {
@@ -103,6 +119,7 @@ async function openInsight(row: ClassStudent) {
   drawerVisible.value = true;
   loadingInsight.value = true;
   current.value = null;
+  currentUserId.value = row.userId;
   try {
     current.value = (await getStudentInsight(row.userId)).data;
     await nextTick();
@@ -111,6 +128,24 @@ async function openInsight(row: ClassStudent) {
     ElMessage.error(error instanceof Error ? error.message : '学情加载失败');
   } finally {
     loadingInsight.value = false;
+  }
+}
+
+async function exportRoster() {
+  if (!classId.value) return;
+  try {
+    await exportClassStudents(classId.value, selectedClassName.value);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '导出失败');
+  }
+}
+
+async function exportScores() {
+  if (!currentUserId.value || !current.value) return;
+  try {
+    await exportStudentScores(currentUserId.value, current.value.student.realName);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '导出失败');
   }
 }
 
@@ -148,6 +183,11 @@ function renderChart() {
 .hint {
   color: #909399;
   font-size: 13px;
+}
+.drawer-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
 }
 .summary-grid {
   display: grid;

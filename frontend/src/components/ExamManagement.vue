@@ -21,9 +21,10 @@
           <el-tag :type="phaseType(scope.row as ExamInfo)">{{ phaseText(scope.row as ExamInfo) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="260" fixed="right">
         <template #default="scope">
           <el-button link type="primary" @click="openEdit(scope.row as ExamInfo)">编辑</el-button>
+          <el-button link type="success" @click="exportScores(scope.row as ExamInfo)">成绩单</el-button>
           <el-button
             link
             type="warning"
@@ -90,7 +91,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { closeExam, createExam, deleteExam, listTeacherExams, updateExam, type ExamInfo } from '../api/exam';
+import { closeExam, createExam, deleteExam, exportExamScores, listTeacherExams, updateExam, type ExamInfo } from '../api/exam';
 import { listPapers, type PaperInfo } from '../api/paper';
 import { listClasses, type ClassInfo } from '../api/basic';
 
@@ -266,6 +267,14 @@ async function remove(row: ExamInfo) {
     await loadExams();
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '删除失败');
+  }
+}
+
+async function exportScores(row: ExamInfo) {
+  try {
+    await exportExamScores(row.id, row.examName);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '导出失败');
   }
 }
 

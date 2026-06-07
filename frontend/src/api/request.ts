@@ -47,6 +47,60 @@ export async function deleteJson<T>(url: string): Promise<ApiResponse<T>> {
   });
 }
 
+/**
+ * 鉴权文件下载：以 Bearer Token 发起 GET，把响应当作二进制读取并触发浏览器下载。
+ * 这里不能用 <a href> 直链，因为后端导出接口需要 Authorization 头，直链带不上 Token。
+ * 文件名优先取后端 Content-Disposition（RFC 5987 编码的中文名），解析失败时回退到 fallbackName。
+ */
+export async function downloadFile(url: string, fallbackName = 'export.csv'): Promise<void> {
+  const token = getToken();
+  const headers = new Headers();
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const response = await fetch(resolveUrl(url), { method: 'GET', headers });
+  if (!response.ok) {
+    let message = `下载失败：${response.status}`;
+    try {
+      const payload = (await response.json()) as ApiResponse<unknown> | null;
+      if (payload?.message) {
+        message = payload.message;
+      }
+    } catch {
+      // 错误响应体不是 JSON 时忽略，沿用状态码提示
+    }
+    throw new Error(message);
+  }
+
+  const blob = await response.blob();
+  const filename = parseFilename(response.headers.get('Content-Disposition')) || fallbackName;
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
+function parseFilename(header: string | null): string | null {
+  if (!header) {
+    return null;
+  }
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header);
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded[1]);
+    } catch {
+      // 解码失败时退回普通 filename
+    }
+  }
+  const plain = /filename="?([^";]+)"?/i.exec(header);
+  return plain ? plain[1] : null;
+}
+
 async function requestJson<T>(url: string, init: RequestInit): Promise<ApiResponse<T>> {
   const token = getToken();
   const headers = new Headers(init.headers);

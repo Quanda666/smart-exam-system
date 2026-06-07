@@ -1,4 +1,4 @@
-import { deleteJson, getJson, postJson, putJson } from './request';
+import { deleteJson, downloadFile, getJson, postJson, putJson } from './request';
 import type { PaperInfo, PaperQuestionInfo } from './paper';
 import type { QuestionOption } from './question';
 
@@ -86,6 +86,10 @@ export function deleteExam(id: number) {
 
 export function closeExam(id: number) {
   return putJson<{ id: number }>(`/api/exams/${id}/close`);
+}
+
+export function exportExamScores(examId: number, examName?: string) {
+  return downloadFile(`/api/exams/${examId}/scores/export`, `${examName || 'exam'}-成绩单.csv`);
 }
 
 export function startExam(attemptId: number) {
