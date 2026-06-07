@@ -54,7 +54,7 @@ public class ExamService {
                 WHERE e.deleted = 0 AND e.created_by = ?
                   AND (? IS NULL OR e.status = ?)
                   AND (? IS NULL OR e.exam_name LIKE CONCAT('%', ?, '%') OR p.paper_name LIKE CONCAT('%', ?, '%'))
-                """, user.getId(), status, status, keyword, keyword, keyword, Long.class);
+                """, Long.class, user.getId(), status, status, keyword, keyword, keyword);
 
         List<Map<String, Object>> list = jdbcTemplate.queryForList("""
                 SELECT e.id, e.exam_name AS examName, e.description, e.start_time AS startTime, e.end_time AS endTime,
@@ -81,7 +81,7 @@ public class ExamService {
                 SELECT COUNT(*) FROM exam_attempt a
                 JOIN exam e ON e.id = a.exam_id
                 WHERE a.user_id = ? AND e.deleted = 0
-                """, user.getId(), Long.class);
+                """, Long.class, user.getId());
 
         List<Map<String, Object>> list = jdbcTemplate.queryForList("""
             SELECT a.id as attemptId, e.id AS examId, e.exam_name AS examName, e.description, e.start_time AS startTime,

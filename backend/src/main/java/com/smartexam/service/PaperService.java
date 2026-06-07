@@ -83,7 +83,7 @@ public class PaperService {
                   AND (? IS NULL OR p.subject_id = ?)
                   AND (? IS NULL OR p.status = ?)
                   AND (? IS NULL OR p.paper_name LIKE CONCAT('%', ?, '%') OR p.description LIKE CONCAT('%', ?, '%') OR s.subject_name LIKE CONCAT('%', ?, '%'))
-                """, subjectId, subjectId, status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), Long.class);
+                """, Long.class, subjectId, subjectId, status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword));
 
         List<Map<String, Object>> list = jdbcTemplate.queryForList("""
                 SELECT p.id, p.subject_id AS subjectId, s.subject_name AS subjectName, p.paper_name AS paperName,

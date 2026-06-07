@@ -77,8 +77,8 @@ public class QuestionBankService {
                   AND (? IS NULL OR q.difficulty = ?)
                   AND (? IS NULL OR q.status = ?)
                   AND (? IS NULL OR q.stem LIKE CONCAT('%', ?, '%') OR s.subject_name LIKE CONCAT('%', ?, '%') OR kp.point_name LIKE CONCAT('%', ?, '%'))
-                """, subjectId, subjectId, knowledgePointId, knowledgePointId, blankToNull(questionType), blankToNull(questionType),
-                blankToNull(difficulty), blankToNull(difficulty), status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), Long.class);
+                """, Long.class, subjectId, subjectId, knowledgePointId, knowledgePointId, blankToNull(questionType), blankToNull(questionType),
+                blankToNull(difficulty), blankToNull(difficulty), status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword));
 
         List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
                 SELECT q.id, q.subject_id AS subjectId, s.subject_name AS subjectName,
