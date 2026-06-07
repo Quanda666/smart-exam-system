@@ -28,12 +28,12 @@ public class OverviewService {
         data.put("todayExams", queryInt(jt, "SELECT COUNT(*) FROM exam WHERE deleted = 0 AND DATE(start_time) = CURDATE()"));
         data.put("totalPapers", queryInt(jt, "SELECT COUNT(*) FROM paper WHERE deleted = 0"));
 
-        // 教师学科分布
+        // 学科分布（teacher_profile 无学科关联字段，改以各科目下的题目数量反映学科分布）
         data.put("teacherSubjects", jt.queryForList("""
-                SELECT COALESCE(s.subject_name, '未分配') AS name, COUNT(tp.user_id) AS value
-                FROM teacher_profile tp
-                JOIN sys_user u ON u.id = tp.user_id AND u.deleted = 0
-                LEFT JOIN edu_subject s ON s.id = tp.subject_id AND s.deleted = 0
+                SELECT s.subject_name AS name, COUNT(q.id) AS value
+                FROM edu_subject s
+                LEFT JOIN question q ON q.subject_id = s.id AND q.deleted = 0
+                WHERE s.deleted = 0
                 GROUP BY s.id, s.subject_name
                 ORDER BY value DESC
                 LIMIT 8
@@ -53,7 +53,7 @@ public class OverviewService {
         data.put("examTrend", jt.queryForList("""
                 SELECT DATE(ea.submit_time) AS date,
                        COUNT(*) AS total,
-                       SUM(CASE WHEN ea.total_score >= 60 THEN 1 ELSE 0 END) AS passed
+                       SUM(CASE WHEN ea.score >= 60 THEN 1 ELSE 0 END) AS passed
                 FROM exam_attempt ea
                 WHERE ea.submit_time IS NOT NULL AND ea.submit_time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
                 GROUP BY DATE(ea.submit_time)
@@ -79,10 +79,10 @@ public class OverviewService {
         // 成绩分布
         data.put("scoreDistribution", jt.queryForList("""
                 SELECT CASE
-                    WHEN ea.total_score >= 90 THEN '90-100'
-                    WHEN ea.total_score >= 80 THEN '80-89'
-                    WHEN ea.total_score >= 70 THEN '70-79'
-                    WHEN ea.total_score >= 60 THEN '60-69'
+                    WHEN ea.score >= 90 THEN '90-100'
+                    WHEN ea.score >= 80 THEN '80-89'
+                    WHEN ea.score >= 70 THEN '70-79'
+                    WHEN ea.score >= 60 THEN '60-69'
                     ELSE '60以下'
                 END AS name, COUNT(*) AS value
                 FROM exam_attempt ea
@@ -115,11 +115,11 @@ public class OverviewService {
                 "SELECT COUNT(*) FROM exam_attempt WHERE user_id = ? AND status = 2", user.getId()));
         // 错题数
         data.put("wrongQuestions", queryInt(jt,
-                "SELECT COUNT(*) FROM wrong_question WHERE user_id = ?", user.getId()));
+                "SELECT COUNT(*) FROM wrong_question_book WHERE user_id = ?", user.getId()));
 
         // 成绩趋势
         data.put("scoreTrend", jt.queryForList("""
-                SELECT DATE(ea.submit_time) AS date, ea.total_score AS score, e.exam_name AS examName
+                SELECT DATE(ea.submit_time) AS date, ea.score AS score, e.exam_name AS examName
                 FROM exam_attempt ea
                 JOIN exam e ON e.id = ea.exam_id
                 WHERE ea.user_id = ? AND ea.submit_time IS NOT NULL
@@ -127,13 +127,15 @@ public class OverviewService {
                 """, user.getId()));
 
         // 知识点掌握度
+        // 知识点掌握度（基于答题记录，wrong_answer 表不存在，改用 answer_record 关联 exam_attempt 取 user）
         data.put("knowledgePoints", jt.queryForList("""
                 SELECT kp.point_name AS name,
-                       ROUND(AVG(CASE WHEN wa.is_correct = 1 THEN 100 ELSE 30 END), 0) AS mastery
-                FROM wrong_answer wa
-                JOIN question q ON q.id = wa.question_id
-                LEFT JOIN edu_knowledge_point kp ON kp.id = q.knowledge_point_id
-                WHERE wa.user_id = ?
+                       ROUND(AVG(CASE WHEN ar.is_correct = 1 THEN 100 ELSE 30 END), 0) AS mastery
+                FROM answer_record ar
+                JOIN exam_attempt ea ON ea.id = ar.attempt_id
+                JOIN question q ON q.id = ar.question_id
+                JOIN edu_knowledge_point kp ON kp.id = q.knowledge_point_id
+                WHERE ea.user_id = ?
                 GROUP BY kp.id, kp.point_name
                 ORDER BY mastery ASC LIMIT 8
                 """, user.getId()));
