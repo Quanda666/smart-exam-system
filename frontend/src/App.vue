@@ -1,69 +1,106 @@
 <template>
   <main class="app-shell">
-    <section v-if="!user" class="login-page">
-      <div class="login-hero">
-        <div class="hero-badge">智慧在线考试系统</div>
-        <h1>欢迎使用</h1>
-        <p>
-          在线考试与学习反馈系统，支持题库管理、智能组卷、在线答题、自动评分与错题分析。
-        </p>
-        <div class="status-strip">
-          <span>后端：{{ healthState }}</span>
-          <span>AI：{{ ai?.mode || '待检测' }}</span>
+    <section v-if="!user" class="login-page-v2">
+      <div class="login-container">
+        <!-- 左侧品牌区 -->
+        <div class="login-brand">
+          <div class="brand-overlay"></div>
+          <div class="brand-content">
+            <div class="brand-icon">
+              <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="48" height="48" rx="12" fill="rgba(255,255,255,0.2)"/>
+                <path d="M14 20L24 14L34 20V30L24 36L14 30V20Z" stroke="white" stroke-width="2" fill="none"/>
+                <circle cx="24" cy="25" r="4" fill="white"/>
+                <path d="M24 29V34" stroke="white" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h1 class="brand-title">广理考试中心</h1>
+            <p class="brand-desc">智慧在线考试与学习反馈系统</p>
+            <div class="brand-features">
+              <div class="feature-item">
+                <span class="feature-icon">📝</span>
+                <span>智能组卷 · 自动评分</span>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">📊</span>
+                <span>学情分析 · 错题回溯</span>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">🔔</span>
+                <span>通知触达 · 考试提醒</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右侧表单区 -->
+        <div class="login-form-area">
+          <div class="login-form-inner">
+            <!-- Tab 切换 -->
+            <div class="login-tabs">
+              <button :class="['tab-btn', { active: loginMode === 'password' }]" @click="loginMode = 'password'">密码登录</button>
+              <button :class="['tab-btn', { active: loginMode === 'code' }]" @click="loginMode = 'code'">验证码登录</button>
+            </div>
+
+            <!-- 密码登录 -->
+            <el-form v-if="loginMode === 'password'" label-position="top" @submit.prevent="handleLogin">
+              <el-form-item label="用户名">
+                <el-input v-model="loginForm.username" placeholder="请输入用户名" size="large" :prefix-icon="User" />
+              </el-form-item>
+              <el-form-item label="密码">
+                <el-input v-model="loginForm.password" placeholder="请输入密码" type="password" show-password size="large" :prefix-icon="Lock" @keyup.enter="handleLogin" />
+              </el-form-item>
+              <el-button type="primary" size="large" class="full-button" :loading="loginLoading" @click="handleLogin">
+                登 录
+              </el-button>
+            </el-form>
+
+            <!-- 验证码登录 -->
+            <el-form v-else label-position="top">
+              <el-form-item label="邮箱">
+                <el-input v-model="codeLoginForm.email" placeholder="请输入已绑定的邮箱" size="large" :prefix-icon="Message" />
+              </el-form-item>
+              <el-form-item label="验证码">
+                <div class="code-row">
+                  <el-input v-model="codeLoginForm.code" placeholder="6位验证码" size="large" :maxlength="6" />
+                  <el-button :disabled="codeCountdown > 0" :loading="codeSending" size="large" class="code-btn" @click="handleSendLoginCode">
+                    {{ codeCountdown > 0 ? `${codeCountdown}s` : '发送验证码' }}
+                  </el-button>
+                </div>
+              </el-form-item>
+              <el-button type="primary" size="large" class="full-button" :loading="codeLoginLoading" @click="handleCodeLogin">
+                验证并登录
+              </el-button>
+            </el-form>
+
+            <!-- 底部链接 -->
+            <div class="login-links">
+              <el-button link type="primary" @click="showRegister = true">注册账号</el-button>
+              <el-button link type="info" @click="showRegister = true">{{ showRegister ? '' : '' }}</el-button>
+            </div>
+
+            <div class="status-strip">
+              <span>后端：{{ healthState }}</span>
+              <span>AI：{{ ai?.mode || '待检测' }}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <el-card class="login-card" shadow="hover">
-        <template #header>
-          <div class="card-header">
-            <span>{{ isRegisterMode ? '用户注册' : '账号登录' }}</span>
-            <el-button link @click="toggleMode">{{ isRegisterMode ? '返回登录' : '注册账号' }}</el-button>
-          </div>
-        </template>
-
-        <el-form v-if="!isRegisterMode" label-position="top" @submit.prevent="handleLogin">
-          <el-form-item label="登录账号">
-            <el-input v-model="loginForm.username" placeholder="请输入用户名" size="large" />
-          </el-form-item>
-          <el-form-item label="登录密码">
-            <el-input
-              v-model="loginForm.password"
-              placeholder="请输入密码"
-              show-password
-              size="large"
-              type="password"
-              @keyup.enter="handleLogin"
-            />
-          </el-form-item>
-          <el-button type="primary" size="large" class="full-button" :loading="loginLoading" @click="handleLogin">
-            登录系统
-          </el-button>
-        </el-form>
-
-        <el-form v-else label-position="top" @submit.prevent="handleRegister">
+      <!-- 注册弹窗 -->
+      <el-dialog v-model="showRegister" title="注册账号" width="480px" :close-on-click-modal="false">
+        <el-form label-position="top" @submit.prevent="handleRegister">
           <el-form-item label="用户名">
-            <el-input v-model="registerForm.username" placeholder="请输入用户名（字母或数字）" size="large" />
+            <el-input v-model="registerForm.username" placeholder="字母或数字，3-64位" size="large" />
           </el-form-item>
           <el-form-item label="真实姓名">
             <el-input v-model="registerForm.realName" placeholder="请输入真实姓名" size="large" />
           </el-form-item>
           <el-form-item label="密码">
-            <el-input
-              v-model="registerForm.password"
-              placeholder="请输入密码（至少6位）"
-              show-password
-              size="large"
-              type="password"
-            />
+            <el-input v-model="registerForm.password" placeholder="至少6位" type="password" show-password size="large" />
           </el-form-item>
           <el-form-item label="确认密码">
-            <el-input
-              v-model="registerForm.confirmPassword"
-              placeholder="请再次输入密码"
-              show-password
-              size="large"
-              type="password"
-            />
+            <el-input v-model="registerForm.confirmPassword" placeholder="请再次输入密码" type="password" show-password size="large" />
           </el-form-item>
           <el-form-item label="角色类型">
             <el-radio-group v-model="registerForm.roleType" size="large">
@@ -72,29 +109,25 @@
             </el-radio-group>
           </el-form-item>
           <el-form-item v-if="registerForm.roleType === 'STUDENT'" label="所属班级">
-            <el-select v-model="registerForm.classId" placeholder="请选择班级" size="large" style="width: 100%">
-              <el-option
-                v-for="cls in availableClasses"
-                :key="cls.id"
-                :label="cls.className"
-                :value="cls.id"
-              />
+            <el-select v-model="registerForm.classId" placeholder="请选择班级" size="large" style="width:100%">
+              <el-option v-for="cls in availableClasses" :key="cls.id" :label="cls.className" :value="cls.id" />
             </el-select>
           </el-form-item>
-          <el-form-item v-if="registerForm.roleType === 'STUDENT'" label="学号">
+          <el-form-item v-if="registerForm.roleType === 'STUDENT'" label="学号（选填）">
             <el-input v-model="registerForm.studentNo" placeholder="请输入学号" size="large" />
           </el-form-item>
-          <el-form-item v-if="registerForm.roleType === 'TEACHER'" label="工号">
+          <el-form-item v-if="registerForm.roleType === 'TEACHER'" label="工号（选填）">
             <el-input v-model="registerForm.teacherNo" placeholder="请输入工号" size="large" />
           </el-form-item>
-          <el-form-item v-if="registerForm.roleType === 'TEACHER'" label="职称">
-            <el-input v-model="registerForm.title" placeholder="请输入职称（如：讲师、副教授）" size="large" />
+          <el-form-item v-if="registerForm.roleType === 'TEACHER'" label="职称（选填）">
+            <el-input v-model="registerForm.title" placeholder="如：讲师、副教授" size="large" />
           </el-form-item>
-          <el-button type="primary" size="large" class="full-button" :loading="registerLoading" @click="handleRegister">
-            注册账号
-          </el-button>
         </el-form>
-      </el-card>
+        <template #footer>
+          <el-button @click="showRegister = false">取消</el-button>
+          <el-button type="primary" :loading="registerLoading" @click="handleRegister">注册</el-button>
+        </template>
+      </el-dialog>
     </section>
 
     <ExamTaking v-else-if="takingExam" :attempt-id="takingExam.attemptId" @submit-success="finishExam" />
@@ -241,6 +274,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
+import { Lock, Message, User } from '@element-plus/icons-vue';
 const BasicDataPanel = defineAsyncComponent(() => import('./components/BasicDataPanel.vue'));
 const QuestionBankPanel = defineAsyncComponent(() => import('./components/QuestionBankPanel.vue'));
 const PaperPanel = defineAsyncComponent(() => import('./components/PaperPanel.vue'));
@@ -260,8 +294,10 @@ import {
   fetchRegisterOptions,
   fetchRoleOverview,
   login,
+  loginByCode,
   logout,
   register,
+  sendLoginCode,
   type AuthUser,
   type MenuItem,
   type RegisterRequest,
@@ -288,7 +324,14 @@ const registerForm = reactive({
   title: ''
 });
 
-const isRegisterMode = ref(false);
+const loginMode = ref<'password' | 'code'>('password');
+const showRegister = ref(false);
+const codeLoginForm = reactive({ email: '', code: '' });
+const codeCountdown = ref(0);
+const codeSending = ref(false);
+const codeLoginLoading = ref(false);
+let codeTimer: ReturnType<typeof setInterval> | null = null;
+
 const takingExam = ref<{ attemptId: number } | null>(null);
 const loginLoading = ref(false);
 const registerLoading = ref(false);
@@ -349,14 +392,49 @@ async function loadRegisterOptions() {
   }));
 }
 
-async function toggleMode() {
-  isRegisterMode.value = !isRegisterMode.value;
-  if (isRegisterMode.value && availableClasses.value.length === 0) {
-    try {
-      await loadRegisterOptions();
-    } catch (error) {
-      ElMessage.warning(error instanceof Error ? error.message : '注册选项加载失败，请稍后重试');
+async function handleSendLoginCode() {
+  if (!codeLoginForm.email) {
+    ElMessage.warning('请输入邮箱');
+    return;
+  }
+  codeSending.value = true;
+  try {
+    await sendLoginCode(codeLoginForm.email);
+    ElMessage.success('验证码已发送');
+    codeCountdown.value = 60;
+    codeTimer = setInterval(() => {
+      codeCountdown.value--;
+      if (codeCountdown.value <= 0) {
+        if (codeTimer) { clearInterval(codeTimer); codeTimer = null; }
+      }
+    }, 1000);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '发送失败');
+  } finally {
+    codeSending.value = false;
+  }
+}
+
+async function handleCodeLogin() {
+  if (!codeLoginForm.email || !codeLoginForm.code) {
+    ElMessage.warning('请输入邮箱和验证码');
+    return;
+  }
+  codeLoginLoading.value = true;
+  try {
+    const response = await loginByCode(codeLoginForm.email, codeLoginForm.code);
+    if (response.data.token) {
+      setToken(response.data.token);
     }
+    user.value = response.data.user;
+    menus.value = response.data.menus;
+    navigateTo(resolveLandingPath(response.data.defaultPath), 'replace');
+    await loadOverview(response.data.user.primaryRole);
+    ElMessage.success(`${response.data.user.roleLabel} ${response.data.user.realName} 登录成功`);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '验证码登录失败');
+  } finally {
+    codeLoginLoading.value = false;
   }
 }
 
@@ -437,10 +515,11 @@ async function handleRegister() {
     if (!response.data.token) {
       // 教师账号需管理员审核启用，注册后不自动登录
       ElMessage.success('注册成功！教师账号需管理员审核启用后方可登录');
-      isRegisterMode.value = false;
+      showRegister.value = false;
       return;
     }
     setToken(response.data.token);
+    showRegister.value = false;
     user.value = response.data.user;
     menus.value = response.data.menus;
     navigateTo(resolveLandingPath(response.data.defaultPath), 'replace');

@@ -95,6 +95,26 @@ export function changePassword(oldPassword: string, newPassword: string) {
   return putJson<{ changed: boolean }, { oldPassword: string; newPassword: string }>('/api/auth/password', { oldPassword, newPassword });
 }
 
+export function sendLoginCode(email: string) {
+  return postJson<{ sent: boolean }, { email: string }>('/api/auth/send-login-code', { email });
+}
+
+export function loginByCode(email: string, code: string) {
+  return postJson<LoginResponse, { email: string; code: string }>('/api/auth/login-by-code', { email, code });
+}
+
+export function sendBindCode(email: string) {
+  return postJson<{ sent: boolean }, { email: string }>('/api/auth/send-bind-code', { email });
+}
+
+export function bindEmail(email: string, code: string) {
+  return postJson<{ bound: boolean; email: string }, { email: string; code: string }>('/api/auth/bind-email', { email, code });
+}
+
+export function updateProfile(realName: string, phone: string) {
+  return putJson<{ updated: boolean }, { realName: string; phone: string }>('/api/auth/profile', { realName, phone });
+}
+
 export function fetchRoleOverview(role: RoleCode) {
   const pathMap: Record<RoleCode, string> = {
     ADMIN: '/api/admin/overview',
