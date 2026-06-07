@@ -123,7 +123,7 @@
     <section v-else class="workspace" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
       <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
         <div class="brand">
-          <div class="brand-logo">考</div>
+          <img src="/logo.png" alt="广理考试中心" class="brand-logo" />
           <div v-show="!sidebarCollapsed">
             <strong>智慧在线考试</strong>
             <span>{{ user.roleLabel }}端</span>

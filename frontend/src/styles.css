@@ -315,14 +315,9 @@ button {
 .brand-logo {
   width: 36px;
   height: 36px;
-  display: grid;
-  place-items: center;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--mp-primary), #7c3aed);
-  color: #ffffff;
-  font-weight: 900;
-  font-size: 18px;
+  border-radius: 8px;
   flex-shrink: 0;
+  object-fit: cover;
 }
 
 .brand strong,
