@@ -1,5 +1,6 @@
 package com.smartexam.service;
 
+import com.smartexam.common.PageResult;
 import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.dto.exam.ExamRequest;
 import com.smartexam.dto.exam.ExamUpdateRequest;
@@ -37,6 +38,64 @@ public class ExamService {
                   AND (? IS NULL OR e.exam_name LIKE CONCAT('%', ?, '%') OR p.paper_name LIKE CONCAT('%', ?, '%'))
                 ORDER BY e.id DESC
                 """, user.getId(), status, status, keyword, keyword, keyword);
+    }
+
+    public PageResult<Map<String, Object>> listTeacherExams(String keyword, Integer status, AuthUser user,
+                                                            int page, int size) {
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        int safeSize = size <= 0 ? 10 : Math.min(size, 100);
+        int safePage = Math.max(1, page);
+        int offset = (safePage - 1) * safeSize;
+
+        Long total = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM exam e
+                JOIN paper p ON p.id = e.paper_id
+                JOIN edu_subject s ON s.id = p.subject_id
+                WHERE e.deleted = 0 AND e.created_by = ?
+                  AND (? IS NULL OR e.status = ?)
+                  AND (? IS NULL OR e.exam_name LIKE CONCAT('%', ?, '%') OR p.paper_name LIKE CONCAT('%', ?, '%'))
+                """, user.getId(), status, status, keyword, keyword, keyword, Long.class);
+
+        List<Map<String, Object>> list = jdbcTemplate.queryForList("""
+                SELECT e.id, e.exam_name AS examName, e.description, e.start_time AS startTime, e.end_time AS endTime,
+                       e.duration_minutes AS durationMinutes, e.status, p.paper_name AS paperName, s.subject_name AS subjectName
+                FROM exam e
+                JOIN paper p ON p.id = e.paper_id
+                JOIN edu_subject s ON s.id = p.subject_id
+                WHERE e.deleted = 0 AND e.created_by = ?
+                  AND (? IS NULL OR e.status = ?)
+                  AND (? IS NULL OR e.exam_name LIKE CONCAT('%', ?, '%') OR p.paper_name LIKE CONCAT('%', ?, '%'))
+                ORDER BY e.id DESC
+                LIMIT ? OFFSET ?
+                """, user.getId(), status, status, keyword, keyword, keyword, safeSize, offset);
+        return PageResult.of(list, total == null ? 0 : total, safePage, safeSize);
+    }
+
+    public PageResult<Map<String, Object>> listStudentExams(AuthUser user, int page, int size) {
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        int safeSize = size <= 0 ? 10 : Math.min(size, 100);
+        int safePage = Math.max(1, page);
+        int offset = (safePage - 1) * safeSize;
+
+        Long total = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM exam_attempt a
+                JOIN exam e ON e.id = a.exam_id
+                WHERE a.user_id = ? AND e.deleted = 0
+                """, user.getId(), Long.class);
+
+        List<Map<String, Object>> list = jdbcTemplate.queryForList("""
+            SELECT a.id as attemptId, e.id AS examId, e.exam_name AS examName, e.description, e.start_time AS startTime,
+                   e.end_time AS endTime, e.duration_minutes AS durationMinutes, a.status,
+                   p.paper_name AS paperName, s.subject_name as subjectName, a.score
+            FROM exam_attempt a
+            JOIN exam e ON e.id = a.exam_id
+            JOIN paper p ON p.id = e.paper_id
+            JOIN edu_subject s ON s.id = p.subject_id
+            WHERE a.user_id = ? AND e.deleted = 0
+            ORDER BY e.start_time DESC
+            LIMIT ? OFFSET ?
+            """, user.getId(), safeSize, offset);
+        return PageResult.of(list, total == null ? 0 : total, safePage, safeSize);
     }
 
     public List<Map<String, Object>> listStudentExams(AuthUser user) {

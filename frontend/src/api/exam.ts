@@ -52,16 +52,25 @@ export interface ExamDetail extends PaperInfo {
   draftAnswers?: string | null;
 }
 
-export function listTeacherExams(query?: { keyword?: string; status?: number | null }) {
+export interface PageResult<T> {
+  list: T[];
+  total: number;
+  page: number;
+  size: number;
+}
+
+export function listTeacherExams(query?: { keyword?: string; status?: number | null; page?: number; size?: number }) {
   const params = new URLSearchParams();
   if (query?.keyword) params.set('keyword', query.keyword);
   if (query?.status !== undefined && query.status !== null) params.set('status', String(query.status));
+  if (query?.page !== undefined) params.set('page', String(query.page));
+  if (query?.size !== undefined) params.set('size', String(query.size));
   const value = params.toString();
-  return getJson<ExamInfo[]>(`/api/exams/teacher${value ? `?${value}` : ''}`);
+  return getJson<PageResult<ExamInfo>>(`/api/exams/teacher${value ? `?${value}` : ''}`);
 }
 
-export function listStudentExams() {
-  return getJson<StudentExamInfo[]>('/api/exams/student');
+export function listStudentExams(page = 1, size = 10) {
+  return getJson<PageResult<StudentExamInfo>>(`/api/exams/student?page=${page}&size=${size}`);
 }
 
 export function createExam(payload: ExamPayload) {

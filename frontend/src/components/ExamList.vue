@@ -69,8 +69,8 @@ const exams = ref<StudentExamInfo[]>([]);
 
 onMounted(async () => {
   try {
-    const response = await listStudentExams();
-    exams.value = response.data;
+    const response = await listStudentExams(1, 10000);
+    exams.value = response.data.list;
   } catch (error) {
     ElMessage.error('加载考试列表失败');
   }

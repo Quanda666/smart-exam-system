@@ -1,6 +1,7 @@
 package com.smartexam.controller;
 
 import com.smartexam.common.ApiResponse;
+import com.smartexam.common.PageResult;
 import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.dto.exam.AnswerRequest;
 import com.smartexam.dto.exam.DraftRequest;
@@ -21,7 +22,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -39,16 +39,19 @@ public class ExamController {
     }
 
     @GetMapping("/teacher")
-    public ApiResponse<List<Map<String, Object>>> listTeacherExams(@RequestParam(required = false) String keyword,
-                                                                   @RequestParam(required = false) Integer status) {
+    public ApiResponse<PageResult<Map<String, Object>>> listTeacherExams(@RequestParam(required = false) String keyword,
+                                                                          @RequestParam(required = false) Integer status,
+                                                                          @RequestParam(defaultValue = "1") int page,
+                                                                          @RequestParam(defaultValue = "10") int size) {
         AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok(examService.listTeacherExams(keyword, status, user));
+        return ApiResponse.ok(examService.listTeacherExams(keyword, status, user, page, size));
     }
 
     @GetMapping("/student")
-    public ApiResponse<List<Map<String, Object>>> listStudentExams() {
+    public ApiResponse<PageResult<Map<String, Object>>> listStudentExams(@RequestParam(defaultValue = "1") int page,
+                                                                          @RequestParam(defaultValue = "10") int size) {
         AuthUser user = roleAccessService.requireRole("STUDENT");
-        return ApiResponse.ok(examService.listStudentExams(user));
+        return ApiResponse.ok(examService.listStudentExams(user, page, size));
     }
 
     @PostMapping

@@ -37,6 +37,17 @@
         </template>
       </el-table-column>
     </el-table>
+    <div class="exam-pagination">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="totalExams"
+        layout="total, sizes, prev, pager, next, jumper"
+        @current-change="handlePageChange"
+        @size-change="handleSizeChange"
+      />
+    </div>
     <el-empty v-if="!loading && exams.length === 0" description="还没有考试任务，点击右上角「发布考试」创建" />
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑考试' : '发布考试'" width="560px">
@@ -96,6 +107,9 @@ import { listPapers, type PaperInfo } from '../api/paper';
 import { listClasses, type ClassInfo } from '../api/basic';
 
 const exams = ref<ExamInfo[]>([]);
+const currentPage = ref(1);
+const pageSize = ref(10);
+const totalExams = ref(0);
 const papers = ref<PaperInfo[]>([]);
 const classes = ref<ClassInfo[]>([]);
 const loading = ref(false);
@@ -128,12 +142,25 @@ onMounted(loadExams);
 async function loadExams() {
   loading.value = true;
   try {
-    exams.value = (await listTeacherExams({ keyword: query.keyword })).data;
+    const response = await listTeacherExams({ keyword: query.keyword, page: currentPage.value, size: pageSize.value });
+    exams.value = response.data.list;
+    totalExams.value = response.data.total;
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '考试列表加载失败');
   } finally {
     loading.value = false;
   }
+}
+
+function handlePageChange(page: number) {
+  currentPage.value = page;
+  loadExams();
+}
+
+function handleSizeChange(size: number) {
+  pageSize.value = size;
+  currentPage.value = 1;
+  loadExams();
 }
 
 function resetForm() {
@@ -319,5 +346,10 @@ function phaseType(row: ExamInfo) {
 }
 .edit-tip {
   margin-top: 4px;
+}
+.exam-pagination {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>
