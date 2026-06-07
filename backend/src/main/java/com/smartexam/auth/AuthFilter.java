@@ -21,6 +21,8 @@ public class AuthFilter extends OncePerRequestFilter {
             "/api/health",
             "/api/ai/status",
             "/api/auth/login",
+            "/api/auth/login-by-code",
+            "/api/auth/send-login-code",
             "/api/auth/register",
             "/api/auth/register-options"
     );
