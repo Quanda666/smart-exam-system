@@ -1,5 +1,6 @@
 package com.smartexam.service;
 
+import com.smartexam.common.PageResult;
 import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.exception.DatabaseUnavailableException;
 import com.smartexam.dto.question.QuestionOptionRequest;
@@ -54,6 +55,55 @@ public class QuestionBankService {
                 blankToNull(difficulty), blankToNull(difficulty), status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword));
         rows.forEach(row -> row.put("options", listOptionsFromDatabase(longValue(row.get("id")))));
         return rows;
+    }
+
+    public PageResult<Map<String, Object>> listQuestions(String keyword, Long subjectId, Long knowledgePointId,
+                                                         String questionType, String difficulty, Integer status,
+                                                         int page, int size) {
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        int safeSize = size <= 0 ? 10 : Math.min(size, 100);
+        int safePage = Math.max(1, page);
+        int offset = (safePage - 1) * safeSize;
+
+        Long total = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM question q
+                JOIN edu_subject s ON s.id = q.subject_id
+                LEFT JOIN edu_knowledge_point kp ON kp.id = q.knowledge_point_id
+                LEFT JOIN sys_user u ON u.id = q.created_by
+                WHERE q.deleted = 0
+                  AND (? IS NULL OR q.subject_id = ?)
+                  AND (? IS NULL OR q.knowledge_point_id = ?)
+                  AND (? IS NULL OR q.question_type = ?)
+                  AND (? IS NULL OR q.difficulty = ?)
+                  AND (? IS NULL OR q.status = ?)
+                  AND (? IS NULL OR q.stem LIKE CONCAT('%', ?, '%') OR s.subject_name LIKE CONCAT('%', ?, '%') OR kp.point_name LIKE CONCAT('%', ?, '%'))
+                """, subjectId, subjectId, knowledgePointId, knowledgePointId, blankToNull(questionType), blankToNull(questionType),
+                blankToNull(difficulty), blankToNull(difficulty), status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), Long.class);
+
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
+                SELECT q.id, q.subject_id AS subjectId, s.subject_name AS subjectName,
+                       q.knowledge_point_id AS knowledgePointId, kp.point_name AS knowledgePointName,
+                       q.question_type AS questionType, q.difficulty, q.stem, q.correct_answer AS correctAnswer,
+                       q.analysis, q.default_score AS defaultScore, q.status, q.created_by AS createdBy,
+                       u.real_name AS creatorName, q.created_at AS createdAt, q.updated_at AS updatedAt
+                FROM question q
+                JOIN edu_subject s ON s.id = q.subject_id
+                LEFT JOIN edu_knowledge_point kp ON kp.id = q.knowledge_point_id
+                LEFT JOIN sys_user u ON u.id = q.created_by
+                WHERE q.deleted = 0
+                  AND (? IS NULL OR q.subject_id = ?)
+                  AND (? IS NULL OR q.knowledge_point_id = ?)
+                  AND (? IS NULL OR q.question_type = ?)
+                  AND (? IS NULL OR q.difficulty = ?)
+                  AND (? IS NULL OR q.status = ?)
+                  AND (? IS NULL OR q.stem LIKE CONCAT('%', ?, '%') OR s.subject_name LIKE CONCAT('%', ?, '%') OR kp.point_name LIKE CONCAT('%', ?, '%'))
+                ORDER BY q.id DESC
+                LIMIT ? OFFSET ?
+                """, subjectId, subjectId, knowledgePointId, knowledgePointId, blankToNull(questionType), blankToNull(questionType),
+                blankToNull(difficulty), blankToNull(difficulty), status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword),
+                safeSize, offset);
+        rows.forEach(row -> row.put("options", listOptionsFromDatabase(longValue(row.get("id")))));
+        return PageResult.of(rows, total == null ? 0 : total, safePage, safeSize);
     }
 
     public Map<String, Object> createQuestion(QuestionRequest request, AuthUser creator) {

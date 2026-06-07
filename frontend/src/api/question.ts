@@ -45,6 +45,13 @@ export interface QuestionPayload {
   options: QuestionOption[];
 }
 
+export interface PageResult<T> {
+  list: T[];
+  total: number;
+  page: number;
+  size: number;
+}
+
 export interface QuestionQuery {
   keyword?: string;
   subjectId?: number | null;
@@ -52,6 +59,8 @@ export interface QuestionQuery {
   questionType?: string | null;
   difficulty?: string | null;
   status?: number | null;
+  page?: number;
+  size?: number;
 }
 
 export interface QuestionSummary {
@@ -75,6 +84,8 @@ function queryString(query: QuestionQuery = {}) {
   if (query.questionType) params.set('questionType', query.questionType);
   if (query.difficulty) params.set('difficulty', query.difficulty);
   if (query.status !== undefined && query.status !== null) params.set('status', String(query.status));
+  if (query.page !== undefined) params.set('page', String(query.page));
+  if (query.size !== undefined) params.set('size', String(query.size));
   const value = params.toString();
   return value ? `?${value}` : '';
 }
@@ -84,7 +95,7 @@ export function fetchQuestionSummary() {
 }
 
 export function listQuestions(query?: QuestionQuery) {
-  return getJson<QuestionInfo[]>(`/api/questions${queryString(query)}`);
+  return getJson<PageResult<QuestionInfo>>(`/api/questions${queryString(query)}`);
 }
 
 export function createQuestion(payload: QuestionPayload) {

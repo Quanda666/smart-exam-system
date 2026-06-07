@@ -331,8 +331,8 @@ async function loadAvailableQuestions() {
     availableQuestions.value = [];
     return;
   }
-  const response = await listQuestions({ subjectId: paperForm.subjectId, status: 1 });
-  availableQuestions.value = response.data;
+  const response = await listQuestions({ subjectId: paperForm.subjectId, status: 1, size: 10000 });
+  availableQuestions.value = response.data.list;
 }
 
 function resetQuery() {

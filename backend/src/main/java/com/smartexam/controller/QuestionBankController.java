@@ -2,6 +2,7 @@ package com.smartexam.controller;
 
 import com.smartexam.auth.AuthContext;
 import com.smartexam.common.ApiResponse;
+import com.smartexam.common.PageResult;
 import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.dto.question.QuestionRequest;
 import com.smartexam.service.QuestionBankService;
@@ -17,7 +18,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -39,14 +39,16 @@ public class QuestionBankController {
     }
 
     @GetMapping
-    public ApiResponse<List<Map<String, Object>>> listQuestions(@RequestParam(required = false) String keyword,
-                                                                @RequestParam(required = false) Long subjectId,
-                                                                @RequestParam(required = false) Long knowledgePointId,
-                                                                @RequestParam(required = false) String questionType,
-                                                                @RequestParam(required = false) String difficulty,
-                                                                @RequestParam(required = false) Integer status) {
+    public ApiResponse<PageResult<Map<String, Object>>> listQuestions(@RequestParam(required = false) String keyword,
+                                                                      @RequestParam(required = false) Long subjectId,
+                                                                      @RequestParam(required = false) Long knowledgePointId,
+                                                                      @RequestParam(required = false) String questionType,
+                                                                      @RequestParam(required = false) String difficulty,
+                                                                      @RequestParam(required = false) Integer status,
+                                                                      @RequestParam(defaultValue = "1") int page,
+                                                                      @RequestParam(defaultValue = "10") int size) {
         roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok(questionBankService.listQuestions(keyword, subjectId, knowledgePointId, questionType, difficulty, status));
+        return ApiResponse.ok(questionBankService.listQuestions(keyword, subjectId, knowledgePointId, questionType, difficulty, status, page, size));
     }
 
     @PostMapping

@@ -165,6 +165,17 @@
           </template>
         </el-table-column>
       </el-table>
+      <div class="question-pagination">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="totalQuestions"
+          layout="total, sizes, prev, pager, next, jumper"
+          @current-change="handlePageChange"
+          @size-change="handleSizeChange"
+        />
+      </div>
     </el-card>
   </section>
 </template>
@@ -210,6 +221,9 @@ const difficulties: Array<{ label: string; value: Difficulty }> = [
 const subjects = ref<SubjectInfo[]>([]);
 const knowledgePoints = ref<KnowledgePointInfo[]>([]);
 const questions = ref<QuestionInfo[]>([]);
+const currentPage = ref(1);
+const pageSize = ref(10);
+const totalQuestions = ref(0);
 const summary = ref({ total: 0, published: 0, draft: 0, types: {}, difficulties: {} });
 const editingQuestionId = ref<number | null>(null);
 
@@ -281,8 +295,9 @@ async function loadKnowledgePoints() {
 
 async function loadQuestions() {
   try {
-    const response = await listQuestions({ ...query });
-    questions.value = response.data;
+    const response = await listQuestions({ ...query, page: currentPage.value, size: pageSize.value });
+    questions.value = response.data.list;
+    totalQuestions.value = response.data.total;
     await loadSummary();
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '题库加载失败');
@@ -305,6 +320,18 @@ function resetQuery() {
   query.questionType = null;
   query.difficulty = null;
   query.status = null;
+  currentPage.value = 1;
+  loadQuestions();
+}
+
+function handlePageChange(page: number) {
+  currentPage.value = page;
+  loadQuestions();
+}
+
+function handleSizeChange(size: number) {
+  pageSize.value = size;
+  currentPage.value = 1;
   loadQuestions();
 }
 
@@ -514,3 +541,10 @@ async function aiGenerateQuestion() {
   }
 }
 </script>
+<style scoped>
+.question-pagination {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+</style>
