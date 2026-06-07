@@ -682,3 +682,28 @@ button {
   .login-brand { flex: 0 0 auto; padding: 32px 24px; }
   .login-form-area { padding: 24px; }
 }
+
+/* ===== V2 侧边栏 & 顶栏 ===== */
+.topbar-left { display: flex; align-items: center; gap: 12px; }
+
+.hamburger-btn {
+  width: 32px; height: 32px; display: flex; flex-direction: column;
+  justify-content: center; gap: 5px; padding: 6px; border: none;
+  background: none; cursor: pointer; border-radius: 6px; transition: background 0.2s;
+}
+.hamburger-btn:hover { background: rgba(0,0,0,0.04); }
+.hamburger-line { display: block; height: 2px; background: #606266; border-radius: 1px; transition: all 0.2s; }
+
+/* 侧边栏折叠状态 */
+.sidebar { transition: width 0.25s ease; }
+.sidebar.collapsed { width: 64px; }
+.sidebar.collapsed .menu-item span { display: none; }
+.sidebar.collapsed .menu-item { justify-content: center; padding: 12px; }
+
+/* 账号中心下拉触发器 */
+.account-trigger {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 4px 8px; border-radius: 8px; transition: background 0.2s;
+}
+.account-trigger:hover { background: rgba(0,0,0,0.04); }
+
