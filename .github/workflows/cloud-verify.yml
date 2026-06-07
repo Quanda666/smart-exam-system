@@ -94,16 +94,15 @@ jobs:
           TOKEN=$(echo "$LOGIN_JSON" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
           test -n "$TOKEN" && test -n "$TCH_TOKEN" && test -n "$STU_TOKEN"
           curl -fsS http://127.0.0.1:8080/api/auth/me -H "Authorization: Bearer $TOKEN" | grep '"username":"admin"'
-          curl -fsS http://127.0.0.1:8080/api/admin/overview -H "Authorization: Bearer $TOKEN" | grep '"role":"ADMIN"'
+          curl -fsS http://127.0.0.1:8080/api/overview/admin -H "Authorization: Bearer $TOKEN" | grep '"totalStudents"'
+          curl -fsS http://127.0.0.1:8080/api/overview/teacher -H "Authorization: Bearer $TCH_TOKEN" | grep '"myExams"'
+          curl -fsS http://127.0.0.1:8080/api/overview/student -H "Authorization: Bearer $STU_TOKEN" | grep '"upcomingExams"'
           curl -fsS http://127.0.0.1:8080/api/basic/summary -H "Authorization: Bearer $TOKEN" | grep '"subjects"'
           curl -fsS http://127.0.0.1:8080/api/basic/classes -H "Authorization: Bearer $TOKEN" | grep '23本科计科1班'
           curl -fsS -X POST http://127.0.0.1:8080/api/basic/notices -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"title":"Actions阶段3公告","content":"云端验证阶段3基础资料接口","status":1}' | grep 'Actions阶段3公告'
           curl -fsS http://127.0.0.1:8080/api/questions/summary -H "Authorization: Bearer $TOKEN" | grep '"total"'
           curl -fsS http://127.0.0.1:8080/api/questions -H "Authorization: Bearer $TOKEN" | grep 'Java 中用于存储键值对的数据结构通常是？'
           curl -fsS -X POST http://127.0.0.1:8080/api/questions -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"subjectId":1,"knowledgePointId":1,"questionType":"SINGLE_CHOICE","difficulty":"EASY","stem":"Actions阶段4题库验证题","correctAnswer":"B","analysis":"用于云端验证题库新增接口。","defaultScore":5,"status":1,"options":[{"optionLabel":"A","optionContent":"错误项","correct":false},{"optionLabel":"B","optionContent":"正确项","correct":true}]}' | grep 'Actions阶段4题库验证题'
-          STUDENT_STATUS=$(curl -s -o /tmp/student-forbidden.json -w '%{http_code}' http://127.0.0.1:8080/api/student/overview -H "Authorization: Bearer $TOKEN")
-          test "$STUDENT_STATUS" = "403"
-          grep '"code":"FORBIDDEN"' /tmp/student-forbidden.json
           # 阶段5-10接口
           curl -fsS http://127.0.0.1:8080/api/papers/summary -H "Authorization: Bearer $TCH_TOKEN" | grep '"total"'
           curl -fsS http://127.0.0.1:8080/api/exams/teacher -H "Authorization: Bearer $TCH_TOKEN"
@@ -113,6 +112,9 @@ jobs:
           curl -fsS http://127.0.0.1:8080/api/student/wrong-questions -H "Authorization: Bearer $STU_TOKEN"
           curl -fsS http://127.0.0.1:8080/api/student/mastery -H "Authorization: Bearer $STU_TOKEN"
           curl -fsS http://127.0.0.1:8080/api/monitor/logs -H "Authorization: Bearer $TOKEN"
+          curl -fsS http://127.0.0.1:8080/api/users -H "Authorization: Bearer $TOKEN" | grep '"username"'
+          curl -fsS http://127.0.0.1:8080/api/auth/menu -H "Authorization: Bearer $TOKEN" | grep '"title"'
+          curl -fsS http://127.0.0.1:8080/api/notifications/unread-count -H "Authorization: Bearer $TOKEN"
           curl -fsS -X POST http://127.0.0.1:8080/api/ai/generate-question -H "Authorization: Bearer $TCH_TOKEN" -H 'Content-Type: application/json' -d '{"subject":"Java","questionType":"SINGLE_CHOICE","difficulty":"EASY","count":1}'
           curl -fsS -X POST http://127.0.0.1:8080/api/ai/explain -H "Authorization: Bearer $STU_TOKEN" -H 'Content-Type: application/json' -d '{"text":"HashMap"}'
           curl -fsS -X POST http://127.0.0.1:8080/api/ai/suggest-review -H "Authorization: Bearer $TCH_TOKEN" -H 'Content-Type: application/json' -d '{"question":"什么是Java？","studentAnswer":"Java是一种编程语言。","correctAnswer":"Java是一种面向对象的编程语言，具有跨平台特性。"}'
