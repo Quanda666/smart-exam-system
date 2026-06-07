@@ -176,7 +176,8 @@ public class AuthService {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         // 检查邮箱是否已绑定
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM sys_user WHERE email = ? AND email_verified = 1 AND deleted = 0", Integer.class, email);
+                "SELECT COUNT(*) FROM sys_user WHERE email = ? AND email_verified = 1 AND deleted = 0",
+                Integer.class, email);
         if (count == null || count == 0) {
             throw new IllegalArgumentException("该邮箱未绑定任何账号");
         }

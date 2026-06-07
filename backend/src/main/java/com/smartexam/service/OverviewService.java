@@ -142,7 +142,7 @@ public class OverviewService {
     }
 
     private int queryInt(JdbcTemplate jt, String sql, Object... args) {
-        Long val = jt.queryForObject(sql, Long.class, args);
+        Long val = jt.queryForObject(sql, (rs, rowNum) -> rs.getLong(1), args);
         return val == null ? 0 : val.intValue();
     }
 
