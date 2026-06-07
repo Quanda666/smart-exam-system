@@ -35,10 +35,13 @@ public class EmailService {
     public boolean sendVerificationCode(String to, String code) {
         // 如果邮件配置缺失，降级为日志记录（避免启动失败）
         if (!isMailConfigured()) {
-            log.warn("邮件服务未配置，验证码已生成但无法发送: {} -> {}", to, code);
+            log.warn("邮件服务未配置，验证码已生成但无法发送:  -> {}", to, code);
             return false;
         }
         try {
+            log.info("准备发送验证码邮件至 {} (SMTP: :{})", to,
+                    getProperty("spring.mail.host"), getProperty("spring.mail.port"));
+
             JavaMailSender mailSender = buildMailSender();
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -46,11 +49,13 @@ public class EmailService {
             helper.setTo(to);
             helper.setSubject("【广理考试中心】邮箱验证码");
             helper.setText(buildEmailBody(code), true);
+
+            log.info("开始连接 SMTP 服务器并发送邮件...");
             mailSender.send(message);
             log.info("验证码邮件已发送至 {}", to);
             return true;
         } catch (Exception e) {
-            log.error("邮件发送失败: {}", e.getMessage());
+            log.error("邮件发送失败: {}", e.getMessage(), e);
             return false;
         }
     }
@@ -78,10 +83,20 @@ public class EmailService {
         sender.setPassword(getProperty("spring.mail.password"));
         sender.setProtocol(getProperty("spring.mail.protocol", "smtps"));
         sender.setDefaultEncoding("UTF-8");
+
         Properties props = sender.getJavaMailProperties();
         props.put("mail.smtp.auth", "true");
         props.put("mail.smtp.ssl.enable", getProperty("spring.mail.properties.mail.smtp.ssl.enable", "true"));
         props.put("mail.smtp.starttls.enable", getProperty("spring.mail.properties.mail.smtp.starttls.enable", "false"));
+
+        // 关键修复：添加超时配置，防止无限等待
+        props.put("mail.smtp.timeout", getProperty("spring.mail.properties.mail.smtp.timeout", "10000"));
+        props.put("mail.smtp.connectiontimeout", getProperty("spring.mail.properties.mail.smtp.connectiontimeout", "10000"));
+        props.put("mail.smtp.writetimeout", getProperty("spring.mail.properties.mail.smtp.writetimeout", "10000"));
+
+        // 启用调试日志（生产环境可通过环境变量关闭）
+        props.put("mail.debug", getProperty("spring.mail.properties.mail.debug", "false"));
+
         return sender;
     }
 
