@@ -161,14 +161,34 @@ http://127.0.0.1:3000
 
 数据库脚本位于 [`database`](database) 目录：
 
-- [`database/schema.sql`](database/schema.sql)：创建了完整的数据库表结构，包括用户、角色、基础资料、题库、试卷、考试、答题、批阅、错题本、防作弊和日志等。
-- [`database/seed.sql`](database/seed.sql)：写入生产初始化所需的基础角色、初始管理员、班级、科目、知识点、题库样例、试卷样例、公告和 AI 提示词模板。
+- [`backend/src/main/resources/db/schema.sql`](backend/src/main/resources/db/schema.sql)：创建了完整的数据库表结构，包括用户、角色、基础资料、题库、试卷、考试、答题、批阅、错题本、防作弊和日志等。
+- [`backend/src/main/resources/db/data.sql`](backend/src/main/resources/db/data.sql)：写入生产初始化所需的基础角色、初始管理员、班级、科目、知识点、公告和 AI 提示词模板。
+
+> Spring Boot 启动时通过 `spring.sql.init`（`mode=always`）自动执行上述脚本完成建表与初始化，无需手动导入。本地验收也可用合并版的 [`docs/init.sql`](docs/init.sql) 一键初始化（含建库语句）。
 
 建议数据库名：
 
 ```text
 smart_exam_system
 ```
+
+## 本地验收部署（推荐）
+
+面向验收老师的「一键交付」方案：拿到 **源码 + jar + init.sql**，5 分钟即可跑通整套系统，无需配置开发环境。完整步骤见 [本地验收部署指南](docs/deploy-local.md)。
+
+```bash
+# 1. 初始化数据库（仅首次，自动建库 + 建表 + 初始数据）
+mysql -u root -p < docs/init.sql
+
+# 2. 启动后端（默认 8080 端口）
+java -jar backend/target/smart-exam-backend-0.1.0-SNAPSHOT.jar
+
+# 3. 浏览器打开 frontend/dist/index.html，使用 admin / admin123 登录
+```
+
+Windows 用户也可直接双击 [`docs/一键启动.bat`](docs/一键启动.bat)：自动检测 JDK、定位 jar、启动后端并打开前端。
+
+相关交付物：[一键初始化脚本 init.sql](docs/init.sql)、[本地部署指南 deploy-local.md](docs/deploy-local.md)、[Windows 一键启动脚本](docs/一键启动.bat)。
 
 ## 云端验证与部署
 
