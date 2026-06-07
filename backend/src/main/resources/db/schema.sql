@@ -374,11 +374,11 @@ CREATE TABLE IF NOT EXISTS ai_usage_log (
 
 -- ---------- V2.0: 邮箱验证 ----------
 
--- sys_user 新增邮箱验证状态字段（如列已存在则忽略，兼容已有数据库）
--- ALTER TABLE sys_user ADD COLUMN IF NOT EXISTS email_verified TINYINT NOT NULL DEFAULT 0 COMMENT '邮箱是否已验证 0未验证 1已验证';
-
--- 实际使用以下语句（MySQL 不支持 IF NOT EXISTS 列）：
--- ALTER TABLE sys_user ADD COLUMN email_verified TINYINT NOT NULL DEFAULT 0 COMMENT '邮箱是否已验证 0未验证 1已验证';
+-- sys_user.email_verified 列：全新库已在上方 CREATE TABLE sys_user 中包含；
+-- 对「V1.0 时期已存在 sys_user」的旧库（如线上持久库），CREATE TABLE IF NOT EXISTS 不会补列，
+-- 且 MySQL 不支持 ADD COLUMN IF NOT EXISTS，故补列改由应用启动时幂等自愈：
+--   com.smartexam.config.DatabaseMigrationRunner（无需人工登库）。
+-- 需要手工迁移时，另见 db/migration-v2.sql。
 
 CREATE TABLE IF NOT EXISTS email_verification (
   id         BIGINT       NOT NULL AUTO_INCREMENT,
