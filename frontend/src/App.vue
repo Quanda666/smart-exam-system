@@ -78,11 +78,6 @@
               <el-button link type="primary" @click="showRegister = true">注册账号</el-button>
               <el-button link type="info" @click="showRegister = true">{{ showRegister ? '' : '' }}</el-button>
             </div>
-
-            <div class="status-strip">
-              <span>后端：{{ healthState }}</span>
-              <span>AI：{{ ai?.mode || '待检测' }}</span>
-            </div>
           </div>
         </div>
       </div>
