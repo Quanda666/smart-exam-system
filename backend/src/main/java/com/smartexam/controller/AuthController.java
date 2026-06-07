@@ -1,8 +1,8 @@
 package com.smartexam.controller;
 
 import com.smartexam.auth.AuthContext;
-import com.smartexam.auth.AuthUser;
 import com.smartexam.common.ApiResponse;
+import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.dto.auth.BindEmailRequest;
 import com.smartexam.dto.auth.ChangePasswordRequest;
 import com.smartexam.dto.auth.LoginByCodeRequest;
