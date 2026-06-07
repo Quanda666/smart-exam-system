@@ -615,48 +615,23 @@ button {
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #e8f0fe 0%, #d4e4fc 50%, #c3d9f7 100%);
-  background-size: 400% 400%;
-  animation: gradientShift 15s ease infinite;
   padding: 20px;
   position: relative;
   overflow: hidden;
 }
 
-/* 背景动态渐变动画 */
-@keyframes gradientShift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-
-/* 背景装饰圆圈 */
-.login-page-v2::before,
-.login-page-v2::after {
+/* 网格点阵背景 */
+.login-page-v2::before {
   content: '';
   position: absolute;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image:
+    radial-gradient(circle, rgba(22, 119, 255, 0.15) 1px, transparent 1px);
+  background-size: 30px 30px;
   pointer-events: none;
-}
-
-.login-page-v2::before {
-  width: 600px;
-  height: 600px;
-  top: -300px;
-  right: -200px;
-  animation: floatCircle 20s ease-in-out infinite;
-}
-
-.login-page-v2::after {
-  width: 400px;
-  height: 400px;
-  bottom: -150px;
-  left: -100px;
-  animation: floatCircle 25s ease-in-out infinite reverse;
-}
-
-@keyframes floatCircle {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(30px, -30px) scale(1.1); }
 }
 
 .login-container {
