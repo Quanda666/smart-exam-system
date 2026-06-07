@@ -182,6 +182,17 @@
           </template>
         </el-table-column>
       </el-table>
+      <div class="paper-pagination">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="totalPapers"
+          layout="total, sizes, prev, pager, next, jumper"
+          @current-change="handlePageChange"
+          @size-change="handleSizeChange"
+        />
+      </div>
     </el-card>
 
     <el-drawer v-model="previewVisible" title="试卷预览" size="52%">
@@ -242,6 +253,9 @@ const subjects = ref<SubjectInfo[]>([]);
 const knowledgePoints = ref<KnowledgePointInfo[]>([]);
 const availableQuestions = ref<QuestionInfo[]>([]);
 const papers = ref<PaperInfo[]>([]);
+const currentPage = ref(1);
+const pageSize = ref(10);
+const totalPapers = ref(0);
 const summary = ref({ total: 0, published: 0, draft: 0, totalQuestions: 0 });
 const selectedQuestionId = ref<number | null>(null);
 const selectedQuestions = ref<PaperQuestionInfo[]>([]);
@@ -309,8 +323,9 @@ async function loadKnowledgePoints() {
 
 async function loadPapers() {
   try {
-    const response = await listPapers({ ...query });
-    papers.value = response.data;
+    const response = await listPapers({ ...query, page: currentPage.value, size: pageSize.value });
+    papers.value = response.data.list;
+    totalPapers.value = response.data.total;
     await loadSummary();
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '试卷加载失败');
@@ -339,6 +354,18 @@ function resetQuery() {
   query.keyword = '';
   query.subjectId = null;
   query.status = null;
+  currentPage.value = 1;
+  loadPapers();
+}
+
+function handlePageChange(page: number) {
+  currentPage.value = page;
+  loadPapers();
+}
+
+function handleSizeChange(size: number) {
+  pageSize.value = size;
+  currentPage.value = 1;
   loadPapers();
 }
 
@@ -713,5 +740,10 @@ function statusText(status: number) {
 .item-actions {
   display: flex;
   align-items: center;
+}
+.paper-pagination {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

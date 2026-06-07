@@ -1,6 +1,7 @@
 package com.smartexam.controller;
 
 import com.smartexam.common.ApiResponse;
+import com.smartexam.common.PageResult;
 import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.dto.paper.GeneratePaperRequest;
 import com.smartexam.dto.paper.PaperRequest;
@@ -17,7 +18,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -39,11 +39,13 @@ public class PaperController {
     }
 
     @GetMapping
-    public ApiResponse<List<Map<String, Object>>> listPapers(@RequestParam(required = false) String keyword,
-                                                             @RequestParam(required = false) Long subjectId,
-                                                             @RequestParam(required = false) Integer status) {
+    public ApiResponse<PageResult<Map<String, Object>>> listPapers(@RequestParam(required = false) String keyword,
+                                                                    @RequestParam(required = false) Long subjectId,
+                                                                    @RequestParam(required = false) Integer status,
+                                                                    @RequestParam(defaultValue = "1") int page,
+                                                                    @RequestParam(defaultValue = "10") int size) {
         roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok(paperService.listPapers(keyword, subjectId, status));
+        return ApiResponse.ok(paperService.listPapers(keyword, subjectId, status, page, size));
     }
 
     @GetMapping("/{id}")

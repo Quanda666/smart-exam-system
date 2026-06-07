@@ -1,5 +1,6 @@
 package com.smartexam.service;
 
+import com.smartexam.common.PageResult;
 import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.exception.DatabaseUnavailableException;
 import com.smartexam.dto.paper.GeneratePaperRequest;
@@ -65,6 +66,45 @@ public class PaperService {
                          p.created_by, u.real_name, p.created_at, p.updated_at
                 ORDER BY p.id DESC
                 """, subjectId, subjectId, status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword));
+    }
+
+    public PageResult<Map<String, Object>> listPapers(String keyword, Long subjectId, Integer status,
+                                                       int page, int size) {
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        int safeSize = size <= 0 ? 10 : Math.min(size, 100);
+        int safePage = Math.max(1, page);
+        int offset = (safePage - 1) * safeSize;
+
+        Long total = jdbcTemplate.queryForObject("""
+                SELECT COUNT(DISTINCT p.id)
+                FROM paper p
+                JOIN edu_subject s ON s.id = p.subject_id
+                WHERE p.deleted = 0
+                  AND (? IS NULL OR p.subject_id = ?)
+                  AND (? IS NULL OR p.status = ?)
+                  AND (? IS NULL OR p.paper_name LIKE CONCAT('%', ?, '%') OR p.description LIKE CONCAT('%', ?, '%') OR s.subject_name LIKE CONCAT('%', ?, '%'))
+                """, subjectId, subjectId, status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), Long.class);
+
+        List<Map<String, Object>> list = jdbcTemplate.queryForList("""
+                SELECT p.id, p.subject_id AS subjectId, s.subject_name AS subjectName, p.paper_name AS paperName,
+                       p.description, p.total_score AS totalScore, p.status, p.created_by AS createdBy,
+                       u.real_name AS creatorName, p.created_at AS createdAt, p.updated_at AS updatedAt,
+                       COUNT(pq.id) AS questionCount
+                FROM paper p
+                JOIN edu_subject s ON s.id = p.subject_id
+                LEFT JOIN sys_user u ON u.id = p.created_by
+                LEFT JOIN paper_question pq ON pq.paper_id = p.id
+                WHERE p.deleted = 0
+                  AND (? IS NULL OR p.subject_id = ?)
+                  AND (? IS NULL OR p.status = ?)
+                  AND (? IS NULL OR p.paper_name LIKE CONCAT('%', ?, '%') OR p.description LIKE CONCAT('%', ?, '%') OR s.subject_name LIKE CONCAT('%', ?, '%'))
+                GROUP BY p.id, p.subject_id, s.subject_name, p.paper_name, p.description, p.total_score, p.status,
+                         p.created_by, u.real_name, p.created_at, p.updated_at
+                ORDER BY p.id DESC
+                LIMIT ? OFFSET ?
+                """, subjectId, subjectId, status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword),
+                safeSize, offset);
+        return PageResult.of(list, total == null ? 0 : total, safePage, safeSize);
     }
 
     public Map<String, Object> getPaper(Long id) {

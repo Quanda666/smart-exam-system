@@ -61,10 +61,19 @@ export interface GeneratePaperPayload {
   rules: GenerateRulePayload[];
 }
 
+export interface PageResult<T> {
+  list: T[];
+  total: number;
+  page: number;
+  size: number;
+}
+
 export interface PaperQuery {
   keyword?: string;
   subjectId?: number | null;
   status?: number | null;
+  page?: number;
+  size?: number;
 }
 
 export interface PaperSummary {
@@ -84,6 +93,8 @@ function queryString(query: PaperQuery = {}) {
   if (query.keyword) params.set('keyword', query.keyword);
   if (query.subjectId !== undefined && query.subjectId !== null) params.set('subjectId', String(query.subjectId));
   if (query.status !== undefined && query.status !== null) params.set('status', String(query.status));
+  if (query.page !== undefined) params.set('page', String(query.page));
+  if (query.size !== undefined) params.set('size', String(query.size));
   const value = params.toString();
   return value ? `?${value}` : '';
 }
@@ -93,7 +104,7 @@ export function fetchPaperSummary() {
 }
 
 export function listPapers(query?: PaperQuery) {
-  return getJson<PaperInfo[]>(`/api/papers${queryString(query)}`);
+  return getJson<PageResult<PaperInfo>>(`/api/papers${queryString(query)}`);
 }
 
 export function getPaper(id: number) {
