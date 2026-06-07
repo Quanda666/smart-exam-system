@@ -33,6 +33,11 @@ public class EmailService {
      * @return true 发送成功
      */
     public boolean sendVerificationCode(String to, String code) {
+        // 如果邮件配置缺失，降级为日志记录（避免启动失败）
+        if (!isMailConfigured()) {
+            log.warn("邮件服务未配置，验证码已生成但无法发送: {} -> {}", to, code);
+            return false;
+        }
         try {
             JavaMailSender mailSender = buildMailSender();
             MimeMessage message = mailSender.createMimeMessage();
@@ -68,19 +73,29 @@ public class EmailService {
     private JavaMailSender buildMailSender() {
         JavaMailSenderImpl sender = new JavaMailSenderImpl();
         sender.setHost(getProperty("spring.mail.host"));
-        sender.setPort(Integer.parseInt(getProperty("spring.mail.port")));
+        sender.setPort(Integer.parseInt(getProperty("spring.mail.port", "465")));
         sender.setUsername(getProperty("spring.mail.username"));
         sender.setPassword(getProperty("spring.mail.password"));
-        sender.setProtocol(getProperty("spring.mail.protocol"));
+        sender.setProtocol(getProperty("spring.mail.protocol", "smtps"));
         sender.setDefaultEncoding("UTF-8");
         Properties props = sender.getJavaMailProperties();
         props.put("mail.smtp.auth", "true");
-        props.put("mail.smtp.ssl.enable", getProperty("spring.mail.properties.mail.smtp.ssl.enable"));
-        props.put("mail.smtp.starttls.enable", getProperty("spring.mail.properties.mail.smtp.starttls.enable"));
+        props.put("mail.smtp.ssl.enable", getProperty("spring.mail.properties.mail.smtp.ssl.enable", "true"));
+        props.put("mail.smtp.starttls.enable", getProperty("spring.mail.properties.mail.smtp.starttls.enable", "false"));
         return sender;
     }
 
+    private boolean isMailConfigured() {
+        String host = getProperty("spring.mail.host");
+        String username = getProperty("spring.mail.username");
+        return host != null && !host.isEmpty() && username != null && !username.isEmpty();
+    }
+
     private String getProperty(String key) {
-        return env.getProperty(key, "");
+        return getProperty(key, "");
+    }
+
+    private String getProperty(String key, String defaultValue) {
+        return env.getProperty(key, defaultValue);
     }
 }
