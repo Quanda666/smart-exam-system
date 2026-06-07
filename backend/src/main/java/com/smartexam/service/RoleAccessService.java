@@ -8,6 +8,11 @@ import org.springframework.stereotype.Service;
 @Service
 public class RoleAccessService {
 
+    /** 要求当前请求已登录（任意角色），返回当前用户。通知等全角色共用接口用此校验。 */
+    public AuthUser requireLogin() {
+        return AuthContext.requireSession().getUser();
+    }
+
     public AuthUser requireRole(String role) {
         AuthUser user = AuthContext.requireSession().getUser();
         if (!user.hasRole(role)) {

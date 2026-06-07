@@ -17,9 +17,11 @@ import java.util.Map;
 public class ExamService {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
+    private final NotificationService notificationService;
 
-    public ExamService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+    public ExamService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider, NotificationService notificationService) {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
+        this.notificationService = notificationService;
     }
 
     public List<Map<String, Object>> listTeacherExams(String keyword, Integer status, AuthUser user) {
@@ -74,6 +76,14 @@ public class ExamService {
         }
         for (Long studentId : studentIds) {
             jdbcTemplate.update("INSERT INTO exam_attempt (exam_id, user_id, status) VALUES (?, ?, 0)", examId, studentId);
+        }
+
+        // 给全体参考学生发站内通知
+        if (!studentIds.isEmpty()) {
+            String title = "新考试：" + request.getExamName();
+            String content = "您有一场新考试「" + request.getExamName() + "」，考试时间 " + request.getStartTime() + " 至 "
+                    + request.getEndTime() + "，请及时参加。";
+            notificationService.sendBatch(studentIds.stream().toList(), title, content, "EXAM", "/student/exams");
         }
 
         return getExamById(examId);

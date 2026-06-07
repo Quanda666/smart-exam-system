@@ -304,6 +304,21 @@ CREATE TABLE IF NOT EXISTS operation_log (
   KEY idx_oplog_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作日志';
 
+-- ---------- 站内通知（个人消息，带已读状态） ----------
+
+CREATE TABLE IF NOT EXISTS notification (
+  id         BIGINT       NOT NULL AUTO_INCREMENT,
+  user_id    BIGINT       NOT NULL COMMENT '接收人 ID',
+  title      VARCHAR(128) NOT NULL COMMENT '通知标题',
+  content    TEXT         DEFAULT NULL COMMENT '通知内容',
+  type       VARCHAR(32)  DEFAULT 'INFO' COMMENT '通知类型：INFO/EXAM/APPROVAL/SYSTEM',
+  link       VARCHAR(255) DEFAULT NULL COMMENT '关联跳转路径（可选）',
+  is_read    TINYINT      NOT NULL DEFAULT 0 COMMENT '0 未读，1 已读',
+  created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_notification_user (user_id, is_read, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='站内通知';
+
 -- ---------- 答题草稿（自动暂存，支持刷新/断线后恢复作答） ----------
 
 CREATE TABLE IF NOT EXISTS exam_answer_draft (

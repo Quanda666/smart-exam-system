@@ -128,6 +128,7 @@
             <h2>{{ isManagedModulePath ? currentMenuTitle : overview?.title || '角色首页' }}</h2>
           </div>
           <div class="user-box">
+            <NotificationBell />
             <el-tag :type="roleTagType">{{ user.primaryRole }}</el-tag>
             <span>{{ user.realName }}</span>
             <el-button plain @click="handleLogout">退出</el-button>
@@ -236,6 +237,7 @@ const SystemLog = defineAsyncComponent(() => import('./components/SystemLog.vue'
 const ExamAnalysis = defineAsyncComponent(() => import('./components/ExamAnalysis.vue'));
 const ExamManagement = defineAsyncComponent(() => import('./components/ExamManagement.vue'));
 const StudentInsight = defineAsyncComponent(() => import('./components/StudentInsight.vue'));
+const NotificationBell = defineAsyncComponent(() => import('./components/NotificationBell.vue'));
 import {
   fetchCurrentUser,
   fetchRegisterOptions,

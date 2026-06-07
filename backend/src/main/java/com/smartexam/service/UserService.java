@@ -16,9 +16,11 @@ import java.util.Objects;
 public class UserService {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
+    private final NotificationService notificationService;
 
-    public UserService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+    public UserService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider, NotificationService notificationService) {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
+        this.notificationService = notificationService;
     }
 
     public PageResult<Map<String, Object>> listUsers(String keyword, String role, Integer status, int page, int size) {
@@ -94,6 +96,10 @@ public class UserService {
         int rows = jdbcTemplate.update("UPDATE sys_user SET status = ? WHERE id = ? AND deleted = 0", status, id);
         if (rows == 0) {
             throw new IllegalArgumentException("用户不存在");
+        }
+        // 账号从禁用改为启用时，通知本人（教师审核通过等场景）
+        if (status == 1) {
+            notificationService.send(id, "账号已启用", "您的账号已通过审核并启用，现在可以正常登录使用系统。", "APPROVAL", null);
         }
     }
 
