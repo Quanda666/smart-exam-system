@@ -1,6 +1,7 @@
 package com.smartexam.controller;
 
 import com.smartexam.common.ApiResponse;
+import com.smartexam.common.PageResult;
 import com.smartexam.dto.monitor.CheatEventRequest;
 import com.smartexam.service.MonitorService;
 import com.smartexam.service.RoleAccessService;
@@ -10,7 +11,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/monitor")
@@ -37,8 +41,9 @@ public class MonitorController {
     }
 
     @GetMapping("/logs")
-    public ApiResponse<?> getOperationLogs() {
+    public ApiResponse<PageResult<Map<String, Object>>> getOperationLogs(@RequestParam(defaultValue = "1") int page,
+                                                                          @RequestParam(defaultValue = "10") int size) {
         roleAccessService.requireRole("ADMIN");
-        return ApiResponse.ok(monitorService.getOperationLogs());
+        return ApiResponse.ok(monitorService.getOperationLogs(page, size));
     }
 }

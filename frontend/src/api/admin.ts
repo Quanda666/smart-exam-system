@@ -112,8 +112,8 @@ export function listRoles() {
   return getJson<SystemRole[]>('/api/system/roles');
 }
 
-export function listOperationLogs() {
-  return getJson<OperationLog[]>('/api/monitor/logs');
+export function listOperationLogs(page = 1, size = 10) {
+  return getJson<PageResult<OperationLog>>(`/api/monitor/logs?page=${page}&size=${size}`);
 }
 
 export function fetchAnalysisOverview() {

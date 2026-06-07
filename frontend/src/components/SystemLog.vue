@@ -29,6 +29,17 @@
       </el-table-column>
     </el-table>
     <el-empty v-if="!loading && logs.length === 0" description="暂无操作日志" />
+    <div class="log-pagination">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="totalLogs"
+        layout="total, sizes, prev, pager, next, jumper"
+        @current-change="handlePageChange"
+        @size-change="handleSizeChange"
+      />
+    </div>
   </section>
 </template>
 
@@ -40,18 +51,34 @@ import { listOperationLogs, type OperationLog } from '../api/admin';
 
 const logs = ref<OperationLog[]>([]);
 const loading = ref(false);
+const currentPage = ref(1);
+const pageSize = ref(10);
+const totalLogs = ref(0);
 
-onMounted(load);
+onMounted(() => load());
 
 async function load() {
   loading.value = true;
   try {
-    logs.value = (await listOperationLogs()).data;
+    const response = await listOperationLogs(currentPage.value, pageSize.value);
+    logs.value = response.data.list;
+    totalLogs.value = response.data.total;
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '操作日志加载失败');
   } finally {
     loading.value = false;
   }
+}
+
+function handlePageChange(page: number) {
+  currentPage.value = page;
+  load();
+}
+
+function handleSizeChange(size: number) {
+  pageSize.value = size;
+  currentPage.value = 1;
+  load();
 }
 </script>
 
@@ -73,5 +100,10 @@ async function load() {
   margin: 0;
   color: #909399;
   font-size: 13px;
+}
+.log-pagination {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

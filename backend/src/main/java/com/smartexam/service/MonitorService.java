@@ -1,5 +1,6 @@
 package com.smartexam.service;
 
+import com.smartexam.common.PageResult;
 import com.smartexam.dto.monitor.CheatEventRequest;
 import com.smartexam.exception.DatabaseUnavailableException;
 import org.springframework.beans.factory.ObjectProvider;
@@ -29,9 +30,18 @@ public class MonitorService {
         return jdbcTemplate.queryForList("SELECT * FROM cheat_event WHERE attempt_id = ? ORDER BY event_time DESC", attemptId);
     }
     
-    public List<Map<String, Object>> getOperationLogs() {
+    public PageResult<Map<String, Object>> getOperationLogs(int page, int size) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
-        return jdbcTemplate.queryForList("SELECT * FROM operation_log ORDER BY created_at DESC");
+        int safeSize = size <= 0 ? 10 : Math.min(size, 100);
+        int safePage = Math.max(1, page);
+        int offset = (safePage - 1) * safeSize;
+
+        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM operation_log", Long.class);
+
+        List<Map<String, Object>> list = jdbcTemplate.queryForList(
+                "SELECT * FROM operation_log ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                safeSize, offset);
+        return PageResult.of(list, total == null ? 0 : total, safePage, safeSize);
     }
 
     private JdbcTemplate requireJdbcTemplate() {
