@@ -7,12 +7,7 @@
           <div class="brand-overlay"></div>
           <div class="brand-content">
             <div class="brand-icon">
-              <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="48" height="48" rx="12" fill="rgba(255,255,255,0.2)"/>
-                <path d="M14 20L24 14L34 20V30L24 36L14 30V20Z" stroke="white" stroke-width="2" fill="none"/>
-                <circle cx="24" cy="25" r="4" fill="white"/>
-                <path d="M24 29V34" stroke="white" stroke-width="2" stroke-linecap="round"/>
-              </svg>
+              <img src="/logo.png" alt="广理考试中心" style="width: 120px; height: 120px; border-radius: 20px;" />
             </div>
             <h1 class="brand-title">广理考试中心</h1>
             <p class="brand-desc">智慧在线考试与学习反馈系统</p>
