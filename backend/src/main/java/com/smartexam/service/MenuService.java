@@ -32,7 +32,7 @@ public class MenuService {
 
     private List<MenuItem> allMenus() {
         return List.of(
-                new MenuItem("管理员首页", "/admin", "DataAnalysis", List.of("ADMIN")),
+                new MenuItem("仪表盘", "/admin", "DataAnalysis", List.of("ADMIN")),
                 new MenuItem("班级管理", "/basic/classes", "OfficeBuilding", List.of("ADMIN")),
                 new MenuItem("科目管理", "/basic/subjects", "Management", List.of("ADMIN", "TEACHER")),
                 new MenuItem("知识点管理", "/basic/knowledge-points", "Connection", List.of("ADMIN", "TEACHER")),
@@ -42,13 +42,13 @@ public class MenuService {
                 new MenuItem("角色管理", "/system/roles", "Lock", List.of("ADMIN")),
                 new MenuItem("系统日志", "/monitor/logs", "Document", List.of("ADMIN")),
                 new MenuItem("全局成绩分析", "/exam/analysis", "PieChart", List.of("ADMIN")),
-                new MenuItem("教师首页", "/teacher", "Notebook", List.of("TEACHER")),
+                new MenuItem("仪表盘", "/teacher", "Notebook", List.of("TEACHER")),
                 new MenuItem("试卷管理", "/papers", "Files", List.of("ADMIN", "TEACHER")),
                 new MenuItem("考试任务", "/exam-tasks", "Calendar", List.of("TEACHER")),
                 new MenuItem("阅卷管理", "/reviews", "EditPen", List.of("TEACHER")),
                 new MenuItem("教师成绩分析", "/teacher/analysis", "TrendCharts", List.of("TEACHER")),
                 new MenuItem("学情分析", "/teacher/students", "DataLine", List.of("TEACHER")),
-                new MenuItem("学生首页", "/student", "House", List.of("STUDENT")),
+                new MenuItem("仪表盘", "/student", "House", List.of("STUDENT")),
                 new MenuItem("考试中心", "/student/exams", "Clock", List.of("STUDENT")),
                 new MenuItem("成绩查询", "/student/results", "Tickets", List.of("STUDENT")),
                 new MenuItem("错题本", "/student/wrong-questions", "Reading", List.of("STUDENT"))
