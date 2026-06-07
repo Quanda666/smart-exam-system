@@ -375,11 +375,16 @@ class SmartExamApplicationTests {
     }
 
     private String registerTeacherAndExtractToken() throws Exception {
+        // 教师账号注册后需管理员审核启用（见 AuthService#register），注册不直接返回 token。
+        // 故由管理员直接创建已启用的教师账号，再登录获取可用 token。
         String suffix = String.valueOf(System.nanoTime());
-        MvcResult result = mockMvc.perform(post("/api/auth/register")
+        String username = "teacher_" + suffix;
+        String adminToken = loginAndExtractToken("admin", "admin123");
+        mockMvc.perform(post("/api/system/users")
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "username", "teacher_" + suffix,
+                                "username", username,
                                 "password", "teacher123",
                                 "realName", "测试教师",
                                 "roleType", "TEACHER",
@@ -387,10 +392,8 @@ class SmartExamApplicationTests {
                                 "title", "讲师"
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andReturn();
-        JsonNode jsonNode = objectMapper.readTree(result.getResponse().getContentAsString());
-        return jsonNode.path("data").path("token").asText();
+                .andExpect(jsonPath("$.success").value(true));
+        return loginAndExtractToken(username, "teacher123");
     }
 
     private String registerStudentAndExtractToken() throws Exception {

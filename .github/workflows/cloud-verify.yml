@@ -87,12 +87,14 @@ jobs:
           REG_JSON=$(curl -fsS -X POST http://127.0.0.1:8080/api/auth/register -H 'Content-Type: application/json' -d '{"username":"ci_student","password":"student123","realName":"CI学生","roleType":"STUDENT","studentNo":"CI2026001","classId":1}')
           echo "$REG_JSON" | grep '"primaryRole":"STUDENT"'
           STU_TOKEN=$(echo "$REG_JSON" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
-          TCH_REG_JSON=$(curl -fsS -X POST http://127.0.0.1:8080/api/auth/register -H 'Content-Type: application/json' -d '{"username":"ci_teacher","password":"teacher123","realName":"CI教师","roleType":"TEACHER","teacherNo":"CI-T-001","title":"讲师"}')
-          echo "$TCH_REG_JSON" | grep '"primaryRole":"TEACHER"'
-          TCH_TOKEN=$(echo "$TCH_REG_JSON" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
           LOGIN_JSON=$(curl -fsS -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin123"}')
           echo "$LOGIN_JSON" | grep '"primaryRole":"ADMIN"'
           TOKEN=$(echo "$LOGIN_JSON" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+          # 教师账号注册后需管理员审核启用，故由管理员直接创建已启用的教师账号，再登录获取 token
+          curl -fsS -X POST http://127.0.0.1:8080/api/system/users -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"username":"ci_teacher","password":"teacher123","realName":"CI教师","roleType":"TEACHER","teacherNo":"CI-T-001","title":"讲师"}' | grep '"success":true'
+          TCH_LOGIN_JSON=$(curl -fsS -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: application/json' -d '{"username":"ci_teacher","password":"teacher123"}')
+          echo "$TCH_LOGIN_JSON" | grep '"primaryRole":"TEACHER"'
+          TCH_TOKEN=$(echo "$TCH_LOGIN_JSON" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
           test -n "$TOKEN" && test -n "$TCH_TOKEN" && test -n "$STU_TOKEN"
           curl -fsS http://127.0.0.1:8080/api/auth/me -H "Authorization: Bearer $TOKEN" | grep '"username":"admin"'
           curl -fsS http://127.0.0.1:8080/api/overview/admin -H "Authorization: Bearer $TOKEN" | grep '"totalStudents"'
