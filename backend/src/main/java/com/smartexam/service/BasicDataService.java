@@ -20,9 +20,11 @@ import java.util.Map;
 public class BasicDataService {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
+    private final NotificationService notificationService;
 
-    public BasicDataService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+    public BasicDataService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider, NotificationService notificationService) {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
+        this.notificationService = notificationService;
     }
 
     public List<Map<String, Object>> listClasses(String keyword, Integer status) {
@@ -211,9 +213,26 @@ public class BasicDataService {
                     VALUES (?, ?, ?, ?, ?)
                     """, trim(request.getTitle()), trim(request.getContent()), publisher.getId(), request.getStatus(), LocalDateTime.now());
             Long id = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
-            return getNoticeById(id);
+            Map<String, Object> notice = getNoticeById(id);
+            // 公告发布（status=1）时，向全体在用用户推送站内通知，使顶栏铃铛能看到新公告
+            if (request.getStatus() != null && request.getStatus() == 1) {
+                pushNoticeNotification(jdbcTemplate, request);
+            }
+            return notice;
         } catch (DuplicateKeyException ex) {
             throw new IllegalArgumentException("公告标题已存在");
+        }
+    }
+
+    /** 公告发布后向全体在用用户群发站内通知；推送失败不影响公告创建本身。 */
+    private void pushNoticeNotification(JdbcTemplate jdbcTemplate, NoticeRequest request) {
+        try {
+            List<Long> userIds = jdbcTemplate.queryForList(
+                    "SELECT id FROM sys_user WHERE deleted = 0 AND status = 1", Long.class);
+            notificationService.sendBatch(userIds, "新公告：" + trim(request.getTitle()),
+                    trim(request.getContent()), "NOTICE", "/basic/notices");
+        } catch (Exception ex) {
+            // 通知为附属能力，推送失败时静默忽略，保证公告主流程成功
         }
     }
 

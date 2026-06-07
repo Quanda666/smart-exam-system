@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -347,6 +348,29 @@ class SmartExamApplicationTests {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    void publishNoticeShouldPushNotificationToUsers() throws Exception {
+        String token = loginAndExtractToken("admin", "admin123");
+        String title = "通知联动测试公告" + System.nanoTime();
+
+        mockMvc.perform(post("/api/basic/notices")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "title", title,
+                                "content", "用于验证公告联动站内通知的测试公告。",
+                                "status", 1
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        // 公告发布后应向全体在用用户（含管理员自己）推送站内通知，顶栏铃铛可见
+        mockMvc.perform(get("/api/notifications/my")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.list[*].title", hasItem("新公告：" + title)));
     }
 
     private Long createPublishedQuestion(String token, String stem, String questionType) throws Exception {

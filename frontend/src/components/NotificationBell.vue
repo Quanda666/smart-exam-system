@@ -1,5 +1,5 @@
 <template>
-  <el-popover placement="bottom" :width="380" trigger="click">
+  <el-popover placement="bottom" :width="380" trigger="click" @show="handleOpen">
     <template #reference>
       <el-badge :value="unreadCount" :hidden="unreadCount === 0" :max="99">
         <el-button :icon="Bell" circle />
@@ -55,6 +55,12 @@ onMounted(async () => {
   // 每 30 秒轮询未读数（可选，按需启用）
   setInterval(loadUnreadCount, 30000);
 });
+
+// 每次展开铃铛都重新拉取最新通知，避免只显示页面加载时的旧列表
+async function handleOpen() {
+  await loadNotifications(1);
+  await loadUnreadCount();
+}
 
 async function loadNotifications(p: number) {
   page.value = p;
