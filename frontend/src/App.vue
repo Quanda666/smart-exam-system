@@ -131,9 +131,25 @@
             <NotificationBell />
             <el-tag :type="roleTagType">{{ user.primaryRole }}</el-tag>
             <span>{{ user.realName }}</span>
+            <el-button plain @click="openChangePassword">修改密码</el-button>
             <el-button plain @click="handleLogout">退出</el-button>
           </div>
         </header>
+
+        <el-dialog v-model="passwordDialogVisible" title="修改密码" width="400px">
+          <el-form label-position="top">
+            <el-form-item label="当前密码">
+              <el-input v-model="passwordForm.oldPassword" type="password" show-password placeholder="请输入当前密码" />
+            </el-form-item>
+            <el-form-item label="新密码">
+              <el-input v-model="passwordForm.newPassword" type="password" show-password placeholder="请输入新密码（至少6位）" />
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="passwordDialogVisible = false">取消</el-button>
+            <el-button type="primary" :loading="passwordChanging" @click="confirmChangePassword">确认修改</el-button>
+          </template>
+        </el-dialog>
 
         <el-alert
           v-if="routeBlockedMessage"
@@ -239,6 +255,7 @@ const ExamManagement = defineAsyncComponent(() => import('./components/ExamManag
 const StudentInsight = defineAsyncComponent(() => import('./components/StudentInsight.vue'));
 const NotificationBell = defineAsyncComponent(() => import('./components/NotificationBell.vue'));
 import {
+  changePassword,
   fetchCurrentUser,
   fetchRegisterOptions,
   fetchRoleOverview,
@@ -283,6 +300,10 @@ const routeBlockedMessage = ref('');
 const health = ref<HealthData | null>(null);
 const ai = ref<AiStatusData | null>(null);
 const availableClasses = ref<Array<{ id: number; className: string }>>([]);
+
+const passwordDialogVisible = ref(false);
+const passwordChanging = ref(false);
+const passwordForm = reactive({ oldPassword: '', newPassword: '' });
 
 const healthState = computed(() => {
   if (!health.value) return '待检测';
@@ -445,6 +466,40 @@ async function handleLogout() {
   currentPath.value = '/login';
   window.history.replaceState({}, '', '/');
   ElMessage.success('已退出登录');
+}
+
+function openChangePassword() {
+  passwordForm.oldPassword = '';
+  passwordForm.newPassword = '';
+  passwordDialogVisible.value = true;
+}
+
+async function confirmChangePassword() {
+  if (!passwordForm.oldPassword) {
+    ElMessage.warning('请输入当前密码');
+    return;
+  }
+  if (!passwordForm.newPassword || passwordForm.newPassword.length < 6) {
+    ElMessage.warning('新密码至少需要6位');
+    return;
+  }
+  passwordChanging.value = true;
+  try {
+    await changePassword(passwordForm.oldPassword, passwordForm.newPassword);
+    passwordDialogVisible.value = false;
+    ElMessage.success('密码修改成功，请使用新密码重新登录');
+    // 修改密码后退出
+    clearToken();
+    user.value = null;
+    menus.value = [];
+    overview.value = null;
+    currentPath.value = '/login';
+    window.history.replaceState({}, '', '/');
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '修改密码失败');
+  } finally {
+    passwordChanging.value = false;
+  }
 }
 
 function startExam(exam: { attemptId: number }) {

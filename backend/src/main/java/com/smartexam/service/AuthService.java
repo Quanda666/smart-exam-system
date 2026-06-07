@@ -145,6 +145,21 @@ public class AuthService {
         tokenStore.revoke(token);
     }
 
+    public void changePassword(Long userId, String oldPassword, String newPassword) {
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT password_hash FROM sys_user WHERE id = ? AND deleted = 0", userId);
+        if (rows.isEmpty()) {
+            throw new IllegalArgumentException("用户不存在");
+        }
+        String storedHash = (String) rows.get(0).get("password_hash");
+        if (!PasswordHashUtil.matches(oldPassword, storedHash)) {
+            throw new IllegalArgumentException("当前密码不正确");
+        }
+        jdbcTemplate.update("UPDATE sys_user SET password_hash = ? WHERE id = ?",
+                PasswordHashUtil.encode(newPassword), userId);
+    }
+
     private AuthUser buildAuthUser(Map<String, Object> userRow) {
         Long userId = longValue(userRow.get("id"));
         String username = stringValue(userRow.get("username"));

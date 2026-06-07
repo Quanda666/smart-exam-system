@@ -1,4 +1,4 @@
-import { getJson, postJson } from './request';
+import { getJson, postJson, putJson } from './request';
 
 export type RoleCode = 'ADMIN' | 'TEACHER' | 'STUDENT' | 'GUEST';
 
@@ -89,6 +89,10 @@ export function fetchCurrentUser() {
 
 export function fetchMenus() {
   return getJson<MenuItem[]>('/api/auth/menus');
+}
+
+export function changePassword(oldPassword: string, newPassword: string) {
+  return putJson<{ changed: boolean }, { oldPassword: string; newPassword: string }>('/api/auth/password', { oldPassword, newPassword });
 }
 
 export function fetchRoleOverview(role: RoleCode) {

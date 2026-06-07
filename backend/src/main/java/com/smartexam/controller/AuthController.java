@@ -2,6 +2,7 @@ package com.smartexam.controller;
 
 import com.smartexam.auth.AuthContext;
 import com.smartexam.common.ApiResponse;
+import com.smartexam.dto.auth.ChangePasswordRequest;
 import com.smartexam.dto.auth.LoginRequest;
 import com.smartexam.dto.auth.LoginResponse;
 import com.smartexam.dto.auth.MenuItem;
@@ -13,6 +14,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -66,6 +68,13 @@ public class AuthController {
     public ApiResponse<Map<String, Object>> logout(HttpServletRequest request) {
         authService.logout(resolveToken(request));
         return ApiResponse.ok("退出成功", Map.of("loggedOut", true));
+    }
+
+    @PutMapping("/password")
+    public ApiResponse<Map<String, Object>> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        AuthUser user = AuthContext.requireSession().getUser();
+        authService.changePassword(user.getId(), request.getOldPassword(), request.getNewPassword());
+        return ApiResponse.ok("密码修改成功", Map.of("changed", true));
     }
 
     @GetMapping("/access-matrix")
