@@ -1,41 +1,119 @@
 <template>
   <section class="dashboard">
-    <div class="stat-cards">
-      <div class="stat-card"><span class="stat-label">学生总数</span><strong>{{ data.totalStudents }}</strong></div>
-      <div class="stat-card"><span class="stat-label">教师总数</span><strong>{{ data.totalTeachers }}</strong></div>
-      <div class="stat-card"><span class="stat-label">今日考试</span><strong>{{ data.todayExams }}</strong></div>
-      <div class="stat-card"><span class="stat-label">试卷总量</span><strong>{{ data.totalPapers }}</strong></div>
+    <!-- 问候语 -->
+    <h2 class="mp-greeting">{{ greeting }}，管理员</h2>
+
+    <!-- 统计卡片网格 -->
+    <div class="mp-stat-grid">
+      <!-- 学生数据 -->
+      <div class="mp-stat-card">
+        <div class="mp-stat-header">
+          <el-icon><UserFilled /></el-icon>
+          学生数据
+        </div>
+        <div class="mp-stat-row">
+          <div class="mp-stat-icon mp-icon-blue">
+            <el-icon><User /></el-icon>
+          </div>
+          <div class="mp-stat-content">
+            <div class="mp-stat-label">学生总数</div>
+            <div class="mp-stat-value">{{ data.totalStudents }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 教师数据 -->
+      <div class="mp-stat-card">
+        <div class="mp-stat-header">
+          <el-icon><Avatar /></el-icon>
+          教师数据
+        </div>
+        <div class="mp-stat-row">
+          <div class="mp-stat-icon mp-icon-green">
+            <el-icon><Avatar /></el-icon>
+          </div>
+          <div class="mp-stat-content">
+            <div class="mp-stat-label">教师总数</div>
+            <div class="mp-stat-value">{{ data.totalTeachers }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 考试数据 -->
+      <div class="mp-stat-card">
+        <div class="mp-stat-header">
+          <el-icon><EditPen /></el-icon>
+          考试数据
+        </div>
+        <div class="mp-stat-row">
+          <div class="mp-stat-icon mp-icon-yellow">
+            <el-icon><Calendar /></el-icon>
+          </div>
+          <div class="mp-stat-content">
+            <div class="mp-stat-label">今日考试</div>
+            <div class="mp-stat-value">{{ data.todayExams }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 试卷数据 -->
+      <div class="mp-stat-card">
+        <div class="mp-stat-header">
+          <el-icon><Document /></el-icon>
+          试卷数据
+        </div>
+        <div class="mp-stat-row">
+          <div class="mp-stat-icon mp-icon-purple">
+            <el-icon><Tickets /></el-icon>
+          </div>
+          <div class="mp-stat-content">
+            <div class="mp-stat-label">试卷总量</div>
+            <div class="mp-stat-value">{{ data.totalPapers }}</div>
+          </div>
+        </div>
+      </div>
     </div>
 
+    <!-- 图表区域 -->
     <el-row :gutter="16">
       <el-col :span="12">
-        <el-card shadow="never">
-          <template #header><span>教师学科分布</span></template>
+        <div class="mp-card">
+          <div class="mp-card-title">
+            <el-icon><Histogram /></el-icon>
+            教师学科分布
+          </div>
           <div ref="teacherSubjectChart" class="chart-box"></div>
-        </el-card>
+        </div>
       </el-col>
       <el-col :span="12">
-        <el-card shadow="never">
-          <template #header><span>学生年级分布</span></template>
+        <div class="mp-card">
+          <div class="mp-card-title">
+            <el-icon><PieChart /></el-icon>
+            学生年级分布
+          </div>
           <div ref="studentGradeChart" class="chart-box"></div>
-        </el-card>
+        </div>
       </el-col>
     </el-row>
 
     <el-row :gutter="16" style="margin-top:16px">
       <el-col :span="24">
-        <el-card shadow="never">
-          <template #header><span>近7天考试通过率趋势</span></template>
+        <div class="mp-card">
+          <div class="mp-card-title">
+            <el-icon><TrendCharts /></el-icon>
+            近7天考试通过率趋势
+          </div>
           <div ref="examTrendChart" class="chart-box"></div>
-        </el-card>
+        </div>
       </el-col>
     </el-row>
   </section>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed } from 'vue';
 import { ElMessage } from 'element-plus';
+import { UserFilled, User, Avatar, EditPen, Calendar, Document, Tickets, Histogram, PieChart, TrendCharts } from '@element-plus/icons-vue';
 import { getJson } from '../api/request';
 import * as echarts from 'echarts';
 
@@ -52,6 +130,16 @@ interface OverviewData {
 const data = ref<OverviewData>({
   totalStudents: 0, totalTeachers: 0, todayExams: 0, totalPapers: 0,
   teacherSubjects: [], studentGrades: [], examTrend: []
+});
+
+// 问候语
+const greeting = computed(() => {
+  const hour = new Date().getHours();
+  if (hour < 6) return '🌙 夜深了';
+  if (hour < 11) return '☀️ 早上好';
+  if (hour < 13) return '👋 中午好';
+  if (hour < 18) return '🌤️ 下午好';
+  return '🌙 晚上好';
 });
 
 const teacherSubjectChart = ref<HTMLElement>();
@@ -72,22 +160,24 @@ function renderCharts() {
   if (teacherSubjectChart.value) {
     const chart = echarts.init(teacherSubjectChart.value);
     chart.setOption({
-      tooltip: { trigger: 'axis' },
-      xAxis: { type: 'category', data: data.value.teacherSubjects.map(s => s.name), axisLabel: { rotate: 30 } },
-      yAxis: { type: 'value' },
-      series: [{ type: 'bar', data: data.value.teacherSubjects.map(s => s.value), itemStyle: { color: '#1677FF', borderRadius: [4,4,0,0] } }],
-      grid: { top: 10, right: 20, bottom: 40, left: 40 }
+      tooltip: { trigger: 'axis', backgroundColor: 'rgba(255,255,255,0.95)', borderColor: '#e8e8e8', textStyle: { color: '#333' } },
+      xAxis: { type: 'category', data: data.value.teacherSubjects.map(s => s.name), axisLabel: { rotate: 30, color: '#666' }, axisLine: { lineStyle: { color: '#e8e8e8' } } },
+      yAxis: { type: 'value', axisLabel: { color: '#666' }, splitLine: { lineStyle: { color: '#f0f0f0' } } },
+      series: [{ type: 'bar', data: data.value.teacherSubjects.map(s => s.value), itemStyle: { color: '#4f46e5', borderRadius: [6,6,0,0] }, barWidth: '50%' }],
+      grid: { top: 10, right: 20, bottom: 50, left: 40 }
     });
   }
 
   if (studentGradeChart.value) {
     const chart = echarts.init(studentGradeChart.value);
     chart.setOption({
-      tooltip: { trigger: 'item' },
+      tooltip: { trigger: 'item', backgroundColor: 'rgba(255,255,255,0.95)', borderColor: '#e8e8e8', textStyle: { color: '#333' } },
+      color: ['#4f46e5', '#16a34a', '#d97706', '#dc2626', '#7c3aed', '#0891b2'],
       series: [{
-        type: 'pie', radius: ['40%', '70%'],
+        type: 'pie', radius: ['45%', '75%'],
         data: data.value.studentGrades.map(s => ({ name: s.name || '未分班', value: s.value })),
-        label: { formatter: '{b}: {c}人' }
+        label: { formatter: '{b}\n{c}人', fontSize: 12, color: '#666' },
+        emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.2)' } }
       }]
     });
   }
@@ -95,25 +185,21 @@ function renderCharts() {
   if (examTrendChart.value) {
     const chart = echarts.init(examTrendChart.value);
     chart.setOption({
-      tooltip: { trigger: 'axis' },
-      legend: { data: ['考试总数', '通过数'] },
-      xAxis: { type: 'category', data: data.value.examTrend.map(e => e.date) },
-      yAxis: { type: 'value' },
+      tooltip: { trigger: 'axis', backgroundColor: 'rgba(255,255,255,0.95)', borderColor: '#e8e8e8', textStyle: { color: '#333' } },
+      legend: { data: ['考试总数', '通过数'], top: 0, textStyle: { color: '#666' } },
+      xAxis: { type: 'category', data: data.value.examTrend.map(e => e.date), axisLabel: { color: '#666' }, axisLine: { lineStyle: { color: '#e8e8e8' } } },
+      yAxis: { type: 'value', axisLabel: { color: '#666' }, splitLine: { lineStyle: { color: '#f0f0f0' } } },
       series: [
-        { name: '考试总数', type: 'line', data: data.value.examTrend.map(e => e.total), smooth: true },
-        { name: '通过数', type: 'line', data: data.value.examTrend.map(e => e.passed), smooth: true, itemStyle: { color: '#67c23a' } }
+        { name: '考试总数', type: 'line', data: data.value.examTrend.map(e => e.total), smooth: true, lineStyle: { width: 3, color: '#4f46e5' }, itemStyle: { color: '#4f46e5' }, areaStyle: { color: 'rgba(79, 70, 229, 0.1)' } },
+        { name: '通过数', type: 'line', data: data.value.examTrend.map(e => e.passed), smooth: true, lineStyle: { width: 3, color: '#16a34a' }, itemStyle: { color: '#16a34a' }, areaStyle: { color: 'rgba(22, 163, 74, 0.1)' } }
       ],
-      grid: { top: 30, right: 20, bottom: 30, left: 50 }
+      grid: { top: 40, right: 20, bottom: 30, left: 50 }
     });
   }
 }
 </script>
 
 <style scoped>
-.dashboard { display: flex; flex-direction: column; gap: 16px; }
-.stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-.stat-card { background: #f5f7fa; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 8px; }
-.stat-card .stat-label { color: #909399; font-size: 13px; }
-.stat-card strong { font-size: 28px; color: #303133; }
+.dashboard { }
 .chart-box { width: 100%; height: 280px; }
 </style>

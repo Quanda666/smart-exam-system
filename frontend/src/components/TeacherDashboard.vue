@@ -1,39 +1,102 @@
 <template>
   <section class="dashboard">
-    <div class="stat-cards">
-      <div class="stat-card"><span class="stat-label">我的考试</span><strong>{{ data.myExams }}</strong></div>
-      <div class="stat-card"><span class="stat-label">待批阅试卷</span><strong class="text-warning">{{ data.pendingReviews }}</strong></div>
-      <div class="stat-card"><span class="stat-label">我的试卷</span><strong>{{ data.myPapers }}</strong></div>
+    <!-- 问候语 -->
+    <h2 class="mp-greeting">{{ greeting }}，老师</h2>
+
+    <!-- 统计卡片网格 -->
+    <div class="mp-stat-grid">
+      <!-- 我的考试 -->
+      <div class="mp-stat-card">
+        <div class="mp-stat-header">
+          <el-icon><EditPen /></el-icon>
+          考试任务
+        </div>
+        <div class="mp-stat-row">
+          <div class="mp-stat-icon mp-icon-blue">
+            <el-icon><Tickets /></el-icon>
+          </div>
+          <div class="mp-stat-content">
+            <div class="mp-stat-label">我的考试</div>
+            <div class="mp-stat-value">{{ data.myExams }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 待批阅试卷 -->
+      <div class="mp-stat-card">
+        <div class="mp-stat-header">
+          <el-icon><Clock /></el-icon>
+          待处理
+        </div>
+        <div class="mp-stat-row">
+          <div class="mp-stat-icon mp-icon-orange">
+            <el-icon><DocumentChecked /></el-icon>
+          </div>
+          <div class="mp-stat-content">
+            <div class="mp-stat-label">待批阅试卷</div>
+            <div class="mp-stat-value" style="color: #ea580c;">{{ data.pendingReviews }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 我的试卷 -->
+      <div class="mp-stat-card">
+        <div class="mp-stat-header">
+          <el-icon><Document /></el-icon>
+          试卷管理
+        </div>
+        <div class="mp-stat-row">
+          <div class="mp-stat-icon mp-icon-purple">
+            <el-icon><Files /></el-icon>
+          </div>
+          <div class="mp-stat-content">
+            <div class="mp-stat-label">我的试卷</div>
+            <div class="mp-stat-value">{{ data.myPapers }}</div>
+          </div>
+        </div>
+      </div>
     </div>
 
+    <!-- 图表区域 -->
     <el-row :gutter="16">
       <el-col :span="12">
-        <el-card shadow="never">
-          <template #header><span>学生成绩分布</span></template>
+        <div class="mp-card">
+          <div class="mp-card-title">
+            <el-icon><PieChart /></el-icon>
+            学生成绩分布
+          </div>
           <div ref="scoreDistChart" class="chart-box"></div>
-        </el-card>
+        </div>
       </el-col>
       <el-col :span="12">
-        <el-card shadow="never">
-          <template #header><span>近期考试安排</span></template>
-          <el-timeline v-if="data.recentExams?.length">
-            <el-timeline-item v-for="exam in data.recentExams" :key="exam.name" :timestamp="exam.time || ''">
-              {{ exam.name }}
-              <el-tag :type="exam.status === 0 ? 'info' : 'success'" size="small" style="margin-left:8px">
-                {{ exam.status === 0 ? '待开始' : '进行中' }}
-              </el-tag>
-            </el-timeline-item>
-          </el-timeline>
-          <el-empty v-else description="暂无考试安排" :image-size="80" />
-        </el-card>
+        <div class="mp-card">
+          <div class="mp-card-title">
+            <el-icon><Calendar /></el-icon>
+            近期考试安排
+          </div>
+          <div style="padding: 12px 0;">
+            <el-timeline v-if="data.recentExams?.length">
+              <el-timeline-item v-for="exam in data.recentExams" :key="exam.name" :timestamp="exam.time || ''" color="#4f46e5">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-weight: 500; color: #1a1a1a;">{{ exam.name }}</span>
+                  <el-tag :type="exam.status === 0 ? 'info' : 'success'" size="small">
+                    {{ exam.status === 0 ? '待开始' : '进行中' }}
+                  </el-tag>
+                </div>
+              </el-timeline-item>
+            </el-timeline>
+            <el-empty v-else description="暂无考试安排" :image-size="80" />
+          </div>
+        </div>
       </el-col>
     </el-row>
   </section>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed } from 'vue';
 import { ElMessage } from 'element-plus';
+import { EditPen, Clock, DocumentChecked, Document, Files, PieChart, Calendar, Tickets } from '@element-plus/icons-vue';
 import { getJson } from '../api/request';
 import * as echarts from 'echarts';
 
@@ -46,6 +109,16 @@ interface TeacherOverview {
 const data = ref<TeacherOverview>({
   myExams: 0, pendingReviews: 0, myPapers: 0, scoreDistribution: [], recentExams: []
 });
+
+const greeting = computed(() => {
+  const hour = new Date().getHours();
+  if (hour < 6) return '🌙 夜深了';
+  if (hour < 11) return '☀️ 早上好';
+  if (hour < 13) return '👋 中午好';
+  if (hour < 18) return '🌤️ 下午好';
+  return '🌙 晚上好';
+});
+
 const scoreDistChart = ref<HTMLElement>();
 
 onMounted(async () => {
@@ -55,13 +128,14 @@ onMounted(async () => {
     if (scoreDistChart.value) {
       const chart = echarts.init(scoreDistChart.value);
       chart.setOption({
-        tooltip: { trigger: 'item' },
+        tooltip: { trigger: 'item', backgroundColor: 'rgba(255,255,255,0.95)', borderColor: '#e8e8e8', textStyle: { color: '#333' } },
         series: [{
-          type: 'pie', radius: '65%',
+          type: 'pie', radius: ['40%', '70%'],
           data: data.value.scoreDistribution.map(s => ({ name: s.name, value: s.value })),
-          label: { formatter: '{b}: {c}人' }
+          label: { formatter: '{b}\n{c}人', fontSize: 12, color: '#666' },
+          emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.2)' } }
         }],
-        color: ['#67c23a', '#409eff', '#e6a23c', '#909399', '#f56c6c']
+        color: ['#16a34a', '#4f46e5', '#d97706', '#999999', '#dc2626']
       });
     }
   } catch (e) {
@@ -71,11 +145,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.dashboard { display: flex; flex-direction: column; gap: 16px; }
-.stat-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.stat-card { background: #f5f7fa; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 8px; }
-.stat-card .stat-label { color: #909399; font-size: 13px; }
-.stat-card strong { font-size: 28px; color: #303133; }
-.text-warning { color: #e6a23c; }
+.dashboard { }
 .chart-box { width: 100%; height: 280px; }
 </style>

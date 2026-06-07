@@ -120,7 +120,7 @@
     </section>
 
     <ExamTaking v-else-if="takingExam" :attempt-id="takingExam.attemptId" @submit-success="finishExam" />
-    <section v-else class="workspace">
+    <section v-else class="workspace" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
       <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
         <div class="brand">
           <div class="brand-logo">考</div>
@@ -139,6 +139,9 @@
             @click="navigateTo(item.path)"
             :title="sidebarCollapsed ? item.title : ''"
           >
+            <el-icon v-if="item.icon && iconMap[item.icon]" :size="18">
+              <component :is="iconMap[item.icon]" />
+            </el-icon>
             <span>{{ item.title }}</span>
           </button>
         </nav>
@@ -239,6 +242,7 @@
           class="mb-16"
         />
 
+        <div class="content-body">
         <BasicDataPanel v-if="isBasicPath && user" :path="currentPath" :role="user.primaryRole" />
         <QuestionBankPanel v-else-if="isQuestionBankPath && user" :role="user.primaryRole" />
         <PaperPanel v-else-if="isPaperPath && user" :role="user.primaryRole" />
@@ -317,6 +321,7 @@
           </el-card>
         </section>
         </template>
+        </div>
       </div>
     </section>
   </main>
@@ -325,7 +330,19 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import { ArrowDown, Lock, Message, User } from '@element-plus/icons-vue';
+import {
+  ArrowDown, Lock, Message, User,
+  DataAnalysis, OfficeBuilding, Management, Connection, Bell, Collection,
+  Document, PieChart, Notebook, Files, Calendar, EditPen, TrendCharts,
+  DataLine, House, Clock, Tickets, Reading
+} from '@element-plus/icons-vue';
+
+// 侧边栏菜单图标映射（后端返回图标名 → Element Plus 组件）
+const iconMap: Record<string, unknown> = {
+  DataAnalysis, OfficeBuilding, Management, Connection, Bell, Collection,
+  User, Lock, Document, PieChart, Notebook, Files, Calendar, EditPen,
+  TrendCharts, DataLine, House, Clock, Tickets, Reading
+};
 const BasicDataPanel = defineAsyncComponent(() => import('./components/BasicDataPanel.vue'));
 const QuestionBankPanel = defineAsyncComponent(() => import('./components/QuestionBankPanel.vue'));
 const PaperPanel = defineAsyncComponent(() => import('./components/PaperPanel.vue'));
