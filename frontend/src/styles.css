@@ -756,3 +756,15 @@ button {
   font-weight: 600;
 }
 
+/* 注册弹窗优化 */
+.el-dialog {
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+/* 毛玻璃遮罩效果 */
+.el-overlay {
+  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.4) !important;
+}
+
