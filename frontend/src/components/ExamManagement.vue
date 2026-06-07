@@ -183,7 +183,7 @@ async function openCreate() {
       listPapers({ status: 1 }),
       listClasses({ status: 1 })
     ]);
-    papers.value = paperResponse.data;
+    papers.value = paperResponse.data.items;
     classes.value = classResponse.data;
   } catch (error) {
     ElMessage.warning(error instanceof Error ? error.message : '试卷或班级加载失败');
