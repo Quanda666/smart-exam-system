@@ -153,6 +153,7 @@
         <ExamAnalysis v-else-if="isAnalysisPath && user" />
         <ExamManagement v-else-if="isExamTaskPath && user" />
         <ExamAnalysis v-else-if="isTeacherAnalysisPath && user" scope="teacher" />
+        <StudentInsight v-else-if="isTeacherStudentsPath && user" />
         <StudentPanel v-else-if="isStudentModulePath && user" :path="currentPath" />
 
         <template v-else>
@@ -234,6 +235,7 @@ const RoleManagement = defineAsyncComponent(() => import('./components/RoleManag
 const SystemLog = defineAsyncComponent(() => import('./components/SystemLog.vue'));
 const ExamAnalysis = defineAsyncComponent(() => import('./components/ExamAnalysis.vue'));
 const ExamManagement = defineAsyncComponent(() => import('./components/ExamManagement.vue'));
+const StudentInsight = defineAsyncComponent(() => import('./components/StudentInsight.vue'));
 import {
   fetchCurrentUser,
   fetchRegisterOptions,
@@ -300,8 +302,9 @@ const isAnalysisPath = computed(() => currentPath.value === '/exam/analysis');
 const isExamTaskPath = computed(() => currentPath.value === '/exam-tasks');
 const isTeacherAnalysisPath = computed(() => currentPath.value === '/teacher/analysis');
 const isStudentModulePath = computed(() => ['/student/exams', '/student/results', '/student/wrong-questions'].includes(currentPath.value));
+const isTeacherStudentsPath = computed(() => currentPath.value === '/teacher/students');
 
-const isManagedModulePath = computed(() => isBasicPath.value || isQuestionBankPath.value || isPaperPath.value || isReviewPath.value || isUserPath.value || isRolePath.value || isLogPath.value || isAnalysisPath.value || isExamTaskPath.value || isTeacherAnalysisPath.value || isStudentModulePath.value);
+const isManagedModulePath = computed(() => isBasicPath.value || isQuestionBankPath.value || isPaperPath.value || isReviewPath.value || isUserPath.value || isRolePath.value || isLogPath.value || isAnalysisPath.value || isExamTaskPath.value || isTeacherAnalysisPath.value || isStudentModulePath.value || isTeacherStudentsPath.value);
 
 const roleTagType = computed(() => {
   if (user.value?.primaryRole === 'ADMIN') return 'danger';
