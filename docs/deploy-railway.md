@@ -158,7 +158,60 @@ AI_TIMEOUT_SECONDS=30
 
 如果不配置 AI，系统会使用模拟模式，不影响核心功能。
 
-### 4.2 使用 Railway 变量引用（推荐）
+#### 邮件服务配置（可选，推荐配置）
+
+系统支持邮箱验证码登录和邮箱绑定功能。配置后用户可以：
+- 使用邮箱验证码登录（已绑定邮箱的用户）
+- 在账号中心绑定/更换邮箱
+- 提升账号安全性
+
+**使用 QQ 邮箱 SMTP**（推荐，免费且稳定）：
+
+```bash
+# QQ 邮箱 SMTP 配置
+SPRING_MAIL_HOST=smtp.qq.com
+SPRING_MAIL_PORT=465
+SPRING_MAIL_USERNAME=your_qq_email@qq.com
+SPRING_MAIL_PASSWORD=your_authorization_code
+SPRING_MAIL_PROTOCOL=smtps
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_ENABLE=true
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=false
+```
+
+**获取 QQ 邮箱授权码**：
+1. 登录 QQ 邮箱网页版：https://mail.qq.com
+2. 进入「设置」→「账户」
+3. 找到「POP3/IMAP/SMTP/Exchange/CardDAV/CalDAV服务」
+4. 开启「IMAP/SMTP服务」或「POP3/SMTP服务」
+5. 生成授权码（16位，如 `abcd efgh ijkl mnop`）
+6. 将授权码填入 `SPRING_MAIL_PASSWORD`（去除空格）
+
+**使用其他邮箱**：
+
+```bash
+# 163 邮箱
+SPRING_MAIL_HOST=smtp.163.com
+SPRING_MAIL_PORT=465
+SPRING_MAIL_USERNAME=your_email@163.com
+SPRING_MAIL_PASSWORD=your_authorization_code
+
+# Gmail（需海外服务器）
+SPRING_MAIL_HOST=smtp.gmail.com
+SPRING_MAIL_PORT=587
+SPRING_MAIL_USERNAME=your_email@gmail.com
+SPRING_MAIL_PASSWORD=your_app_password
+SPRING_MAIL_PROTOCOL=smtp
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true
+```
+
+**注意事项**：
+- 邮件服务为**可选配置**，不配置不影响系统核心功能
+- 未配置时，系统会降级：验证码生成但无法发送（仅记录日志）
+- 登录页的「验证码登录」Tab 在未配置邮件时不可用
+- 推荐在生产环境配置邮件服务以提升用户体验
+
+### 4.3 使用 Railway 变量引用（推荐）
 
 Railway 支持变量引用，可以直接使用 MySQL 服务的变量：
 
@@ -170,7 +223,7 @@ MYSQL_PASSWORD=${{MySQL.MYSQLPASSWORD}}
 
 这样当 MySQL 凭据更新时，应用会自动使用新值。
 
-### 4.3 保存并重新部署
+### 4.4 保存并重新部署
 
 添加完环境变量后，点击 **"Deploy"** 重新部署应用。
 
@@ -387,6 +440,74 @@ Railway 默认启用了自动部署功能：
 1. 进入 **"Deployments"** 标签
 2. 找到稳定的历史部署
 3. 点击 **"Redeploy"**
+
+---
+
+## 邮件功能使用指南
+
+如果已配置邮件服务，用户可使用以下功能：
+
+### 邮箱验证码登录
+
+**适用场景**：用户忘记密码，但已绑定邮箱
+
+1. 访问登录页，切换到「验证码登录」Tab
+2. 输入已绑定的邮箱地址
+3. 点击「发送验证码」，系统会发送 6 位验证码到邮箱
+4. 输入验证码并登录
+
+**验证码规则**：
+- 有效期 5 分钟
+- 每天每邮箱最多发送 5 次
+- 60 秒内不可重复发送
+- 验证码一次性使用
+
+### 邮箱绑定/更换
+
+**操作步骤**：
+
+1. 登录后，点击右上角用户名下拉菜单
+2. 选择「绑定/更换邮箱」
+3. 输入要绑定的邮箱地址
+4. 点击「发送验证码」
+5. 输入收到的 6 位验证码
+6. 完成绑定
+
+**注意事项**：
+- 每个邮箱只能绑定一个账号
+- 绑定成功后即可使用验证码登录
+- 更换邮箱需要重新验证新邮箱
+
+### 验证码邮件模板
+
+系统发送的邮件格式如下：
+
+```
+主题：【广理考试中心】邮箱验证码
+
+您的验证码是：123456
+验证码 5 分钟内有效，请勿泄露给他人。
+此邮件由系统自动发送，请勿回复。
+```
+
+### 故障排查
+
+**用户无法收到验证码**：
+
+1. **检查垃圾邮件箱**：某些邮箱可能将验证码邮件识别为垃圾邮件
+2. **检查邮箱拼写**：确认输入的邮箱地址正确
+3. **检查发送频率**：60 秒内不可重复发送
+4. **联系管理员**：确认服务器邮件配置是否正确
+
+**管理员检查邮件配置**：
+
+1. 访问 `/api/health` 端点，检查邮件配置状态
+2. 查看应用日志中的邮件发送记录：
+   ```
+   邮件服务未配置，验证码已生成但无法发送: user@example.com -> 123456
+   ```
+3. 确认 Railway 环境变量中邮件配置正确
+4. 测试 SMTP 连接（使用邮件客户端或在线工具）
 
 ---
 

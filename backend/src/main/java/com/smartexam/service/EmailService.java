@@ -46,7 +46,13 @@ public class EmailService {
             JavaMailSender mailSender = buildMailSender();
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setFrom(getProperty("spring.mail.username"));
+
+            // 发件人地址：优先使用配置的 FROM 地址，否则使用 USERNAME
+            String from = getProperty("spring.mail.from");
+            if (from == null || from.isEmpty()) {
+                from = getProperty("spring.mail.username");
+            }
+            helper.setFrom(from);
             helper.setTo(to);
             helper.setSubject("【广理考试中心】邮箱验证码");
             helper.setText(buildEmailBody(code), true);

@@ -173,6 +173,45 @@ AI_TIMEOUT_SECONDS=30
 
 如果不配置 AI，系统会使用模拟模式。
 
+#### 邮件服务配置（可选，推荐）
+
+系统支持邮箱验证码登录和邮箱绑定功能。配置后用户可以：
+- 使用邮箱验证码登录（忘记密码时的备用方式）
+- 在账号中心绑定/更换邮箱
+
+**使用 QQ 邮箱**（推荐）：
+
+```bash
+SPRING_MAIL_HOST=smtp.qq.com
+SPRING_MAIL_PORT=465
+SPRING_MAIL_USERNAME=your_qq_email@qq.com
+SPRING_MAIL_PASSWORD=your_authorization_code
+SPRING_MAIL_PROTOCOL=smtps
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_ENABLE=true
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=false
+```
+
+**使用 Gmail**（需海外服务器）：
+
+```bash
+SPRING_MAIL_HOST=smtp.gmail.com
+SPRING_MAIL_PORT=587
+SPRING_MAIL_USERNAME=your_email@gmail.com
+SPRING_MAIL_PASSWORD=your_app_password
+SPRING_MAIL_PROTOCOL=smtp
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_ENABLE=false
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true
+```
+
+**注意事项**：
+- 邮件服务为**可选配置**，不配置不影响系统核心功能
+- `SPRING_MAIL_PASSWORD` 需要填写授权码，不是邮箱登录密码
+- QQ 邮箱授权码获取：登录 QQ 邮箱 → 设置 → 账户 → 生成授权码
+- Gmail 需要在 Google 账户中生成应用专用密码
+- 详细配置指南见：[邮件服务配置文档](./email-service.md)
+
 ### 3.3 保存并重新部署
 
 1. 点击 **"Save Changes"**
