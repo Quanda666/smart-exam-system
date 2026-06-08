@@ -1,6 +1,10 @@
 <template>
   <main class="app-shell">
-    <section v-if="!user" class="login-page-v2">
+    <section v-if="initializing" class="app-loading" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:14px;color:#909399;">
+      <el-icon class="is-loading" :size="34"><Loading /></el-icon>
+      <span style="font-size:14px;">正在加载…</span>
+    </section>
+    <section v-else-if="!user" class="login-page-v2">
       <div class="login-container">
         <!-- 左侧品牌区 -->
         <div class="login-brand">
@@ -338,7 +342,7 @@
 import { computed, defineAsyncComponent, onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import {
-  ArrowDown, Lock, Message, User,
+  ArrowDown, Lock, Message, User, Loading,
   DataAnalysis, OfficeBuilding, Management, Connection, Bell, Collection,
   Document, PieChart, Notebook, Files, Calendar, EditPen, TrendCharts,
   DataLine, House, Clock, Tickets, Reading
@@ -434,6 +438,8 @@ let codeTimer: ReturnType<typeof setInterval> | null = null;
 const takingExam = ref<{ attemptId: number } | null>(null);
 const loginLoading = ref(false);
 const registerLoading = ref(false);
+// 会话恢复进行中标记：首屏（含刷新）在恢复完成前显示加载态，避免误显登录页
+const initializing = ref(true);
 const user = ref<AuthUser | null>(null);
 const menus = ref<MenuItem[]>([]);
 const overview = ref<RoleOverview | null>(null);
@@ -825,12 +831,18 @@ async function loadOverview(role: RoleCode) {
 }
 
 onMounted(async () => {
+  // 先恢复会话（若本地有 token），恢复期间显示加载态而非登录页，避免刷新后闪现登录页。
   try {
-    await loadPublicData();
-  } catch (error) {
-    ElMessage.warning(error instanceof Error ? error.message : '公共状态加载失败');
+    await restoreSession();
+  } finally {
+    initializing.value = false;
   }
-  await restoreSession();
+
+  // 后端健康 / AI 状态非首屏关键信息，后台静默加载，不阻塞首屏、失败也不打断。
+  loadPublicData().catch((error) => {
+    ElMessage.warning(error instanceof Error ? error.message : '公共状态加载失败');
+  });
+
   // 响应浏览器前进/后退：URL 已由浏览器更新，按当前 path 切换页面（silent 不再回写 history）
   window.addEventListener('popstate', () => {
     if (user.value) {
