@@ -15,6 +15,7 @@ spring:
     init:
       mode: ${DB_INIT_MODE:always}
       encoding: UTF-8
+      # 新库由 schema.sql 建表（自带 avatar/email_verified 列）；旧库缺列由 DatabaseMigrationRunner 启动时幂等补齐
       schema-locations: classpath:db/schema.sql
       data-locations: classpath:db/data.sql
       continue-on-error: false

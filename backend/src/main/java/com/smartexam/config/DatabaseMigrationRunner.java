@@ -44,6 +44,7 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
             return;
         }
         ensureSysUserEmailVerifiedColumn(jdbc);
+        ensureSysUserAvatarColumn(jdbc);
         ensureEmailVerificationTable(jdbc);
     }
 
@@ -63,6 +64,25 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
             log.info("数据库自愈迁移：已为 sys_user 补充 email_verified 列");
         } catch (Exception ex) {
             log.error("数据库自愈迁移：为 sys_user 补列 email_verified 失败（不影响应用启动），原因：{}", ex.getMessage());
+        }
+    }
+
+    /** sys_user.avatar 缺失则补列（V2.0 头像功能升级场景；缺此列会导致登录时 findProfile 抛 BadSqlGrammarException）。 */
+    private void ensureSysUserAvatarColumn(JdbcTemplate jdbc) {
+        try {
+            Integer count = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                            + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_user' "
+                            + "AND COLUMN_NAME = 'avatar'",
+                    Integer.class);
+            if (count != null && count > 0) {
+                return; // 列已存在，无需处理
+            }
+            jdbc.execute("ALTER TABLE sys_user ADD COLUMN avatar LONGTEXT DEFAULT NULL "
+                    + "COMMENT '头像 base64 dataURL（前端压缩后存储）'");
+            log.info("数据库自愈迁移：已为 sys_user 补充 avatar 列");
+        } catch (Exception ex) {
+            log.error("数据库自愈迁移：为 sys_user 补列 avatar 失败（不影响应用启动），原因：{}", ex.getMessage());
         }
     }
 

@@ -43,8 +43,8 @@
 
             <!-- 密码登录 -->
             <el-form v-if="loginMode === 'password'" label-position="top" @submit.prevent="handleLogin">
-              <el-form-item label="用户名">
-                <el-input v-model="loginForm.username" placeholder="请输入用户名" size="large" :prefix-icon="User" />
+              <el-form-item label="学号/工号">
+                <el-input v-model="loginForm.username" placeholder="请输入学号/工号" size="large" :prefix-icon="User" />
               </el-form-item>
               <el-form-item label="密码">
                 <el-input v-model="loginForm.password" placeholder="请输入密码" type="password" show-password size="large" :prefix-icon="Lock" @keyup.enter="handleLogin" />
@@ -74,7 +74,7 @@
 
             <!-- 底部链接 -->
             <div class="login-links">
-              <el-button link type="primary" @click="showRegister = true">注册账号</el-button>
+              <el-button link type="primary" @click="openRegister">注册账号</el-button>
             </div>
           </div>
         </div>
@@ -83,9 +83,6 @@
       <!-- 注册弹窗 -->
       <el-dialog v-model="showRegister" title="注册账号" width="480px" :close-on-click-modal="false">
         <el-form label-position="top" @submit.prevent="handleRegister">
-          <el-form-item label="用户名">
-            <el-input v-model="registerForm.username" placeholder="字母或数字，3-64位" size="large" />
-          </el-form-item>
           <el-form-item label="真实姓名">
             <el-input v-model="registerForm.realName" placeholder="请输入真实姓名" size="large" />
           </el-form-item>
@@ -106,11 +103,11 @@
               <el-option v-for="cls in availableClasses" :key="cls.id" :label="cls.className" :value="cls.id" />
             </el-select>
           </el-form-item>
-          <el-form-item v-if="registerForm.roleType === 'STUDENT'" label="学号（选填）">
-            <el-input v-model="registerForm.studentNo" placeholder="请输入学号" size="large" />
+          <el-form-item v-if="registerForm.roleType === 'STUDENT'" label="学号">
+            <el-input v-model="registerForm.studentNo" placeholder="将作为登录账号，字母或数字至少3位" size="large" />
           </el-form-item>
-          <el-form-item v-if="registerForm.roleType === 'TEACHER'" label="工号（选填）">
-            <el-input v-model="registerForm.teacherNo" placeholder="请输入工号" size="large" />
+          <el-form-item v-if="registerForm.roleType === 'TEACHER'" label="工号">
+            <el-input v-model="registerForm.teacherNo" placeholder="将作为登录账号，字母或数字至少3位" size="large" />
           </el-form-item>
           <el-form-item v-if="registerForm.roleType === 'TEACHER'" label="职称（选填）">
             <el-input v-model="registerForm.title" placeholder="如：讲师、副教授" size="large" />
@@ -353,7 +350,6 @@ const loginForm = reactive({
 });
 
 const registerForm = reactive({
-  username: '',
   realName: '',
   password: '',
   confirmPassword: '',
@@ -439,6 +435,14 @@ async function loadRegisterOptions() {
     id: item.id,
     className: `${item.className}${item.grade ? `（${item.grade}）` : ''}`
   }));
+}
+
+// 打开注册弹窗时再拉取班级列表，避免登录页空跑接口；失败仅提示不阻断
+function openRegister() {
+  showRegister.value = true;
+  loadRegisterOptions().catch((error) => {
+    ElMessage.warning(error instanceof Error ? error.message : '班级列表加载失败');
+  });
 }
 
 async function handleSendLoginCode() {
@@ -530,7 +534,7 @@ async function handleLogin() {
 }
 
 async function handleRegister() {
-  if (!registerForm.username || !registerForm.realName || !registerForm.password || !registerForm.confirmPassword) {
+  if (!registerForm.realName || !registerForm.password || !registerForm.confirmPassword) {
     ElMessage.warning('请完整填写注册信息');
     return;
   }
@@ -547,8 +551,10 @@ async function handleRegister() {
     return;
   }
 
+  // 学号/工号即登录账号，提交给后端作为 username
+  const account = (registerForm.roleType === 'STUDENT' ? registerForm.studentNo : registerForm.teacherNo).trim();
   const payload: RegisterRequest = {
-    username: registerForm.username.trim(),
+    username: account,
     password: registerForm.password,
     realName: registerForm.realName.trim(),
     roleType: registerForm.roleType,

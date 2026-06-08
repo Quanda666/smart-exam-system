@@ -39,7 +39,7 @@ public class MenuService {
                 new MenuItem("仪表盘", "/admin", "DataAnalysis", List.of("ADMIN")),
                 new MenuItem("题库管理", "/question-bank", "Collection", List.of("ADMIN", "TEACHER")),
                 new MenuItem("试卷管理", "/papers", "Files", List.of("ADMIN", "TEACHER")),
-                new MenuItem("全局成绩分析", "/exam/analysis", "PieChart", List.of("ADMIN")),
+                new MenuItem("成绩分析", "/exam/analysis", "PieChart", List.of("ADMIN")),
                 new MenuItem("基础数据", "/basic/data", "Management", List.of("ADMIN", "TEACHER", "STUDENT")),
                 new MenuItem("用户管理", "/system/users", "User", List.of("ADMIN")),
                 new MenuItem("角色管理", "/system/roles", "Lock", List.of("ADMIN")),
