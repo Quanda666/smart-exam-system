@@ -88,7 +88,7 @@ public class EmailServiceV3 {
         return """
                 <div style="max-width:480px;margin:0 auto;padding:24px;font-family:Arial,sans-serif;">
                   <div style="text-align:center;margin-bottom:24px;">
-                    <img src="https://raw.githubusercontent.com/Quanda666/smart-exam-system/main/frontend/public/logo.png" alt="广理考试中心" style="height:48px;width:auto;"/>
+                    <img src="https://img.110995.xyz/file/logo/iBhVRiau.png" alt="广理考试中心" style="height:48px;width:auto;"/>
                   </div>
                   <h2 style="color:#1677FF;text-align:center;">广理考试中心</h2>
                   <p>您的验证码是：</p>
