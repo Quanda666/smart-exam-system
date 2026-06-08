@@ -1,10 +1,14 @@
 <template>
   <section class="question-panel">
-    <div class="question-summary-grid">
-      <div v-for="card in summaryCards" :key="card.label" class="question-summary-card">
-        <span>{{ card.label }}</span>
-        <strong>{{ card.value }}</strong>
-        <small>{{ card.remark }}</small>
+    <div class="mp-stat-grid">
+      <div v-for="card in summaryCards" :key="card.label" class="mp-stat-card">
+        <div class="mp-stat-header">{{ card.label }}</div>
+        <div class="mp-stat-row">
+          <div class="mp-stat-content">
+            <div class="mp-stat-value">{{ card.value }}</div>
+            <div class="mp-stat-label">{{ card.remark }}</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -12,7 +16,6 @@
       <template #header>
         <div class="card-header">
           <span>题库筛选</span>
-          <el-tag type="success">阶段 4</el-tag>
         </div>
       </template>
 
@@ -113,12 +116,22 @@
     <el-card shadow="never" class="question-workbench">
       <template #header>
         <div class="card-header">
-          <span>题目列表</span>
-          <el-tag>{{ questions.length }} 题</el-tag>
+          <span>题目列表（共 {{ totalQuestions }} 题）</span>
+          <el-button size="small" :icon="Download" :loading="exporting" @click="exportQuestions">导出</el-button>
         </div>
       </template>
 
-      <el-table :data="questions" border class="question-table">
+      <div v-if="canManageQuestions && selectedQuestions.length > 0" class="mp-batch-bar">
+        已选择 <span class="mp-batch-count">{{ selectedQuestions.length }}</span> 题
+        <span class="mp-batch-bar-spacer"></span>
+        <el-button size="small" type="success" plain @click="batchSetStatus(1)">批量发布</el-button>
+        <el-button size="small" type="warning" plain @click="batchSetStatus(0)">批量撤回</el-button>
+        <el-button size="small" type="danger" plain @click="batchDelete">批量删除</el-button>
+        <el-button size="small" text @click="clearSelection">取消选择</el-button>
+      </div>
+
+      <el-table ref="tableRef" :data="questions" border class="question-table" @selection-change="onSelectionChange">
+        <el-table-column v-if="canManageQuestions" type="selection" width="46" />
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column label="题干" min-width="260" show-overflow-tooltip>
           <template #default="scope">
@@ -183,6 +196,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { Download } from '@element-plus/icons-vue';
+import { exportToCsv } from '../utils/exportCsv';
 import { listKnowledgePoints, listSubjects, type KnowledgePointInfo, type SubjectInfo } from '../api/basic';
 import {
   createQuestion,
@@ -226,6 +241,10 @@ const pageSize = ref(10);
 const totalQuestions = ref(0);
 const summary = ref({ total: 0, published: 0, draft: 0, types: {}, difficulties: {} });
 const editingQuestionId = ref<number | null>(null);
+
+const tableRef = ref<{ clearSelection: () => void }>();
+const selectedQuestions = ref<QuestionInfo[]>([]);
+const exporting = ref(false);
 
 const query = reactive<{
   keyword: string;
@@ -476,6 +495,90 @@ async function removeQuestion(id: number) {
     await loadQuestions();
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '题目删除失败');
+  }
+}
+
+function onSelectionChange(rows: QuestionInfo[]) {
+  selectedQuestions.value = rows;
+}
+
+function clearSelection() {
+  tableRef.value?.clearSelection();
+}
+
+async function batchSetStatus(next: number) {
+  const rows = selectedQuestions.value;
+  if (rows.length === 0) return;
+  try {
+    await ElMessageBox.confirm(`确认${next === 1 ? '发布' : '撤回'}选中的 ${rows.length} 道题目吗？`, '批量操作', { type: 'warning' });
+  } catch {
+    return;
+  }
+  try {
+    await Promise.all(rows.map((r) => updateQuestionStatus(r.id, next)));
+    ElMessage.success(`已${next === 1 ? '发布' : '撤回'} ${rows.length} 道题目`);
+    clearSelection();
+    await loadQuestions();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '批量操作失败');
+  }
+}
+
+async function batchDelete() {
+  const rows = selectedQuestions.value;
+  if (rows.length === 0) return;
+  try {
+    await ElMessageBox.confirm(`确认删除选中的 ${rows.length} 道题目吗？该操作不可恢复。`, '批量删除', {
+      type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消'
+    });
+  } catch {
+    return;
+  }
+  try {
+    await Promise.all(rows.map((r) => deleteQuestion(r.id)));
+    ElMessage.success(`已删除 ${rows.length} 道题目`);
+    clearSelection();
+    await loadQuestions();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '批量删除失败');
+  }
+}
+
+async function exportQuestions() {
+  exporting.value = true;
+  try {
+    const response = await listQuestions({ ...query, page: 1, size: 10000 });
+    const rows = response.data.list.map((q) => ({
+      id: q.id,
+      stem: q.stem,
+      subject: q.subjectName || '',
+      knowledgePoint: q.knowledgePointName || '',
+      type: typeText(q.questionType),
+      difficulty: difficultyText(q.difficulty),
+      score: q.defaultScore,
+      answer: isObjectiveType(q.questionType)
+        ? (q.options || []).filter((o) => isCorrectOption(o.correct)).map((o) => o.optionLabel).join('')
+        : (q.correctAnswer || ''),
+      status: statusText(q.status),
+      creator: q.creatorName || ''
+    }));
+    exportToCsv(`题库_${new Date().toISOString().slice(0, 10)}`, [
+      { key: 'id', label: 'ID' },
+      { key: 'stem', label: '题干' },
+      { key: 'subject', label: '科目' },
+      { key: 'knowledgePoint', label: '知识点' },
+      { key: 'type', label: '题型' },
+      { key: 'difficulty', label: '难度' },
+      { key: 'score', label: '分值' },
+      { key: 'answer', label: '答案' },
+      { key: 'status', label: '状态' },
+      { key: 'creator', label: '创建人' }
+    ], rows);
+    ElMessage.success(`已导出 ${rows.length} 道题目`);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '导出失败');
+  } finally {
+    exporting.value = false;
   }
 }
 

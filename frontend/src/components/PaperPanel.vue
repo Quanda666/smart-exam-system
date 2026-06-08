@@ -1,10 +1,14 @@
 <template>
   <section class="question-panel">
-    <div class="question-summary-grid">
-      <div v-for="card in summaryCards" :key="card.label" class="question-summary-card">
-        <span>{{ card.label }}</span>
-        <strong>{{ card.value }}</strong>
-        <small>{{ card.remark }}</small>
+    <div class="mp-stat-grid">
+      <div v-for="card in summaryCards" :key="card.label" class="mp-stat-card">
+        <div class="mp-stat-header">{{ card.label }}</div>
+        <div class="mp-stat-row">
+          <div class="mp-stat-content">
+            <div class="mp-stat-value">{{ card.value }}</div>
+            <div class="mp-stat-label">{{ card.remark }}</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -148,12 +152,22 @@
     <el-card shadow="never" class="workbench">
       <template #header>
         <div class="card-header">
-          <span>试卷列表</span>
-          <el-tag>{{ papers.length }} 份</el-tag>
+          <span>试卷列表（共 {{ totalPapers }} 份）</span>
+          <el-button size="small" :icon="Download" :loading="exporting" @click="exportPapers">导出</el-button>
         </div>
       </template>
 
-      <el-table :data="papers" border class="question-table">
+      <div v-if="canManagePapers && selectedPapers.length > 0" class="mp-batch-bar">
+        已选择 <span class="mp-batch-count">{{ selectedPapers.length }}</span> 份
+        <span class="mp-batch-bar-spacer"></span>
+        <el-button size="small" type="success" plain @click="batchSetStatus(1)">批量发布</el-button>
+        <el-button size="small" type="warning" plain @click="batchSetStatus(0)">批量撤回</el-button>
+        <el-button size="small" type="danger" plain @click="batchDelete">批量删除</el-button>
+        <el-button size="small" text @click="clearSelection">取消选择</el-button>
+      </div>
+
+      <el-table ref="tableRef" :data="papers" border class="question-table" @selection-change="onSelectionChange">
+        <el-table-column v-if="canManagePapers" type="selection" width="46" />
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column label="试卷" min-width="240" show-overflow-tooltip>
           <template #default="scope">
@@ -211,7 +225,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Close, DArrowRight } from '@element-plus/icons-vue';
+import { Close, DArrowRight, Download } from '@element-plus/icons-vue';
+import { exportToCsv } from '../utils/exportCsv';
 import { listKnowledgePoints, listSubjects, type KnowledgePointInfo, type SubjectInfo } from '../api/basic';
 import { listQuestions, type Difficulty, type QuestionInfo, type QuestionType } from '../api/question';
 import {
@@ -263,6 +278,10 @@ const editingPaperId = ref<number | null>(null);
 const previewVisible = ref(false);
 const preview = ref<PaperInfo | null>(null);
 const creationMode = ref('manual');
+
+const tableRef = ref<{ clearSelection: () => void }>();
+const selectedPapers = ref<PaperInfo[]>([]);
+const exporting = ref(false);
 
 const query = reactive<{ keyword: string; subjectId: number | null; status: number | null }>({
   keyword: '',
@@ -500,6 +519,84 @@ async function removePaper(id: number) {
     await loadPapers();
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '试卷删除失败');
+  }
+}
+
+function onSelectionChange(rows: PaperInfo[]) {
+  selectedPapers.value = rows;
+}
+
+function clearSelection() {
+  tableRef.value?.clearSelection();
+}
+
+async function batchSetStatus(next: number) {
+  const rows = selectedPapers.value;
+  if (rows.length === 0) return;
+  try {
+    await ElMessageBox.confirm(`确认${next === 1 ? '发布' : '撤回'}选中的 ${rows.length} 份试卷吗？`, '批量操作', { type: 'warning' });
+  } catch {
+    return;
+  }
+  try {
+    await Promise.all(rows.map((r) => updatePaperStatus(r.id, next)));
+    ElMessage.success(`已${next === 1 ? '发布' : '撤回'} ${rows.length} 份试卷`);
+    clearSelection();
+    await loadPapers();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '批量操作失败');
+  }
+}
+
+async function batchDelete() {
+  const rows = selectedPapers.value;
+  if (rows.length === 0) return;
+  try {
+    await ElMessageBox.confirm(`确认删除选中的 ${rows.length} 份试卷吗？该操作不可恢复。`, '批量删除', {
+      type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消'
+    });
+  } catch {
+    return;
+  }
+  try {
+    await Promise.all(rows.map((r) => deletePaper(r.id)));
+    ElMessage.success(`已删除 ${rows.length} 份试卷`);
+    clearSelection();
+    await loadPapers();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '批量删除失败');
+  }
+}
+
+async function exportPapers() {
+  exporting.value = true;
+  try {
+    const response = await listPapers({ ...query, page: 1, size: 10000 });
+    const rows = response.data.list.map((p) => ({
+      id: p.id,
+      paperName: p.paperName,
+      subject: p.subjectName || '',
+      questionCount: p.questionCount,
+      totalScore: p.totalScore,
+      status: statusText(p.status),
+      creator: p.creatorName || '',
+      description: p.description || ''
+    }));
+    exportToCsv(`试卷列表_${new Date().toISOString().slice(0, 10)}`, [
+      { key: 'id', label: 'ID' },
+      { key: 'paperName', label: '试卷名称' },
+      { key: 'subject', label: '科目' },
+      { key: 'questionCount', label: '题量' },
+      { key: 'totalScore', label: '总分' },
+      { key: 'status', label: '状态' },
+      { key: 'creator', label: '创建人' },
+      { key: 'description', label: '说明' }
+    ], rows);
+    ElMessage.success(`已导出 ${rows.length} 份试卷`);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '导出失败');
+  } finally {
+    exporting.value = false;
   }
 }
 
