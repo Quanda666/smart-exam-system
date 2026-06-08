@@ -1111,3 +1111,28 @@ button {
   margin-bottom: 16px;
 }
 
+/* ===== 面包屑导航样式 ===== */
+.crumb {
+  font-size: 13px;
+  color: #909399;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.crumb-link {
+  color: #409eff;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.crumb-link:hover {
+  color: #66b1ff;
+  text-decoration: underline;
+}
+.crumb-sep {
+  color: #dcdfe6;
+}
+.crumb-current {
+  color: #303133;
+  font-weight: 500;
+}
+

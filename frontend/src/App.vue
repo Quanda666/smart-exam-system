@@ -156,7 +156,11 @@
               <span class="hamburger-line"></span>
             </button>
             <div>
-              <div class="crumb">{{ user.roleLabel }} / {{ currentMenuTitle }}</div>
+              <div class="crumb">
+                <a class="crumb-link" @click="navigateTo(user.defaultPath)">{{ user.roleLabel }}</a>
+                <span class="crumb-sep">/</span>
+                <span class="crumb-current">{{ currentMenuTitle }}</span>
+              </div>
               <h2>{{ isManagedModulePath ? currentMenuTitle : '工作台' }}</h2>
             </div>
           </div>
@@ -261,6 +265,9 @@
         <TeacherDashboard v-else-if="currentPath === '/teacher' && user" @navigate="navigateTo" />
         <StudentDashboard v-else-if="currentPath === '/student' && user" @navigate="navigateTo" />
 
+        <!-- 404 页面 -->
+        <NotFoundPage v-else-if="show404 && user" :requested-path="requestedPath404" :default-path="user.defaultPath" @navigate="navigateTo" />
+
         <template v-else>
         <section class="overview-grid">
           <el-card class="overview-main" shadow="hover">
@@ -339,9 +346,26 @@ import {
 
 // 侧边栏菜单图标映射（后端返回图标名 → Element Plus 组件）
 const iconMap: Record<string, unknown> = {
-  DataAnalysis, OfficeBuilding, Management, Connection, Bell, Collection,
-  User, Lock, Document, PieChart, Notebook, Files, Calendar, EditPen,
-  TrendCharts, DataLine, House, Clock, Tickets, Reading
+  DataAnalysis,
+  OfficeBuilding,
+  Management,
+  Connection,
+  Bell,
+  Collection,
+  User,
+  Lock,
+  Document,
+  PieChart,
+  Notebook,
+  Files,
+  Calendar,
+  EditPen,
+  TrendCharts,
+  DataLine,
+  House,
+  Clock,
+  Tickets,
+  Reading
 };
 const BasicDataPanel = defineAsyncComponent(() => import('./components/BasicDataPanel.vue'));
 const QuestionBankPanel = defineAsyncComponent(() => import('./components/QuestionBankPanel.vue'));
@@ -359,6 +383,7 @@ const AdminDashboard = defineAsyncComponent(() => import('./components/AdminDash
 const TeacherDashboard = defineAsyncComponent(() => import('./components/TeacherDashboard.vue'));
 const StudentDashboard = defineAsyncComponent(() => import('./components/StudentDashboard.vue'));
 const NotificationBell = defineAsyncComponent(() => import('./components/NotificationBell.vue'));
+const NotFoundPage = defineAsyncComponent(() => import('./components/NotFoundPage.vue'));
 import {
   bindEmail,
   changePassword,
@@ -413,6 +438,8 @@ const user = ref<AuthUser | null>(null);
 const menus = ref<MenuItem[]>([]);
 const overview = ref<RoleOverview | null>(null);
 const currentPath = ref('/login');
+const show404 = ref(false);
+const requestedPath404 = ref('');
 const routeBlockedMessage = ref('');
 const health = ref<HealthData | null>(null);
 const ai = ref<AiStatusData | null>(null);
@@ -760,6 +787,9 @@ type NavigateMode = 'push' | 'replace' | 'silent';
 
 function navigateTo(path: string, mode: NavigateMode = 'push') {
   routeBlockedMessage.value = '';
+  show404.value = false;
+  requestedPath404.value = '';
+
   if (!user.value) {
     currentPath.value = '/login';
     return;
@@ -767,8 +797,10 @@ function navigateTo(path: string, mode: NavigateMode = 'push') {
 
   const allowed = menus.value.some((item) => item.path === path);
   if (!allowed) {
-    routeBlockedMessage.value = `当前${user.value.roleLabel}账号不能访问 ${path}，已回到默认首页。`;
-    currentPath.value = user.value.defaultPath;
+    // 显示 404 页面而不是静默回首页
+    show404.value = true;
+    requestedPath404.value = path;
+    currentPath.value = path; // 保持 URL 不变
   } else {
     currentPath.value = path;
   }
