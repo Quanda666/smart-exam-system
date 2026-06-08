@@ -55,11 +55,10 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- SendGrid HTTP API (不走 SMTP，绕过端口限制) -->
+        <!-- HTTP Client for Resend API -->
         <dependency>
-            <groupId>com.sendgrid</groupId>
-            <artifactId>sendgrid-java</artifactId>
-            <version>4.10.2</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
 
         <dependency>
