@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.Properties;
@@ -35,11 +36,11 @@ public class EmailService {
     public boolean sendVerificationCode(String to, String code) {
         // 如果邮件配置缺失，降级为日志记录（避免启动失败）
         if (!isMailConfigured()) {
-            log.warn("邮件服务未配置，验证码已生成但无法发送:  -> {}", to, code);
+            log.warn("邮件服务未配置，验证码已生成但无法发送: {} -> {}", to, code);
             return false;
         }
         try {
-            log.info("准备发送验证码邮件至 {} (SMTP: :{})", to,
+            log.info("准备发送验证码邮件至 {} (SMTP: {}:{})", to,
                     getProperty("spring.mail.host"), getProperty("spring.mail.port"));
 
             JavaMailSender mailSender = buildMailSender();
@@ -58,6 +59,18 @@ public class EmailService {
             log.error("邮件发送失败: {}", e.getMessage(), e);
             return false;
         }
+    }
+
+    /**
+     * 异步发送邮箱验证码（不阻塞主线程）。
+     * 用于验证码发送场景，避免 SMTP 超时导致接口 502。
+     *
+     * @param to   目标邮箱
+     * @param code 6位验证码
+     */
+    @Async
+    public void sendVerificationCodeAsync(String to, String code) {
+        sendVerificationCode(to, code);
     }
 
     private String buildEmailBody(String code) {
@@ -104,6 +117,11 @@ public class EmailService {
         String host = getProperty("spring.mail.host");
         String username = getProperty("spring.mail.username");
         return host != null && !host.isEmpty() && username != null && !username.isEmpty();
+    }
+
+    /** 对外暴露：邮件服务是否已配置。 */
+    public boolean isConfigured() {
+        return isMailConfigured();
     }
 
     private String getProperty(String key) {

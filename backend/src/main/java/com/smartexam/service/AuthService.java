@@ -10,6 +10,8 @@ import com.smartexam.dto.auth.LoginResponse;
 import com.smartexam.dto.auth.MenuItem;
 import com.smartexam.dto.auth.RegisterRequest;
 import com.smartexam.util.PasswordHashUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -27,6 +29,8 @@ import java.util.Map;
 
 @Service
 public class AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
     private final TokenStore tokenStore;
@@ -223,10 +227,11 @@ public class AuthService {
                 "INSERT INTO email_verification (email, code, purpose, expires_at) VALUES (?, ?, ?, ?)",
                 email, code, purpose, expiresAt.toString().replace('T', ' ').substring(0, 19));
 
-        // 发送邮件
-        boolean sent = emailService.sendVerificationCode(email, code);
-        if (!sent) {
-            throw new IllegalStateException("邮件发送失败，请稍后再试");
+        // 异步发送邮件（不阻塞 HTTP 请求，避免 SMTP 超时导致 502）
+        if (emailService.isConfigured()) {
+            emailService.sendVerificationCodeAsync(email, code);
+        } else {
+            log.warn("邮件服务未配置，验证码已生成但仅记录在数据库: {} -> {}", email, code);
         }
     }
 
