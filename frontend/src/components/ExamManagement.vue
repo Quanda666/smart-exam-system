@@ -1,13 +1,23 @@
 <template>
-  <section class="exam-mgmt">
-    <div class="toolbar-line">
+  <section class="mp-page">
+    <div class="mp-toolbar">
       <el-input v-model="query.keyword" placeholder="按考试或试卷名称搜索" clearable style="width: 240px" @keyup.enter="loadExams" />
-      <el-button type="primary" @click="loadExams">查询</el-button>
-      <el-button type="success" @click="openCreate">发布考试</el-button>
+      <el-button type="primary" :icon="Search" @click="loadExams">查询</el-button>
+      <span class="mp-toolbar-spacer"></span>
+      <el-button type="success" :icon="Plus" @click="openCreate">发布考试</el-button>
     </div>
 
-    <el-table v-loading="loading" :data="exams" border>
-      <el-table-column prop="id" label="ID" width="70" />
+    <div class="mp-table-card">
+      <div v-if="selectedExams.length > 0" class="mp-batch-bar">
+        已选择 <span class="mp-batch-count">{{ selectedExams.length }}</span> 场
+        <span class="mp-batch-bar-spacer"></span>
+        <el-button size="small" type="danger" plain @click="batchDelete">批量删除</el-button>
+        <el-button size="small" text @click="clearSelection">取消选择</el-button>
+      </div>
+
+      <el-table ref="tableRef" v-loading="loading" :data="exams" @selection-change="onSelectionChange">
+        <el-table-column type="selection" width="46" />
+        <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="examName" label="考试名称" min-width="170" />
       <el-table-column prop="subjectName" label="科目" width="120" />
       <el-table-column prop="paperName" label="试卷" min-width="140" />
@@ -37,18 +47,18 @@
         </template>
       </el-table-column>
     </el-table>
-    <div class="exam-pagination">
+      <el-empty v-if="!loading && exams.length === 0" description="还没有考试任务，点击右上角「发布考试」创建" />
       <el-pagination
         v-model:current-page="currentPage"
         v-model:page-size="pageSize"
         :page-sizes="[10, 20, 50, 100]"
         :total="totalExams"
         layout="total, sizes, prev, pager, next, jumper"
+        class="mp-pager"
         @current-change="handlePageChange"
         @size-change="handleSizeChange"
       />
     </div>
-    <el-empty v-if="!loading && exams.length === 0" description="还没有考试任务，点击右上角「发布考试」创建" />
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑考试' : '发布考试'" width="560px">
       <el-form :model="form" label-position="top">
@@ -102,6 +112,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { Search, Plus } from '@element-plus/icons-vue';
 import { closeExam, createExam, deleteExam, exportExamScores, listTeacherExams, updateExam, type ExamInfo } from '../api/exam';
 import { listPapers, type PaperInfo } from '../api/paper';
 import { listClasses, type ClassInfo } from '../api/basic';
@@ -118,6 +129,37 @@ const dialogVisible = ref(false);
 const editingId = ref<number | null>(null);
 const editPaperName = ref('');
 const query = reactive({ keyword: '' });
+
+const tableRef = ref<{ clearSelection: () => void }>();
+const selectedExams = ref<ExamInfo[]>([]);
+
+function onSelectionChange(rows: ExamInfo[]) {
+  selectedExams.value = rows;
+}
+
+function clearSelection() {
+  tableRef.value?.clearSelection();
+}
+
+async function batchDelete() {
+  const rows = selectedExams.value;
+  if (rows.length === 0) return;
+  try {
+    await ElMessageBox.confirm(`确认删除选中的 ${rows.length} 场考试吗？未开始的答卷会一并移除，该操作不可恢复。`, '批量删除', {
+      type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消'
+    });
+  } catch {
+    return;
+  }
+  try {
+    await Promise.all(rows.map((r) => deleteExam(r.id)));
+    ElMessage.success(`已删除 ${rows.length} 场考试`);
+    clearSelection();
+    await loadExams();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '批量删除失败');
+  }
+}
 
 const form = reactive<{
   paperId: number | null;
