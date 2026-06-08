@@ -392,3 +392,17 @@ CREATE TABLE IF NOT EXISTS email_verification (
   KEY idx_ev_email_purpose (email, purpose, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='邮箱验证码';
 
+-- ---------- V3.0: Token 持久化 ----------
+
+-- 替代内存 ConcurrentHashMap，支持服务重启后会话恢复
+CREATE TABLE IF NOT EXISTS user_token (
+  token      VARCHAR(64) NOT NULL COMMENT '会话令牌（UUID 去横线）',
+  user_id    BIGINT      NOT NULL COMMENT '用户ID',
+  expires_at DATETIME    NOT NULL COMMENT '过期时间',
+  created_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (token),
+  KEY idx_user_token_user_id (user_id),
+  KEY idx_user_token_expires_at (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户会话令牌';
+
+
