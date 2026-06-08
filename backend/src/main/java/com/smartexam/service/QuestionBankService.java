@@ -31,8 +31,10 @@ public class QuestionBankService {
     }
 
     public List<Map<String, Object>> listQuestions(String keyword, Long subjectId, Long knowledgePointId,
-                                                   String questionType, String difficulty, Integer status) {
+                                                   String questionType, String difficulty, Integer status, AuthUser user) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        int ownerScope = ownerScope(user);
+        Long ownerId = ownerId(user);
         List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
                 SELECT q.id, q.subject_id AS subjectId, s.subject_name AS subjectName,
                        q.knowledge_point_id AS knowledgePointId, kp.point_name AS knowledgePointName,
@@ -44,6 +46,7 @@ public class QuestionBankService {
                 LEFT JOIN edu_knowledge_point kp ON kp.id = q.knowledge_point_id
                 LEFT JOIN sys_user u ON u.id = q.created_by
                 WHERE q.deleted = 0
+                  AND (? = 1 OR q.created_by = ? OR q.status = 1)
                   AND (? IS NULL OR q.subject_id = ?)
                   AND (? IS NULL OR q.knowledge_point_id = ?)
                   AND (? IS NULL OR q.question_type = ?)
@@ -51,7 +54,7 @@ public class QuestionBankService {
                   AND (? IS NULL OR q.status = ?)
                   AND (? IS NULL OR q.stem LIKE CONCAT('%', ?, '%') OR s.subject_name LIKE CONCAT('%', ?, '%') OR kp.point_name LIKE CONCAT('%', ?, '%'))
                 ORDER BY q.id DESC
-                """, subjectId, subjectId, knowledgePointId, knowledgePointId, blankToNull(questionType), blankToNull(questionType),
+                """, ownerScope, ownerId, subjectId, subjectId, knowledgePointId, knowledgePointId, blankToNull(questionType), blankToNull(questionType),
                 blankToNull(difficulty), blankToNull(difficulty), status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword));
         rows.forEach(row -> row.put("options", listOptionsFromDatabase(longValue(row.get("id")))));
         return rows;
@@ -59,8 +62,10 @@ public class QuestionBankService {
 
     public PageResult<Map<String, Object>> listQuestions(String keyword, Long subjectId, Long knowledgePointId,
                                                          String questionType, String difficulty, Integer status,
-                                                         int page, int size) {
+                                                         int page, int size, AuthUser user) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        int ownerScope = ownerScope(user);
+        Long ownerId = ownerId(user);
         int safeSize = size <= 0 ? 10 : Math.min(size, 100);
         int safePage = Math.max(1, page);
         int offset = (safePage - 1) * safeSize;
@@ -71,13 +76,14 @@ public class QuestionBankService {
                 LEFT JOIN edu_knowledge_point kp ON kp.id = q.knowledge_point_id
                 LEFT JOIN sys_user u ON u.id = q.created_by
                 WHERE q.deleted = 0
+                  AND (? = 1 OR q.created_by = ? OR q.status = 1)
                   AND (? IS NULL OR q.subject_id = ?)
                   AND (? IS NULL OR q.knowledge_point_id = ?)
                   AND (? IS NULL OR q.question_type = ?)
                   AND (? IS NULL OR q.difficulty = ?)
                   AND (? IS NULL OR q.status = ?)
                   AND (? IS NULL OR q.stem LIKE CONCAT('%', ?, '%') OR s.subject_name LIKE CONCAT('%', ?, '%') OR kp.point_name LIKE CONCAT('%', ?, '%'))
-                """, Long.class, subjectId, subjectId, knowledgePointId, knowledgePointId, blankToNull(questionType), blankToNull(questionType),
+                """, Long.class, ownerScope, ownerId, subjectId, subjectId, knowledgePointId, knowledgePointId, blankToNull(questionType), blankToNull(questionType),
                 blankToNull(difficulty), blankToNull(difficulty), status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword));
 
         List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
@@ -91,6 +97,7 @@ public class QuestionBankService {
                 LEFT JOIN edu_knowledge_point kp ON kp.id = q.knowledge_point_id
                 LEFT JOIN sys_user u ON u.id = q.created_by
                 WHERE q.deleted = 0
+                  AND (? = 1 OR q.created_by = ? OR q.status = 1)
                   AND (? IS NULL OR q.subject_id = ?)
                   AND (? IS NULL OR q.knowledge_point_id = ?)
                   AND (? IS NULL OR q.question_type = ?)
@@ -99,7 +106,7 @@ public class QuestionBankService {
                   AND (? IS NULL OR q.stem LIKE CONCAT('%', ?, '%') OR s.subject_name LIKE CONCAT('%', ?, '%') OR kp.point_name LIKE CONCAT('%', ?, '%'))
                 ORDER BY q.id DESC
                 LIMIT ? OFFSET ?
-                """, subjectId, subjectId, knowledgePointId, knowledgePointId, blankToNull(questionType), blankToNull(questionType),
+                """, ownerScope, ownerId, subjectId, subjectId, knowledgePointId, knowledgePointId, blankToNull(questionType), blankToNull(questionType),
                 blankToNull(difficulty), blankToNull(difficulty), status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword),
                 safeSize, offset);
         rows.forEach(row -> row.put("options", listOptionsFromDatabase(longValue(row.get("id")))));
@@ -186,8 +193,8 @@ public class QuestionBankService {
         return getQuestionById(id);
     }
 
-    public Map<String, Object> summary() {
-        List<Map<String, Object>> questions = listQuestions(null, null, null, null, null, null);
+    public Map<String, Object> summary(AuthUser user) {
+        List<Map<String, Object>> questions = listQuestions(null, null, null, null, null, null, user);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("total", questions.size());
         data.put("published", questions.stream().filter(row -> Objects.equals(intValue(row.get("status")), 1)).count());
@@ -309,6 +316,19 @@ public class QuestionBankService {
     private String blankToNull(String value) {
         String trimmed = trim(value);
         return trimmed == null || trimmed.isBlank() ? null : trimmed;
+    }
+
+    /**
+     * 数据隔离范围标记：管理员或系统级调用（user 为 null）返回 1，表示不受限、可见全部题目；
+     * 普通教师返回 0，配合 SQL 中的 {@code (? = 1 OR q.created_by = ? OR q.status = 1)}
+     * 仅可见本人创建或已发布（status=1）的题目。
+     */
+    private int ownerScope(AuthUser user) {
+        return user == null || user.hasRole("ADMIN") ? 1 : 0;
+    }
+
+    private Long ownerId(AuthUser user) {
+        return user == null ? null : user.getId();
     }
 
     private String trim(String value) {

@@ -213,7 +213,7 @@ public class PaperService {
             if (difficulty != null && !ALL_DIFFICULTIES.contains(difficulty)) {
                 throw new IllegalArgumentException("不支持的难度：" + rule.getDifficulty());
             }
-            List<Map<String, Object>> candidates = questionBankService.listQuestions(null, request.getSubjectId(), rule.getKnowledgePointId(), type, difficulty, 1).stream()
+            List<Map<String, Object>> candidates = questionBankService.listQuestions(null, request.getSubjectId(), rule.getKnowledgePointId(), type, difficulty, 1, null).stream()
                     .filter(row -> selectedIds.add(longValue(row.get("id"))))
                     .sorted(Comparator.comparing(row -> longValue(row.get("id"))))
                     .limit(rule.getCount())
@@ -265,7 +265,7 @@ public class PaperService {
     }
 
     private Map<String, Object> findQuestion(Long questionId) {
-        return questionBankService.listQuestions(null, null, null, null, null, null).stream()
+        return questionBankService.listQuestions(null, null, null, null, null, null, null).stream()
                 .filter(row -> Objects.equals(longValue(row.get("id")), questionId))
                 .findFirst()
                 .orElse(null);

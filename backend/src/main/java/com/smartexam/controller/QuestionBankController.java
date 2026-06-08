@@ -34,8 +34,8 @@ public class QuestionBankController {
 
     @GetMapping("/summary")
     public ApiResponse<Map<String, Object>> summary() {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok(questionBankService.summary());
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        return ApiResponse.ok(questionBankService.summary(user));
     }
 
     @GetMapping
@@ -47,8 +47,8 @@ public class QuestionBankController {
                                                                       @RequestParam(required = false) Integer status,
                                                                       @RequestParam(defaultValue = "1") int page,
                                                                       @RequestParam(defaultValue = "10") int size) {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok(questionBankService.listQuestions(keyword, subjectId, knowledgePointId, questionType, difficulty, status, page, size));
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        return ApiResponse.ok(questionBankService.listQuestions(keyword, subjectId, knowledgePointId, questionType, difficulty, status, page, size, user));
     }
 
     @PostMapping
