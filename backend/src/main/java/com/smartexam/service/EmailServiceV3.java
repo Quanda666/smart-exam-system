@@ -93,13 +93,13 @@ public class EmailServiceV3 {
                   <h2 style="color:#1677FF;text-align:center;">广理考试中心</h2>
                   <p>您的验证码是：</p>
                   <div style="background:#f5f7fa;padding:20px;text-align:center;border-radius:8px;margin:16px 0;">
-                    <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#303133;">%s</span>
+                    <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#303133;">{code}</span>
                   </div>
                   <p style="color:#909399;font-size:13px;">验证码 5 分钟内有效，请勿泄露给他人。</p>
                   <hr style="border:none;border-top:1px solid #eee;margin:24px 0;"/>
                   <p style="color:#c0c4cc;font-size:12px;">此邮件由系统自动发送，请勿回复。</p>
                 </div>
-                """.formatted(code);
+                """.replace("{code}", code);
     }
 
     public boolean isConfigured() {
