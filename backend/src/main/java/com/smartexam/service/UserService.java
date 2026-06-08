@@ -25,10 +25,13 @@ public class UserService {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
     private final NotificationService notificationService;
+    private final TeachingScopeService teachingScopeService;
 
-    public UserService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider, NotificationService notificationService) {
+    public UserService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider, NotificationService notificationService,
+                       TeachingScopeService teachingScopeService) {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
         this.notificationService = notificationService;
+        this.teachingScopeService = teachingScopeService;
     }
 
     public PageResult<Map<String, Object>> listUsers(String keyword, String role, Integer status, int page, int size) {
@@ -55,11 +58,12 @@ public class UserService {
                        (SELECT GROUP_CONCAT(r.role_code ORDER BY r.id SEPARATOR ',')
                           FROM sys_user_role ur JOIN sys_role r ON r.id = ur.role_id
                          WHERE ur.user_id = u.id) AS roleCodes,
-                       sp.student_no AS studentNo, c.class_name AS className,
-                       tp.teacher_no AS teacherNo, tp.title AS teacherTitle
-                FROM sys_user u
-                LEFT JOIN student_profile sp ON sp.user_id = u.id AND sp.deleted = 0
-                LEFT JOIN edu_class c ON c.id = sp.class_id
+                       sp.student_no AS studentNo, COALESCE(sp.primary_class_id, sp.class_id) AS classId,
+                       c.class_name AS className, c.class_type AS classType,
+                       tp.teacher_no AS teacherNo, tp.hire_date AS hireDate, tp.title AS teacherTitle, tp.college AS teacherCollege
+               FROM sys_user u
+               LEFT JOIN student_profile sp ON sp.user_id = u.id AND sp.deleted = 0
+               LEFT JOIN edu_class c ON c.id = COALESCE(sp.primary_class_id, sp.class_id)
                 LEFT JOIN teacher_profile tp ON tp.user_id = u.id AND tp.deleted = 0
                 WHERE u.deleted = 0
                   AND (? IS NULL OR u.username LIKE CONCAT('%', ?, '%') OR u.real_name LIKE CONCAT('%', ?, '%'))
@@ -130,6 +134,7 @@ public class UserService {
         if (rows == 0) {
             throw new IllegalArgumentException("用户不存在");
         }
+        teachingScopeService.clearStudentScope(id);
         jdbcTemplate.update("DELETE FROM sys_user_role WHERE user_id = ?", id);
     }
 
@@ -181,8 +186,9 @@ public class UserService {
         // Create profile
         if ("STUDENT".equals(roleType)) {
             jdbcTemplate.update(
-                    "INSERT INTO student_profile (user_id, student_no, class_id, status) VALUES (?, ?, ?, 1)",
-                    userId, trim(request.getStudentNo()), request.getClassId());
+                    "INSERT INTO student_profile (user_id, student_no, class_id, primary_class_id, status) VALUES (?, ?, ?, ?, 1)",
+                    userId, trim(request.getStudentNo()), request.getClassId(), request.getClassId());
+            teachingScopeService.syncStudentPrimaryClass(userId, request.getClassId());
         } else if ("TEACHER".equals(roleType)) {
             jdbcTemplate.update(
                     "INSERT INTO teacher_profile (user_id, teacher_no, title, status) VALUES (?, ?, ?, 1)",
@@ -224,14 +230,16 @@ public class UserService {
         if ("STUDENT".equals(roleType)) {
             jdbcTemplate.update("DELETE FROM teacher_profile WHERE user_id = ?", id);
             int profileRows = jdbcTemplate.update(
-                    "UPDATE student_profile SET student_no = ?, class_id = ? WHERE user_id = ?",
-                    trim(request.getStudentNo()), request.getClassId(), id);
+                    "UPDATE student_profile SET student_no = ?, class_id = ?, primary_class_id = ?, deleted = 0 WHERE user_id = ?",
+                    trim(request.getStudentNo()), request.getClassId(), request.getClassId(), id);
             if (profileRows == 0) {
                 jdbcTemplate.update(
-                        "INSERT INTO student_profile (user_id, student_no, class_id, status) VALUES (?, ?, ?, 1)",
-                        id, trim(request.getStudentNo()), request.getClassId());
+                        "INSERT INTO student_profile (user_id, student_no, class_id, primary_class_id, status) VALUES (?, ?, ?, ?, 1)",
+                        id, trim(request.getStudentNo()), request.getClassId(), request.getClassId());
             }
+            teachingScopeService.syncStudentPrimaryClass(id, request.getClassId());
         } else if ("TEACHER".equals(roleType)) {
+            teachingScopeService.clearStudentScope(id);
             jdbcTemplate.update("DELETE FROM student_profile WHERE user_id = ?", id);
             int profileRows = jdbcTemplate.update(
                     "UPDATE teacher_profile SET teacher_no = ?, title = ? WHERE user_id = ?",
@@ -243,6 +251,7 @@ public class UserService {
             }
         } else {
             // ADMIN: remove both profiles
+            teachingScopeService.clearStudentScope(id);
             jdbcTemplate.update("DELETE FROM student_profile WHERE user_id = ?", id);
             jdbcTemplate.update("DELETE FROM teacher_profile WHERE user_id = ?", id);
         }
@@ -255,14 +264,15 @@ public class UserService {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
                 SELECT u.id, u.username, u.real_name AS realName, u.phone, u.email,
                        u.status, u.created_at AS createdAt, u.updated_at AS updatedAt,
-                       s.student_no AS studentNo, c.class_name AS className, s.class_id AS classId,
-                       t.teacher_no AS teacherNo, t.title,
+                       s.student_no AS studentNo, c.class_name AS className, COALESCE(s.primary_class_id, s.class_id) AS classId,
+                       c.class_type AS classType,
+                       t.teacher_no AS teacherNo, t.hire_date AS hireDate, t.title, t.college AS teacherCollege,
                        (SELECT GROUP_CONCAT(r.role_code ORDER BY r.id SEPARATOR ',')
                         FROM sys_user_role ur JOIN sys_role r ON r.id = ur.role_id
                         WHERE ur.user_id = u.id) AS roleCodes
                 FROM sys_user u
                 LEFT JOIN student_profile s ON s.user_id = u.id AND s.deleted = 0
-                LEFT JOIN edu_class c ON c.id = s.class_id AND c.deleted = 0
+                LEFT JOIN edu_class c ON c.id = COALESCE(s.primary_class_id, s.class_id) AND c.deleted = 0
                 LEFT JOIN teacher_profile t ON t.user_id = u.id AND t.deleted = 0
                 WHERE u.id = ? AND u.deleted = 0
                 """, id);

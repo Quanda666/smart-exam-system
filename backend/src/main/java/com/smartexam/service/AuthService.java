@@ -37,14 +37,17 @@ public class AuthService {
     private final MenuService menuService;
     private final LoginAttemptGuard loginAttemptGuard;
     private final EmailServiceV3 emailService;
+    private final TeachingScopeService teachingScopeService;
 
     public AuthService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider, TokenStore tokenStore, MenuService menuService,
-                       LoginAttemptGuard loginAttemptGuard, EmailServiceV3 emailService) {
+                       LoginAttemptGuard loginAttemptGuard, EmailServiceV3 emailService,
+                       TeachingScopeService teachingScopeService) {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
         this.tokenStore = tokenStore;
         this.menuService = menuService;
         this.loginAttemptGuard = loginAttemptGuard;
         this.emailService = emailService;
+        this.teachingScopeService = teachingScopeService;
     }
 
     public LoginResponse login(LoginRequest request) {
@@ -107,9 +110,10 @@ public class AuthService {
         if ("STUDENT".equals(roleType)) {
             validateClassExists(jdbcTemplate, request.getClassId());
             jdbcTemplate.update("""
-                    INSERT INTO student_profile (user_id, student_no, class_id, status)
-                    VALUES (?, ?, ?, 1)
-                    """, userId, trim(request.getStudentNo()), request.getClassId());
+                    INSERT INTO student_profile (user_id, student_no, class_id, primary_class_id, status)
+                    VALUES (?, ?, ?, ?, 1)
+                    """, userId, trim(request.getStudentNo()), request.getClassId(), request.getClassId());
+            teachingScopeService.syncStudentPrimaryClass(userId, request.getClassId());
         } else {
             jdbcTemplate.update("""
                     INSERT INTO teacher_profile (user_id, teacher_no, title, introduction, status)
@@ -386,9 +390,11 @@ public class AuthService {
 
         if (roles.stream().anyMatch("STUDENT"::equalsIgnoreCase)) {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
-                    SELECT sp.student_no, c.class_name, c.major, c.grade
+                    SELECT sp.student_no, COALESCE(sp.primary_class_id, sp.class_id) AS class_id,
+                           c.class_name, c.class_type, c.major, c.grade,
+                           sp.enrollment_year, sp.college
                     FROM student_profile sp
-                    LEFT JOIN edu_class c ON c.id = sp.class_id
+                    LEFT JOIN edu_class c ON c.id = COALESCE(sp.primary_class_id, sp.class_id)
                     WHERE sp.user_id = ? AND sp.deleted = 0
                     LIMIT 1
                     """, userId);
@@ -398,7 +404,7 @@ public class AuthService {
         }
         if (roles.stream().anyMatch("TEACHER"::equalsIgnoreCase)) {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
-                    SELECT teacher_no, title, introduction
+                    SELECT teacher_no, hire_date, title, college, introduction
                     FROM teacher_profile
                     WHERE user_id = ? AND deleted = 0
                     LIMIT 1

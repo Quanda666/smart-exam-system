@@ -53,31 +53,40 @@ CREATE TABLE IF NOT EXISTS sys_user_role (
 -- ---------- 学生 / 教师档案 ----------
 
 CREATE TABLE IF NOT EXISTS student_profile (
-  id         BIGINT      NOT NULL AUTO_INCREMENT,
-  user_id    BIGINT      NOT NULL,
-  student_no VARCHAR(64) DEFAULT NULL COMMENT '学号',
-  class_id   BIGINT      DEFAULT NULL,
-  status     TINYINT     NOT NULL DEFAULT 1,
-  deleted    TINYINT     NOT NULL DEFAULT 0,
-  created_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  id               BIGINT       NOT NULL AUTO_INCREMENT,
+  user_id          BIGINT       NOT NULL,
+  student_no       VARCHAR(64)  DEFAULT NULL COMMENT '学号',
+  class_id         BIGINT       DEFAULT NULL COMMENT '兼容旧字段：原所属班级，语义等同主班级',
+  primary_class_id BIGINT       DEFAULT NULL COMMENT '主专业班级 edu_class.id',
+  enrollment_year  VARCHAR(32)  DEFAULT NULL COMMENT '入学年份/年级，如2023',
+  college          VARCHAR(128) DEFAULT NULL COMMENT '学院',
+  major            VARCHAR(128) DEFAULT NULL COMMENT '专业',
+  status           TINYINT      NOT NULL DEFAULT 1,
+  deleted          TINYINT      NOT NULL DEFAULT 0,
+  created_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uk_student_user (user_id),
-  KEY idx_student_class (class_id)
+  KEY idx_student_class (class_id),
+  KEY idx_student_primary_class (primary_class_id),
+  KEY idx_student_no (student_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学生档案';
 
 CREATE TABLE IF NOT EXISTS teacher_profile (
   id           BIGINT        NOT NULL AUTO_INCREMENT,
   user_id      BIGINT        NOT NULL,
   teacher_no   VARCHAR(64)   DEFAULT NULL COMMENT '工号',
+  hire_date    DATE          DEFAULT NULL COMMENT '入职时间',
   title        VARCHAR(64)   DEFAULT NULL COMMENT '职称',
+  college      VARCHAR(128)  DEFAULT NULL COMMENT '学院/部门',
   introduction VARCHAR(1000) DEFAULT NULL COMMENT '简介',
   status       TINYINT       NOT NULL DEFAULT 1,
   deleted      TINYINT       NOT NULL DEFAULT 0,
   created_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uk_teacher_user (user_id)
+  UNIQUE KEY uk_teacher_user (user_id),
+  KEY idx_teacher_no (teacher_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='教师档案';
 
 -- ---------- 基础资料：班级 / 科目 / 知识点 / 公告 ----------
@@ -85,6 +94,8 @@ CREATE TABLE IF NOT EXISTS teacher_profile (
 CREATE TABLE IF NOT EXISTS edu_class (
   id         BIGINT       NOT NULL AUTO_INCREMENT,
   class_name VARCHAR(128) NOT NULL COMMENT '班级名称',
+  class_code VARCHAR(64)  DEFAULT NULL COMMENT '班级编码',
+  class_type VARCHAR(32)  NOT NULL DEFAULT 'MAJOR' COMMENT '班级类型：MAJOR主专业班级/ELECTIVE选修临时班级/TEMPORARY临时班级',
   major      VARCHAR(128) DEFAULT NULL COMMENT '专业',
   grade      VARCHAR(32)  DEFAULT NULL COMMENT '年级',
   status     TINYINT      NOT NULL DEFAULT 1,
@@ -92,7 +103,9 @@ CREATE TABLE IF NOT EXISTS edu_class (
   created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uk_class_name (class_name)
+  UNIQUE KEY uk_class_name (class_name),
+  UNIQUE KEY uk_class_code (class_code),
+  KEY idx_class_type (class_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='班级';
 
 CREATE TABLE IF NOT EXISTS edu_subject (
@@ -106,6 +119,91 @@ CREATE TABLE IF NOT EXISTS edu_subject (
   PRIMARY KEY (id),
   UNIQUE KEY uk_subject_name (subject_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='科目';
+
+CREATE TABLE IF NOT EXISTS edu_course (
+  id          BIGINT        NOT NULL AUTO_INCREMENT,
+  course_code VARCHAR(64)   NOT NULL COMMENT '课程编码',
+  course_name VARCHAR(128)  NOT NULL COMMENT '课程名称',
+  subject_id  BIGINT        DEFAULT NULL COMMENT '关联科目 edu_subject.id',
+  credit      DECIMAL(4,1)  DEFAULT NULL COMMENT '学分',
+  description VARCHAR(500)  DEFAULT NULL,
+  status      TINYINT       NOT NULL DEFAULT 1,
+  deleted     TINYINT       NOT NULL DEFAULT 0,
+  created_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_course_code (course_code),
+  KEY idx_course_subject (subject_id),
+  KEY idx_course_status (status, deleted)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程';
+
+CREATE TABLE IF NOT EXISTS class_course (
+  id          BIGINT       NOT NULL AUTO_INCREMENT,
+  class_id    BIGINT       NOT NULL COMMENT '班级 edu_class.id',
+  course_id   BIGINT       NOT NULL COMMENT '课程 edu_course.id',
+  term_name   VARCHAR(64)  NOT NULL DEFAULT '默认学期' COMMENT '开课学期',
+  status      TINYINT      NOT NULL DEFAULT 1,
+  deleted     TINYINT      NOT NULL DEFAULT 0,
+  created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_class_course_term (class_id, course_id, term_name),
+  KEY idx_class_course_class (class_id),
+  KEY idx_class_course_course (course_id),
+  KEY idx_class_course_status (status, deleted)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='班级课程/开课实例';
+
+CREATE TABLE IF NOT EXISTS teacher_class_course (
+  id             BIGINT      NOT NULL AUTO_INCREMENT,
+  teacher_user_id BIGINT     NOT NULL COMMENT '教师 sys_user.id',
+  class_course_id BIGINT     NOT NULL COMMENT '班级课程 class_course.id',
+  teacher_role   VARCHAR(32) NOT NULL DEFAULT 'LECTURER' COMMENT '授课角色：LECTURER主讲/ASSISTANT助教',
+  status         TINYINT     NOT NULL DEFAULT 1,
+  deleted        TINYINT     NOT NULL DEFAULT 0,
+  created_at     DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_teacher_class_course (teacher_user_id, class_course_id, teacher_role),
+  KEY idx_tcc_teacher (teacher_user_id),
+  KEY idx_tcc_class_course (class_course_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='教师-班级课程授课关系';
+
+CREATE TABLE IF NOT EXISTS student_class_membership (
+  id              BIGINT      NOT NULL AUTO_INCREMENT,
+  student_user_id BIGINT      NOT NULL COMMENT '学生 sys_user.id',
+  class_id         BIGINT     NOT NULL COMMENT '班级 edu_class.id',
+  membership_type VARCHAR(32) NOT NULL DEFAULT 'PRIMARY' COMMENT '归属类型：PRIMARY主班级/ELECTIVE选修班级/TEMPORARY临时班级',
+  source          VARCHAR(32) DEFAULT 'ADMIN' COMMENT '来源：ADMIN/IMPORT/APPLY/SYSTEM',
+  status          TINYINT     NOT NULL DEFAULT 1,
+  deleted         TINYINT     NOT NULL DEFAULT 0,
+  joined_at       DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  left_at         DATETIME    DEFAULT NULL,
+  created_at      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_student_class_membership (student_user_id, class_id, membership_type),
+  KEY idx_scm_student (student_user_id),
+  KEY idx_scm_class (class_id),
+  KEY idx_scm_type (membership_type, status, deleted)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学生多班级归属';
+
+CREATE TABLE IF NOT EXISTS student_course_enrollment (
+  id              BIGINT      NOT NULL AUTO_INCREMENT,
+  student_user_id BIGINT      NOT NULL COMMENT '学生 sys_user.id',
+  class_course_id BIGINT      NOT NULL COMMENT '班级课程 class_course.id',
+  enrollment_type VARCHAR(32) NOT NULL DEFAULT 'CLASS' COMMENT '选课类型：CLASS主班级同步/ELECTIVE选修/ASSIGNED手动分配',
+  status          TINYINT     NOT NULL DEFAULT 1,
+  deleted         TINYINT     NOT NULL DEFAULT 0,
+  enrolled_at     DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  dropped_at      DATETIME    DEFAULT NULL,
+  created_at      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_student_course_enrollment (student_user_id, class_course_id),
+  KEY idx_sce_student (student_user_id),
+  KEY idx_sce_class_course (class_course_id),
+  KEY idx_sce_status (status, deleted)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学生课程选课关系';
 
 CREATE TABLE IF NOT EXISTS edu_knowledge_point (
   id         BIGINT       NOT NULL AUTO_INCREMENT,
@@ -136,6 +234,19 @@ CREATE TABLE IF NOT EXISTS notice (
   UNIQUE KEY uk_notice_title (title),
   KEY idx_notice_publisher (publisher_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='公告';
+
+CREATE TABLE IF NOT EXISTS notice_target (
+  id          BIGINT      NOT NULL AUTO_INCREMENT,
+  notice_id   BIGINT      NOT NULL COMMENT '公告 notice.id',
+  target_type VARCHAR(32) NOT NULL COMMENT 'SYSTEM/ROLE/CLASS/CLASS_COURSE/USER',
+  target_id   BIGINT      NOT NULL DEFAULT 0 COMMENT '目标ID；SYSTEM/ROLE 可为0',
+  target_code VARCHAR(64) NOT NULL DEFAULT '' COMMENT '角色编码等文本目标，如 TEACHER/STUDENT',
+  created_at  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_notice_target (notice_id, target_type, target_id, target_code),
+  KEY idx_notice_target_notice (notice_id),
+  KEY idx_notice_target_lookup (target_type, target_id, target_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='公告目标范围';
 
 -- ---------- 题库 ----------
 
@@ -225,8 +336,22 @@ CREATE TABLE IF NOT EXISTS exam_class (
   class_id BIGINT NOT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uk_exam_class (exam_id, class_id),
-  KEY idx_ec_exam (exam_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='考试-班级范围';
+  KEY idx_ec_exam (exam_id),
+  KEY idx_ec_class (class_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='考试-班级范围（兼容旧范围模型）';
+
+CREATE TABLE IF NOT EXISTS exam_target (
+  id          BIGINT      NOT NULL AUTO_INCREMENT,
+  exam_id     BIGINT      NOT NULL COMMENT '考试 exam.id',
+  target_type VARCHAR(32) NOT NULL DEFAULT 'CLASS_COURSE' COMMENT 'CLASS/CLASS_COURSE/USER',
+  target_id   BIGINT      NOT NULL COMMENT '目标ID',
+  target_code VARCHAR(64) NOT NULL DEFAULT '' COMMENT '预留文本目标',
+  created_at  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_exam_target (exam_id, target_type, target_id, target_code),
+  KEY idx_exam_target_exam (exam_id),
+  KEY idx_exam_target_lookup (target_type, target_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='考试目标范围';
 
 CREATE TABLE IF NOT EXISTS exam_attempt (
   id          BIGINT        NOT NULL AUTO_INCREMENT,
