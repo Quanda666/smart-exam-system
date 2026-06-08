@@ -337,11 +337,21 @@ import {
 import { clearToken, getToken, setToken } from './api/request';
 import { fetchAiStatus, fetchHealth, type AiStatusData, type HealthData } from './api/system';
 
-function handleProfileUpdated(updates: Partial<AuthUser>) {
+function handleProfileUpdated(updates: { realName?: string; email?: string; phone?: string; avatar?: string; emailVerified?: boolean; profile?: Record<string, unknown> }) {
   if (!user.value) return;
-  // UserProfile 每次回传 realName 与完整 profile 快照，整体替换即可保证个人中心即时刷新
   if (updates.realName !== undefined) user.value.realName = updates.realName;
-  if (updates.profile !== undefined) user.value.profile = updates.profile;
+  // 兼容两种回传：①整体 profile 快照；②离散字段（email/phone/avatar/emailVerified 均落在后端 profile map）
+  if (updates.profile !== undefined) {
+    user.value.profile = updates.profile;
+  } else {
+    const profile = { ...(user.value.profile as Record<string, unknown>) };
+    let changed = false;
+    if (updates.email !== undefined) { profile.email = updates.email; changed = true; }
+    if (updates.phone !== undefined) { profile.phone = updates.phone; changed = true; }
+    if (updates.avatar !== undefined) { profile.avatar = updates.avatar; changed = true; }
+    if (updates.emailVerified !== undefined) { profile.emailVerified = updates.emailVerified; changed = true; }
+    if (changed) user.value.profile = profile;
+  }
 }
 
 const loginForm = reactive({
