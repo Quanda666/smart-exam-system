@@ -34,8 +34,8 @@ public class PaperController {
 
     @GetMapping("/summary")
     public ApiResponse<Map<String, Object>> summary() {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok(paperService.summary());
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        return ApiResponse.ok(paperService.summary(user));
     }
 
     @GetMapping
@@ -44,8 +44,8 @@ public class PaperController {
                                                                     @RequestParam(required = false) Integer status,
                                                                     @RequestParam(defaultValue = "1") int page,
                                                                     @RequestParam(defaultValue = "10") int size) {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok(paperService.listPapers(keyword, subjectId, status, page, size));
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        return ApiResponse.ok(paperService.listPapers(keyword, subjectId, status, page, size, user));
     }
 
     @GetMapping("/{id}")

@@ -37,8 +37,8 @@ public class PaperService {
         this.questionBankService = questionBankService;
     }
 
-    public Map<String, Object> summary() {
-        List<Map<String, Object>> papers = listPapers(null, null, null);
+    public Map<String, Object> summary(AuthUser user) {
+        List<Map<String, Object>> papers = listPapers(null, null, null, user);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("total", papers.size());
         data.put("published", papers.stream().filter(row -> Objects.equals(intValue(row.get("status")), 1)).count());
@@ -47,8 +47,10 @@ public class PaperService {
         return data;
     }
 
-    public List<Map<String, Object>> listPapers(String keyword, Long subjectId, Integer status) {
+    public List<Map<String, Object>> listPapers(String keyword, Long subjectId, Integer status, AuthUser user) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        int ownerScope = ownerScope(user);
+        Long ownerId = ownerId(user);
         return jdbcTemplate.queryForList("""
                 SELECT p.id, p.subject_id AS subjectId, s.subject_name AS subjectName, p.paper_name AS paperName,
                        p.description, p.total_score AS totalScore, p.status, p.created_by AS createdBy,
@@ -59,18 +61,21 @@ public class PaperService {
                 LEFT JOIN sys_user u ON u.id = p.created_by
                 LEFT JOIN paper_question pq ON pq.paper_id = p.id
                 WHERE p.deleted = 0
+                  AND (? = 1 OR p.created_by = ? OR p.status = 1)
                   AND (? IS NULL OR p.subject_id = ?)
                   AND (? IS NULL OR p.status = ?)
                   AND (? IS NULL OR p.paper_name LIKE CONCAT('%', ?, '%') OR p.description LIKE CONCAT('%', ?, '%') OR s.subject_name LIKE CONCAT('%', ?, '%'))
                 GROUP BY p.id, p.subject_id, s.subject_name, p.paper_name, p.description, p.total_score, p.status,
                          p.created_by, u.real_name, p.created_at, p.updated_at
                 ORDER BY p.id DESC
-                """, subjectId, subjectId, status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword));
+                """, ownerScope, ownerId, subjectId, subjectId, status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword));
     }
 
     public PageResult<Map<String, Object>> listPapers(String keyword, Long subjectId, Integer status,
-                                                       int page, int size) {
+                                                       int page, int size, AuthUser user) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        int ownerScope = ownerScope(user);
+        Long ownerId = ownerId(user);
         int safeSize = size <= 0 ? 10 : Math.min(size, 100);
         int safePage = Math.max(1, page);
         int offset = (safePage - 1) * safeSize;
@@ -80,10 +85,11 @@ public class PaperService {
                 FROM paper p
                 JOIN edu_subject s ON s.id = p.subject_id
                 WHERE p.deleted = 0
+                  AND (? = 1 OR p.created_by = ? OR p.status = 1)
                   AND (? IS NULL OR p.subject_id = ?)
                   AND (? IS NULL OR p.status = ?)
                   AND (? IS NULL OR p.paper_name LIKE CONCAT('%', ?, '%') OR p.description LIKE CONCAT('%', ?, '%') OR s.subject_name LIKE CONCAT('%', ?, '%'))
-                """, Long.class, subjectId, subjectId, status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword));
+                """, Long.class, ownerScope, ownerId, subjectId, subjectId, status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword));
 
         List<Map<String, Object>> list = jdbcTemplate.queryForList("""
                 SELECT p.id, p.subject_id AS subjectId, s.subject_name AS subjectName, p.paper_name AS paperName,
@@ -95,6 +101,7 @@ public class PaperService {
                 LEFT JOIN sys_user u ON u.id = p.created_by
                 LEFT JOIN paper_question pq ON pq.paper_id = p.id
                 WHERE p.deleted = 0
+                  AND (? = 1 OR p.created_by = ? OR p.status = 1)
                   AND (? IS NULL OR p.subject_id = ?)
                   AND (? IS NULL OR p.status = ?)
                   AND (? IS NULL OR p.paper_name LIKE CONCAT('%', ?, '%') OR p.description LIKE CONCAT('%', ?, '%') OR s.subject_name LIKE CONCAT('%', ?, '%'))
@@ -102,7 +109,7 @@ public class PaperService {
                          p.created_by, u.real_name, p.created_at, p.updated_at
                 ORDER BY p.id DESC
                 LIMIT ? OFFSET ?
-                """, subjectId, subjectId, status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword),
+                """, ownerScope, ownerId, subjectId, subjectId, status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword),
                 safeSize, offset);
         return PageResult.of(list, total == null ? 0 : total, safePage, safeSize);
     }
@@ -353,6 +360,19 @@ public class PaperService {
     private String blankToNull(String value) {
         String trimmed = trim(value);
         return trimmed == null || trimmed.isBlank() ? null : trimmed;
+    }
+
+    /**
+     * 数据隔离范围标记：管理员或系统级调用（user 为 null）返回 1，表示不受限、可见全部试卷；
+     * 普通教师返回 0，配合 SQL 中的 {@code (? = 1 OR p.created_by = ? OR p.status = 1)}
+     * 仅可见本人创建或已发布（status=1）的试卷。与 QuestionBankService 的题库隔离策略保持一致。
+     */
+    private int ownerScope(AuthUser user) {
+        return user == null || user.hasRole("ADMIN") ? 1 : 0;
+    }
+
+    private Long ownerId(AuthUser user) {
+        return user == null ? null : user.getId();
     }
 
     private String trim(String value) {
