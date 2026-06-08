@@ -87,7 +87,10 @@ public class EmailServiceV3 {
     private String buildEmailBody(String code) {
         return """
                 <div style="max-width:480px;margin:0 auto;padding:24px;font-family:Arial,sans-serif;">
-                  <h2 style="color:#1677FF;">广理考试中心</h2>
+                  <div style="text-align:center;margin-bottom:24px;">
+                    <img src="https://raw.githubusercontent.com/Quanda666/smart-exam-system/main/frontend/public/logo.png" alt="广理考试中心" style="height:48px;width:auto;"/>
+                  </div>
+                  <h2 style="color:#1677FF;text-align:center;">广理考试中心</h2>
                   <p>您的验证码是：</p>
                   <div style="background:#f5f7fa;padding:20px;text-align:center;border-radius:8px;margin:16px 0;">
                     <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#303133;">%s</span>
