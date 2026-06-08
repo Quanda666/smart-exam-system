@@ -530,6 +530,147 @@ function tabFromPath(path: string) {
   if (path.includes('classes')) return 'classes';
   if (path.includes('subjects')) return 'subjects';
   if (path.includes('knowledge-points')) return 'knowledge-points';
+  if (path.includes('notices')) return 'notices';
+  // 默认根据角色显示不同的初始标签
+  if (props.role === 'ADMIN') return 'classes';
+  if (props.role === 'TEACHER') return 'subjects';
   return 'notices';
 }
 </script>
+
+<style scoped>
+.basic-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.basic-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.basic-summary-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 20px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.basic-summary-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+}
+
+.basic-summary-card span {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.basic-summary-card strong {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.basic-summary-card small {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 4px;
+}
+
+.basic-tabs {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.basic-tabs :deep(.el-tabs__header) {
+  margin-bottom: 24px;
+}
+
+.basic-tabs :deep(.el-tabs__item) {
+  font-size: 15px;
+  font-weight: 500;
+  padding: 0 24px;
+  height: 44px;
+  line-height: 44px;
+}
+
+.basic-tabs :deep(.el-tabs__active-bar) {
+  height: 3px;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+}
+
+.toolbar-line {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.toolbar-line .el-input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.toolbar-line .el-select {
+  width: 140px;
+}
+
+.inline-editor {
+  background: #f8f9fa;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+
+.inline-editor :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+.inline-editor :deep(.el-form-item__label) {
+  font-size: 13px;
+  font-weight: 500;
+  color: #606266;
+  margin-bottom: 6px;
+}
+
+.notice-editor {
+  grid-template-columns: 1fr 1fr 120px 1fr;
+}
+
+.notice-editor :deep(.el-form-item:first-child) {
+  grid-column: 1 / -1;
+}
+
+.notice-editor :deep(.el-form-item:nth-child(2)) {
+  grid-column: 1 / -1;
+}
+
+.el-table {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.el-table :deep(.el-table__header) {
+  font-weight: 600;
+}
+
+.el-table :deep(.el-table__row:hover) {
+  background: #f5f7fa;
+}
+</style>

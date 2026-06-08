@@ -10,7 +10,9 @@ export interface AuthUser {
   primaryRole: RoleCode;
   roleLabel: string;
   defaultPath: string;
+  // profile 由后端按角色拼装，可能含 email/emailVerified/phone/student_no/class_name/major/grade/teacher_no/title 等
   profile: Record<string, unknown>;
+  avatar?: string;
 }
 
 export interface MenuItem {
@@ -113,6 +115,21 @@ export function bindEmail(email: string, code: string) {
 
 export function updateProfile(realName: string, phone: string) {
   return putJson<{ updated: boolean }, { realName: string; phone: string }>('/api/auth/profile', { realName, phone });
+}
+
+export function updateAvatar(avatar: string) {
+  return putJson<{ updated: boolean }, { avatar: string }>('/api/auth/avatar', { avatar });
+}
+
+export interface LoginLog {
+  action?: string;
+  ip?: string;
+  detail?: string;
+  created_at?: string;
+}
+
+export function fetchLoginLogs() {
+  return getJson<LoginLog[]>('/api/auth/login-logs');
 }
 
 export function fetchRoleOverview(role: RoleCode) {

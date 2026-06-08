@@ -170,76 +170,9 @@
           </div>
           <div class="user-box">
             <NotificationBell />
-            <el-dropdown trigger="click" @command="handleAccountCommand">
-              <span class="account-trigger">
-                <el-tag :type="roleTagType" size="small">{{ user.primaryRole }}</el-tag>
-                <span>{{ user.realName }}</span>
-                <el-icon><ArrowDown /></el-icon>
-              </span>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="profile">个人资料</el-dropdown-item>
-                  <el-dropdown-item command="email">绑定/更换邮箱</el-dropdown-item>
-                  <el-dropdown-item command="password">修改密码</el-dropdown-item>
-                  <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
+            <UserProfile :user="user" @logout="handleLogout" @profile-updated="handleProfileUpdated" @preference-changed="handlePreferenceChanged" />
           </div>
         </header>
-
-        <!-- 修改密码弹窗 -->
-        <el-dialog v-model="passwordDialogVisible" title="修改密码" width="400px">
-          <el-form label-position="top">
-            <el-form-item label="当前密码">
-              <el-input v-model="passwordForm.oldPassword" type="password" show-password placeholder="请输入当前密码" />
-            </el-form-item>
-            <el-form-item label="新密码">
-              <el-input v-model="passwordForm.newPassword" type="password" show-password placeholder="请输入新密码（至少6位）" />
-            </el-form-item>
-          </el-form>
-          <template #footer>
-            <el-button @click="passwordDialogVisible = false">取消</el-button>
-            <el-button type="primary" :loading="passwordChanging" @click="confirmChangePassword">确认修改</el-button>
-          </template>
-        </el-dialog>
-
-        <!-- 账号中心：个人资料 -->
-        <el-dialog v-model="profileDialogVisible" title="个人资料" width="400px">
-          <el-form label-position="top">
-            <el-form-item label="真实姓名">
-              <el-input v-model="profileForm.realName" placeholder="真实姓名" />
-            </el-form-item>
-            <el-form-item label="手机号">
-              <el-input v-model="profileForm.phone" placeholder="手机号（选填）" />
-            </el-form-item>
-          </el-form>
-          <template #footer>
-            <el-button @click="profileDialogVisible = false">取消</el-button>
-            <el-button type="primary" :loading="profileSaving" @click="confirmProfile">保存</el-button>
-          </template>
-        </el-dialog>
-
-        <!-- 账号中心：绑定/更换邮箱 -->
-        <el-dialog v-model="emailDialogVisible" title="绑定/更换邮箱" width="400px">
-          <el-form label-position="top">
-            <el-form-item label="邮箱地址">
-              <el-input v-model="emailForm.email" placeholder="请输入邮箱" />
-            </el-form-item>
-            <el-form-item label="验证码">
-              <div class="code-row">
-                <el-input v-model="emailForm.code" placeholder="6位验证码" :maxlength="6" />
-                <el-button :disabled="emailCountdown > 0" :loading="emailSending" class="code-btn" @click="handleSendBindCode">
-                  {{ emailCountdown > 0 ? `${emailCountdown}s` : '发送验证码' }}
-                </el-button>
-              </div>
-            </el-form-item>
-          </el-form>
-          <template #footer>
-            <el-button @click="emailDialogVisible = false">取消</el-button>
-            <el-button type="primary" :loading="emailBinding" @click="confirmBindEmail">确认绑定</el-button>
-          </template>
-        </el-dialog>
 
         <el-alert
           v-if="routeBlockedMessage"
@@ -339,10 +272,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, reactive, ref } from 'vue';
+import { computed, defineAsyncComponent, onMounted, reactive, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import {
-  ArrowDown, Lock, Message, User, Loading,
+  Lock, Message, User, Loading,
   DataAnalysis, OfficeBuilding, Management, Connection, Bell, Collection,
   Document, PieChart, Notebook, Files, Calendar, EditPen, TrendCharts,
   DataLine, House, Clock, Tickets, Reading
@@ -388,9 +321,8 @@ const TeacherDashboard = defineAsyncComponent(() => import('./components/Teacher
 const StudentDashboard = defineAsyncComponent(() => import('./components/StudentDashboard.vue'));
 const NotificationBell = defineAsyncComponent(() => import('./components/NotificationBell.vue'));
 const NotFoundPage = defineAsyncComponent(() => import('./components/NotFoundPage.vue'));
+const UserProfile = defineAsyncComponent(() => import('./components/UserProfile.vue'));
 import {
-  bindEmail,
-  changePassword,
   fetchCurrentUser,
   fetchRegisterOptions,
   fetchRoleOverview,
@@ -398,9 +330,7 @@ import {
   loginByCode,
   logout,
   register,
-  sendBindCode,
   sendLoginCode,
-  updateProfile,
   type AuthUser,
   type MenuItem,
   type RegisterRequest,
@@ -409,6 +339,13 @@ import {
 } from './api/auth';
 import { clearToken, getToken, setToken } from './api/request';
 import { fetchAiStatus, fetchHealth, type AiStatusData, type HealthData } from './api/system';
+
+function handleProfileUpdated(updates: Partial<AuthUser>) {
+  if (!user.value) return;
+  // UserProfile 每次回传 realName 与完整 profile 快照，整体替换即可保证个人中心即时刷新
+  if (updates.realName !== undefined) user.value.realName = updates.realName;
+  if (updates.profile !== undefined) user.value.profile = updates.profile;
+}
 
 const loginForm = reactive({
   username: '',
@@ -451,23 +388,14 @@ const health = ref<HealthData | null>(null);
 const ai = ref<AiStatusData | null>(null);
 const availableClasses = ref<Array<{ id: number; className: string }>>([]);
 
-const passwordDialogVisible = ref(false);
-const passwordChanging = ref(false);
-const passwordForm = reactive({ oldPassword: '', newPassword: '' });
-
-// 账号中心
-const profileDialogVisible = ref(false);
-const profileSaving = ref(false);
-const profileForm = reactive({ realName: '', phone: '' });
-const emailDialogVisible = ref(false);
-const emailSending = ref(false);
-const emailBinding = ref(false);
-const emailCountdown = ref(0);
-const emailForm = reactive({ email: '', code: '' });
-let emailTimer: ReturnType<typeof setInterval> | null = null;
-
-// 侧边栏
-const sidebarCollapsed = ref(false);
+// 侧边栏（折叠状态持久化为个人偏好，刷新/重登保持）
+const sidebarCollapsed = ref(localStorage.getItem('pref_sidebar_collapsed') === '1');
+watch(sidebarCollapsed, (collapsed) => {
+  localStorage.setItem('pref_sidebar_collapsed', collapsed ? '1' : '0');
+});
+function handlePreferenceChanged(prefs: { sidebarCollapsed: boolean }) {
+  sidebarCollapsed.value = prefs.sidebarCollapsed;
+}
 
 const healthState = computed(() => {
   if (!health.value) return '待检测';
@@ -666,113 +594,6 @@ async function handleLogout() {
   currentPath.value = '/login';
   window.history.replaceState({}, '', '/');
   ElMessage.success('已退出登录');
-}
-
-function handleAccountCommand(command: string) {
-  switch (command) {
-    case 'profile':
-      profileForm.realName = user.value?.realName || '';
-      profileForm.phone = '';
-      profileDialogVisible.value = true;
-      break;
-    case 'email':
-      emailForm.email = '';
-      emailForm.code = '';
-      emailDialogVisible.value = true;
-      break;
-    case 'password':
-      passwordForm.oldPassword = '';
-      passwordForm.newPassword = '';
-      passwordDialogVisible.value = true;
-      break;
-    case 'logout':
-      handleLogout();
-      break;
-  }
-}
-
-async function confirmProfile() {
-  if (!profileForm.realName.trim()) {
-    ElMessage.warning('请输入真实姓名');
-    return;
-  }
-  profileSaving.value = true;
-  try {
-    await updateProfile(profileForm.realName, profileForm.phone);
-    if (user.value) { user.value.realName = profileForm.realName; }
-    profileDialogVisible.value = false;
-    ElMessage.success('个人资料已更新');
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '保存失败');
-  } finally {
-    profileSaving.value = false;
-  }
-}
-
-async function handleSendBindCode() {
-  if (!emailForm.email) {
-    ElMessage.warning('请输入邮箱');
-    return;
-  }
-  emailSending.value = true;
-  try {
-    await sendBindCode(emailForm.email);
-    ElMessage.success('验证码已发送');
-    emailCountdown.value = 60;
-    emailTimer = setInterval(() => {
-      emailCountdown.value--;
-      if (emailCountdown.value <= 0 && emailTimer) { clearInterval(emailTimer); emailTimer = null; }
-    }, 1000);
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '发送失败');
-  } finally {
-    emailSending.value = false;
-  }
-}
-
-async function confirmBindEmail() {
-  if (!emailForm.email || !emailForm.code) {
-    ElMessage.warning('请输入邮箱和验证码');
-    return;
-  }
-  emailBinding.value = true;
-  try {
-    await bindEmail(emailForm.email, emailForm.code);
-    emailDialogVisible.value = false;
-    ElMessage.success('邮箱绑定成功');
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '绑定失败');
-  } finally {
-    emailBinding.value = false;
-  }
-}
-
-async function confirmChangePassword() {
-  if (!passwordForm.oldPassword) {
-    ElMessage.warning('请输入当前密码');
-    return;
-  }
-  if (!passwordForm.newPassword || passwordForm.newPassword.length < 6) {
-    ElMessage.warning('新密码至少需要6位');
-    return;
-  }
-  passwordChanging.value = true;
-  try {
-    await changePassword(passwordForm.oldPassword, passwordForm.newPassword);
-    passwordDialogVisible.value = false;
-    ElMessage.success('密码修改成功，请使用新密码重新登录');
-    // 修改密码后退出
-    clearToken();
-    user.value = null;
-    menus.value = [];
-    overview.value = null;
-    currentPath.value = '/login';
-    window.history.replaceState({}, '', '/');
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '修改密码失败');
-  } finally {
-    passwordChanging.value = false;
-  }
 }
 
 function startExam(exam: { attemptId: number }) {

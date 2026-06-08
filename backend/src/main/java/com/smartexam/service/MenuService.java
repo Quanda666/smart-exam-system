@@ -24,30 +24,35 @@ public class MenuService {
 
     public Map<String, List<String>> rolePageMap() {
         Map<String, List<String>> data = new LinkedHashMap<>();
-        data.put("ADMIN", List.of("/admin", "/basic/classes", "/basic/subjects", "/basic/knowledge-points", "/basic/notices", "/question-bank", "/papers", "/system/users", "/system/roles", "/monitor/logs", "/exam/analysis"));
-        data.put("TEACHER", List.of("/teacher", "/basic/subjects", "/basic/knowledge-points", "/basic/notices", "/question-bank", "/papers", "/exam-tasks", "/reviews", "/teacher/analysis", "/teacher/students"));
-        data.put("STUDENT", List.of("/student", "/basic/notices", "/student/exams", "/student/results", "/student/wrong-questions"));
+        // 管理员：仪表盘 -> 核心业务 -> 基础数据 -> 系统管理
+        data.put("ADMIN", List.of("/admin", "/question-bank", "/papers", "/exam/analysis", "/basic/data", "/system/users", "/system/roles", "/monitor/logs"));
+        // 教师：仪表盘 -> 核心业务 -> 基础数据
+        data.put("TEACHER", List.of("/teacher", "/exam-tasks", "/reviews", "/teacher/analysis", "/teacher/students", "/question-bank", "/papers", "/basic/data"));
+        // 学生：仪表盘 -> 核心功能 -> 基础数据
+        data.put("STUDENT", List.of("/student", "/student/exams", "/student/results", "/student/wrong-questions", "/basic/data"));
         return data;
     }
 
     private List<MenuItem> allMenus() {
         return List.of(
+                // 管理员菜单 - 按使用频率排序
                 new MenuItem("仪表盘", "/admin", "DataAnalysis", List.of("ADMIN")),
-                new MenuItem("班级管理", "/basic/classes", "OfficeBuilding", List.of("ADMIN")),
-                new MenuItem("科目管理", "/basic/subjects", "Management", List.of("ADMIN", "TEACHER")),
-                new MenuItem("知识点管理", "/basic/knowledge-points", "Connection", List.of("ADMIN", "TEACHER")),
-                new MenuItem("公告管理", "/basic/notices", "Bell", List.of("ADMIN", "TEACHER", "STUDENT")),
                 new MenuItem("题库管理", "/question-bank", "Collection", List.of("ADMIN", "TEACHER")),
+                new MenuItem("试卷管理", "/papers", "Files", List.of("ADMIN", "TEACHER")),
+                new MenuItem("全局成绩分析", "/exam/analysis", "PieChart", List.of("ADMIN")),
+                new MenuItem("基础数据", "/basic/data", "Management", List.of("ADMIN", "TEACHER", "STUDENT")),
                 new MenuItem("用户管理", "/system/users", "User", List.of("ADMIN")),
                 new MenuItem("角色管理", "/system/roles", "Lock", List.of("ADMIN")),
                 new MenuItem("系统日志", "/monitor/logs", "Document", List.of("ADMIN")),
-                new MenuItem("全局成绩分析", "/exam/analysis", "PieChart", List.of("ADMIN")),
+
+                // 教师菜单 - 按使用频率排序
                 new MenuItem("仪表盘", "/teacher", "Notebook", List.of("TEACHER")),
-                new MenuItem("试卷管理", "/papers", "Files", List.of("ADMIN", "TEACHER")),
                 new MenuItem("考试任务", "/exam-tasks", "Calendar", List.of("TEACHER")),
                 new MenuItem("阅卷管理", "/reviews", "EditPen", List.of("TEACHER")),
                 new MenuItem("教师成绩分析", "/teacher/analysis", "TrendCharts", List.of("TEACHER")),
                 new MenuItem("学情分析", "/teacher/students", "DataLine", List.of("TEACHER")),
+
+                // 学生菜单 - 按使用频率排序
                 new MenuItem("仪表盘", "/student", "House", List.of("STUDENT")),
                 new MenuItem("考试中心", "/student/exams", "Clock", List.of("STUDENT")),
                 new MenuItem("成绩查询", "/student/results", "Tickets", List.of("STUDENT")),

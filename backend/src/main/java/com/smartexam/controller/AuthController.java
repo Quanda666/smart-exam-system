@@ -12,6 +12,7 @@ import com.smartexam.dto.auth.MenuItem;
 import com.smartexam.dto.auth.RegisterRequest;
 import com.smartexam.dto.auth.SendBindCodeRequest;
 import com.smartexam.dto.auth.SendLoginCodeRequest;
+import com.smartexam.dto.auth.UpdateAvatarRequest;
 import com.smartexam.dto.auth.UpdateProfileRequest;
 import com.smartexam.service.AuthService;
 import com.smartexam.service.MenuService;
@@ -120,6 +121,19 @@ public class AuthController {
         AuthUser user = AuthContext.requireSession().getUser();
         authService.updateProfile(user.getId(), request.getRealName(), request.getPhone());
         return ApiResponse.ok("个人资料已更新", Map.of("updated", true));
+    }
+
+    @PutMapping("/avatar")
+    public ApiResponse<Map<String, Object>> updateAvatar(@Valid @RequestBody UpdateAvatarRequest request) {
+        AuthUser user = AuthContext.requireSession().getUser();
+        authService.updateAvatar(user.getId(), request.getAvatar());
+        return ApiResponse.ok("头像已更新", Map.of("updated", true));
+    }
+
+    @GetMapping("/login-logs")
+    public ApiResponse<List<Map<String, Object>>> loginLogs() {
+        AuthUser user = AuthContext.requireSession().getUser();
+        return ApiResponse.ok(authService.listLoginLogs(user.getId(), 10));
     }
 
     @GetMapping("/access-matrix")

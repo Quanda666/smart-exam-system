@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS sys_user (
   phone         VARCHAR(32)  DEFAULT NULL,
   email         VARCHAR(128) DEFAULT NULL,
   email_verified TINYINT     NOT NULL DEFAULT 0 COMMENT '邮箱是否已验证 0未验证 1已验证',
+  avatar        LONGTEXT     DEFAULT NULL COMMENT '头像 base64 dataURL（前端压缩后存储）',
   status        TINYINT      NOT NULL DEFAULT 1 COMMENT '1启用 0禁用',
   deleted       TINYINT      NOT NULL DEFAULT 0 COMMENT '0正常 1已删除',
   created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,

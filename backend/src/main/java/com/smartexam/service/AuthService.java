@@ -278,6 +278,24 @@ public class AuthService {
                 realName, blankToNull(phone), userId);
     }
 
+    /** 更新头像（base64 dataURL） */
+    public void updateAvatar(Long userId, String avatar) {
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        jdbcTemplate.update(
+                "UPDATE sys_user SET avatar = ? WHERE id = ? AND deleted = 0",
+                blankToNull(avatar), userId);
+    }
+
+    /** 查询当前用户最近的登录记录（密码登录 + 验证码登录，二者 target 均为「认证」） */
+    public List<Map<String, Object>> listLoginLogs(Long userId, int limit) {
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        int safeLimit = limit <= 0 ? 10 : Math.min(limit, 50);
+        return jdbcTemplate.queryForList(
+                "SELECT action, ip, detail, created_at FROM operation_log "
+                        + "WHERE operator_id = ? AND target = '认证' ORDER BY created_at DESC LIMIT ?",
+                userId, safeLimit);
+    }
+
     private void verifyCode(JdbcTemplate jdbcTemplate, String email, String code, String purpose) {
         List<Map<String, Object>> codes = jdbcTemplate.queryForList(
                 "SELECT code, used, expires_at FROM email_verification WHERE email = ? AND purpose = ? ORDER BY created_at DESC LIMIT 1",
@@ -353,6 +371,29 @@ public class AuthService {
     private Map<String, Object> findProfile(Long userId, List<String> roles) {
         Map<String, Object> profile = new LinkedHashMap<>();
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+
+        // 通用账户信息：邮箱、手机号与头像，供个人中心展示与安全状态判断
+        List<Map<String, Object>> baseRows = jdbcTemplate.queryForList("""
+                SELECT email, email_verified, phone, avatar
+                FROM sys_user
+                WHERE id = ? AND deleted = 0
+                LIMIT 1
+                """, userId);
+        if (!baseRows.isEmpty()) {
+            Map<String, Object> base = baseRows.get(0);
+            if (base.get("email") != null) {
+                profile.put("email", base.get("email"));
+            }
+            if (base.get("email_verified") != null) {
+                profile.put("emailVerified", intValue(base.get("email_verified")) == 1);
+            }
+            if (base.get("phone") != null) {
+                profile.put("phone", base.get("phone"));
+            }
+            if (base.get("avatar") != null) {
+                profile.put("avatar", base.get("avatar"));
+            }
+        }
 
         if (roles.stream().anyMatch("STUDENT"::equalsIgnoreCase)) {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList("""

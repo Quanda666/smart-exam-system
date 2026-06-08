@@ -18,6 +18,18 @@ PREPARE stmt FROM @ddl;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+-- 1b. sys_user 新增头像字段（base64 dataURL，已存在则跳过）
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'sys_user'
+                      AND COLUMN_NAME = 'avatar');
+SET @ddl := IF(@col_exists = 0,
+  'ALTER TABLE sys_user ADD COLUMN avatar LONGTEXT DEFAULT NULL COMMENT ''头像 base64 dataURL（前端压缩后存储）''',
+  'SELECT 1');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 -- 2. 邮箱验证码表（如已有则跳过）
 CREATE TABLE IF NOT EXISTS email_verification (
   id         BIGINT       NOT NULL AUTO_INCREMENT,
