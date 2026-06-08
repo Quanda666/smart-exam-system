@@ -278,25 +278,6 @@ public class AuthService {
                 realName, blankToNull(phone), userId);
     }
 
-    /** 更新头像（base64 dataURL） */
-    public void updateAvatar(Long userId, String avatar) {
-        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
-        jdbcTemplate.update(
-                "UPDATE sys_user SET avatar = ? WHERE id = ? AND deleted = 0",
-                blankToNull(avatar), userId);
-    }
-
-    /** 按需获取头像(avatar 存 base64 可达几百 KB,不放入 findProfile 避免拖垮数据库,仅个人中心按需拉) */
-    public String fetchAvatar(Long userId) {
-        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT avatar FROM sys_user WHERE id = ? AND deleted = 0 LIMIT 1", userId);
-        if (rows.isEmpty() || rows.get(0).get("avatar") == null) {
-            return null;
-        }
-        return (String) rows.get(0).get("avatar");
-    }
-
     /** 查询当前用户最近的登录记录（密码登录 + 验证码登录，二者 target 均为「认证」） */
     public List<Map<String, Object>> listLoginLogs(Long userId, int limit) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();

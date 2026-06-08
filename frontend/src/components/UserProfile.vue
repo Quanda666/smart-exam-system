@@ -27,10 +27,6 @@
           <el-icon><User /></el-icon>
           <span>个人信息</span>
         </el-dropdown-item>
-        <el-dropdown-item command="avatar">
-          <el-icon><Picture /></el-icon>
-          <span>修改头像</span>
-        </el-dropdown-item>
         <el-dropdown-item command="email">
           <el-icon><Message /></el-icon>
           <span>{{ userEmail ? '更换邮箱' : '绑定邮箱' }}</span>
@@ -96,30 +92,6 @@
     <template #footer>
       <el-button @click="profileVisible = false">取消</el-button>
       <el-button type="primary" :loading="profileSaving" @click="saveProfile">保存</el-button>
-    </template>
-  </el-dialog>
-
-  <!-- 修改头像弹窗 -->
-  <el-dialog v-model="avatarVisible" title="修改头像" width="400px" :close-on-click-modal="false">
-    <div class="avatar-upload-area">
-      <el-avatar :size="120" :src="previewAvatar || avatarUrl" class="preview-avatar">
-        <el-icon :size="48"><User /></el-icon>
-      </el-avatar>
-      <el-upload
-        class="avatar-uploader"
-        action="#"
-        :auto-upload="false"
-        :show-file-list="false"
-        :on-change="handleAvatarChange"
-        accept="image/png,image/jpeg,image/jpg,image/webp"
-      >
-        <el-button type="primary" :icon="Upload">选择图片</el-button>
-      </el-upload>
-      <div class="avatar-tip">支持 JPG/PNG/WebP，自动裁剪压缩为 200×200，单张不超过 5MB</div>
-    </div>
-    <template #footer>
-      <el-button @click="avatarVisible = false">取消</el-button>
-      <el-button type="primary" :loading="avatarUploading" :disabled="!previewAvatar" @click="uploadAvatar">确认上传</el-button>
     </template>
   </el-dialog>
 
@@ -232,11 +204,10 @@
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue';
 import { ElMessage } from 'element-plus';
-import type { UploadFile } from 'element-plus';
 import {
-  User, ArrowDown, Lock, Message, Picture, Connection, SwitchButton, Upload, Setting
+  User, ArrowDown, Lock, Message, Connection, SwitchButton, Setting
 } from '@element-plus/icons-vue';
-import { bindEmail, changePassword, fetchAvatar, fetchLoginLogs, sendBindCode, updateAvatar, updateProfile, type AuthUser, type LoginLog } from '../api/auth';
+import { bindEmail, changePassword, fetchLoginLogs, sendBindCode, updateProfile, type AuthUser, type LoginLog } from '../api/auth';
 import { formatDateTime } from '../utils/dateFormat';
 
 const SIDEBAR_PREF_KEY = 'pref_sidebar_collapsed';
@@ -248,7 +219,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   logout: [];
-  profileUpdated: [updates: { realName?: string; email?: string; phone?: string; avatar?: string; emailVerified?: boolean }];
+  profileUpdated: [updates: { realName?: string; email?: string; phone?: string; emailVerified?: boolean }];
   preferenceChanged: [prefs: { sidebarCollapsed: boolean }];
 }>();
 
@@ -258,8 +229,7 @@ function profileStr(key: string): string {
   return value == null ? '' : String(value);
 }
 
-// avatar 不放 profile(base64 可达几百 KB,频繁拉会拖垮后端),改为下拉打开时按需独立拉取
-const avatarUrl = ref('');
+const avatarUrl = '';  // 头像功能已移除,保留空字符串让 el-avatar 显示默认图标
 const userEmail = computed(() => profileStr('email'));
 const userPhone = computed(() => profileStr('phone'));
 const emailVerified = computed(() => props.user?.profile?.emailVerified === true);
@@ -281,7 +251,6 @@ const roleTagType = computed(() => {
 
 // ---- 弹窗可见性 ----
 const profileVisible = ref(false);
-const avatarVisible = ref(false);
 const emailVisible = ref(false);
 const passwordVisible = ref(false);
 const securityVisible = ref(false);
@@ -289,7 +258,6 @@ const preferenceVisible = ref(false);
 
 // ---- 表单 ----
 const profileForm = reactive({ realName: '', phone: '' });
-const previewAvatar = ref('');            // 压缩后的 base64 dataURL，确认后上传
 const emailForm = reactive({ email: '', code: '' });
 const passwordForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' });
 
@@ -302,7 +270,6 @@ const sidebarCollapsedPref = ref(localStorage.getItem(SIDEBAR_PREF_KEY) === '1')
 
 // ---- 加载态 ----
 const profileSaving = ref(false);
-const avatarUploading = ref(false);
 const emailSending = ref(false);
 const emailBinding = ref(false);
 const emailCountdown = ref(0);
@@ -311,21 +278,10 @@ const passwordChanging = ref(false);
 let emailTimer: ReturnType<typeof setInterval> | null = null;
 
 function handleDropdownVisibleChange(visible: boolean) {
-  // 每次展开都用最新 profile 回填可编辑表单，避免编辑后状态残留；同时按需拉取头像(避免登录时拉几百 KB base64 拖垮后端)
+  // 每次展开都用最新 profile 回填可编辑表单，避免编辑后状态残留
   if (visible && props.user) {
     profileForm.realName = props.user.realName;
     profileForm.phone = userPhone.value;
-    loadAvatarOnDemand();
-  }
-}
-
-async function loadAvatarOnDemand() {
-  try {
-    const response = await fetchAvatar();
-    avatarUrl.value = response.data.avatar || '';
-  } catch (error) {
-    // 头像拉取失败静默降级(不阻断下拉菜单打开),保持空头像
-    avatarUrl.value = '';
   }
 }
 
@@ -335,10 +291,6 @@ function handleCommand(command: string) {
       profileForm.realName = props.user?.realName || '';
       profileForm.phone = userPhone.value;
       profileVisible.value = true;
-      break;
-    case 'avatar':
-      previewAvatar.value = '';
-      avatarVisible.value = true;
       break;
     case 'email':
       emailForm.email = '';
@@ -401,64 +353,6 @@ async function saveProfile() {
     ElMessage.error(error instanceof Error ? error.message : '保存失败');
   } finally {
     profileSaving.value = false;
-  }
-}
-
-// 选择图片：本地裁剪压缩为 200x200 JPEG，预览并暂存待上传
-function handleAvatarChange(file: UploadFile) {
-  const raw = file.raw;
-  if (!raw) return;
-  if (raw.size > 5 * 1024 * 1024) {
-    ElMessage.warning('图片大小不能超过 5MB');
-    return;
-  }
-  compressImage(raw, 200)
-    .then((dataUrl) => { previewAvatar.value = dataUrl; })
-    .catch(() => ElMessage.error('图片处理失败，请更换图片重试'));
-}
-
-// 居中裁剪为正方形并缩放到指定边长，输出 JPEG dataURL
-function compressImage(file: File, size: number): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { reject(new Error('canvas 不可用')); return; }
-        const min = Math.min(img.width, img.height);
-        const sx = (img.width - min) / 2;
-        const sy = (img.height - min) / 2;
-        ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
-        resolve(canvas.toDataURL('image/jpeg', 0.85));
-      };
-      img.onerror = () => reject(new Error('图片加载失败'));
-      img.src = e.target?.result as string;
-    };
-    reader.onerror = () => reject(new Error('文件读取失败'));
-    reader.readAsDataURL(file);
-  });
-}
-
-async function uploadAvatar() {
-  if (!previewAvatar.value) {
-    ElMessage.warning('请先选择图片');
-    return;
-  }
-  avatarUploading.value = true;
-  try {
-    await updateAvatar(previewAvatar.value);
-    avatarUrl.value = previewAvatar.value;  // 立即更新本地头像,无需再拉接口
-    emit('profileUpdated', { avatar: previewAvatar.value });
-    avatarVisible.value = false;
-    ElMessage.success('头像已更新');
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '头像上传失败');
-  } finally {
-    avatarUploading.value = false;
   }
 }
 

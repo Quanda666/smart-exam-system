@@ -44,7 +44,6 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
             return;
         }
         ensureSysUserEmailVerifiedColumn(jdbc);
-        ensureSysUserAvatarColumn(jdbc);
         ensureEmailVerificationTable(jdbc);
     }
 
