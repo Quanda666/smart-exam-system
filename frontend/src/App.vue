@@ -257,9 +257,9 @@
         <StudentPanel v-else-if="isStudentModulePath && user" :path="currentPath" />
 
         <!-- V2 角色仪表盘 -->
-        <AdminDashboard v-else-if="currentPath === '/admin' && user" />
-        <TeacherDashboard v-else-if="currentPath === '/teacher' && user" />
-        <StudentDashboard v-else-if="currentPath === '/student' && user" />
+        <AdminDashboard v-else-if="currentPath === '/admin' && user" @navigate="navigateTo" />
+        <TeacherDashboard v-else-if="currentPath === '/teacher' && user" @navigate="navigateTo" />
+        <StudentDashboard v-else-if="currentPath === '/student' && user" @navigate="navigateTo" />
 
         <template v-else>
         <section class="overview-grid">

@@ -3,6 +3,13 @@
     <!-- 问候语 -->
     <h2 class="mp-greeting">{{ greeting }}，同学</h2>
 
+    <!-- 快捷操作入口 -->
+    <div class="mp-quick-actions">
+      <div class="mp-quick-action" @click="emit('navigate', '/student/exams')"><el-icon><AlarmClock /></el-icon>进入考试</div>
+      <div class="mp-quick-action" @click="emit('navigate', '/student/wrong-questions')"><el-icon><Notebook /></el-icon>错题本</div>
+      <div class="mp-quick-action" @click="emit('navigate', '/student/results')"><el-icon><TrendCharts /></el-icon>成绩查询</div>
+    </div>
+
     <!-- 统计卡片网格 -->
     <div class="mp-stat-grid">
       <!-- 待参加考试 -->
@@ -88,7 +95,11 @@ import { onMounted, ref, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Calendar, AlarmClock, CircleCheck, Finished, Warning, Notebook, TrendCharts, Aim } from '@element-plus/icons-vue';
 import { getJson } from '../api/request';
+import { useChartAutoResize } from '../composables/useChartAutoResize';
 import * as echarts from 'echarts';
+
+const emit = defineEmits<{ navigate: [path: string] }>();
+const { register } = useChartAutoResize();
 
 interface StudentOverview {
   upcomingExams: number; finishedExams: number; wrongQuestions: number;
@@ -125,6 +136,7 @@ onMounted(async () => {
 function renderCharts() {
   if (scoreTrendChart.value && data.value.scoreTrend.length) {
     const chart = echarts.init(scoreTrendChart.value);
+    register(chart, scoreTrendChart.value);
     chart.setOption({
       tooltip: { trigger: 'axis', backgroundColor: 'rgba(255,255,255,0.95)', borderColor: '#e8e8e8', textStyle: { color: '#333' } },
       xAxis: { type: 'category', data: data.value.scoreTrend.map(e => e.date || e.examName), axisLabel: { rotate: 30, color: '#666' }, axisLine: { lineStyle: { color: '#e8e8e8' } } },
@@ -135,6 +147,7 @@ function renderCharts() {
   }
   if (kpChart.value && data.value.knowledgePoints.length) {
     const chart = echarts.init(kpChart.value);
+    register(chart, kpChart.value);
     // 知识点雷达图
     const indicators = data.value.knowledgePoints.map(k => ({ name: k.name, max: 100 }));
     const values = data.value.knowledgePoints.map(k => k.mastery);

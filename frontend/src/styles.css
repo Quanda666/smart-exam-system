@@ -948,3 +948,166 @@ button {
   background: rgba(0, 0, 0, 0.4) !important;
 }
 
+/* ===================================================================== */
+/* ===== Metapi 业务页统一设计语言（用户/题库/试卷/考试/分析共用） ===== */
+/* ===================================================================== */
+
+/* 业务页根容器：纵向堆叠，统一间距 */
+.mp-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 页头：标题 + 描述 + 右侧操作区 */
+.mp-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.mp-page-header .mp-page-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--mp-text-primary);
+  margin: 0 0 4px;
+}
+.mp-page-header .mp-page-desc {
+  font-size: 13px;
+  color: var(--mp-text-muted);
+  margin: 0;
+}
+.mp-page-header .mp-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* 工具栏：筛选条件 + 操作按钮，置于白色卡片中 */
+.mp-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--mp-bg-card);
+  border: 1px solid var(--mp-border-light);
+  border-radius: var(--mp-radius-md);
+  box-shadow: var(--mp-shadow-card);
+}
+/* 弹性占位：把其后的按钮推到工具栏右端 */
+.mp-toolbar-spacer {
+  flex: 1 1 auto;
+}
+
+/* 表格卡片：承载 el-table 的白色圆角容器 */
+.mp-table-card {
+  background: var(--mp-bg-card);
+  border: 1px solid var(--mp-border-light);
+  border-radius: var(--mp-radius-md);
+  box-shadow: var(--mp-shadow-card);
+  padding: 12px;
+}
+
+/* 表格卡内的表格：去掉外边框，表头浅灰、字重提升，行悬浮高亮更柔和 */
+.mp-table-card .el-table {
+  --el-table-border-color: var(--mp-border-light);
+  border-radius: var(--mp-radius-sm);
+}
+.mp-table-card .el-table th.el-table__cell {
+  background: #fafbfc;
+  color: var(--mp-text-secondary);
+  font-weight: 600;
+}
+.mp-table-card .el-table .el-table__row:hover > td.el-table__cell {
+  background: var(--mp-primary-light);
+}
+
+/* 批量操作浮条：选中若干行后出现在表格上方 */
+.mp-batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  margin-bottom: 12px;
+  background: var(--mp-primary-light);
+  border: 1px solid color-mix(in srgb, var(--mp-primary) 22%, transparent);
+  border-radius: var(--mp-radius-sm);
+  color: var(--mp-text-secondary);
+  font-size: 13px;
+}
+.mp-batch-bar .mp-batch-count {
+  color: var(--mp-primary);
+  font-weight: 700;
+}
+.mp-batch-bar-spacer {
+  flex: 1 1 auto;
+}
+
+/* 分页条：右对齐，与表格卡留出间距 */
+.mp-pager {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+/* 工具栏 / 批量条上的轻量文字提示 */
+.mp-hint {
+  font-size: 12px;
+  color: var(--mp-text-muted);
+}
+
+/* 统计卡片数值的语义着色（复用于各业务页 summary） */
+.mp-val-ok { color: var(--mp-success) !important; }
+.mp-val-warn { color: var(--mp-warning) !important; }
+.mp-val-danger { color: var(--mp-danger) !important; }
+.mp-val-muted { color: var(--mp-text-muted) !important; }
+
+/* 窄屏下工具栏内的输入/选择器占满整行 */
+@media (max-width: 720px) {
+  .mp-toolbar > .el-input,
+  .mp-toolbar > .el-select {
+    width: 100% !important;
+  }
+}
+
+/* ===== 仪表盘快捷操作入口 ===== */
+.mp-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.mp-quick-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  background: var(--mp-bg-card);
+  border: 1px solid var(--mp-border-light);
+  border-radius: var(--mp-radius-md);
+  box-shadow: var(--mp-shadow-card);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--mp-text-secondary);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.mp-quick-action:hover {
+  color: var(--mp-primary);
+  border-color: var(--mp-primary);
+  transform: translateY(-2px);
+  box-shadow: var(--mp-shadow-md);
+}
+.mp-quick-action .el-icon {
+  font-size: 18px;
+  color: var(--mp-primary);
+}
+
+/* 仪表盘问候语与快捷区的间距收敛 */
+.dashboard .mp-greeting {
+  margin-bottom: 16px;
+}
+

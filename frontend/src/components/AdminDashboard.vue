@@ -3,6 +3,14 @@
     <!-- 问候语 -->
     <h2 class="mp-greeting">{{ greeting }}，管理员</h2>
 
+    <!-- 快捷操作入口 -->
+    <div class="mp-quick-actions">
+      <div class="mp-quick-action" @click="emit('navigate', '/system/users')"><el-icon><Plus /></el-icon>新建用户</div>
+      <div class="mp-quick-action" @click="emit('navigate', '/basic/notices')"><el-icon><Bell /></el-icon>发布公告</div>
+      <div class="mp-quick-action" @click="emit('navigate', '/question-bank')"><el-icon><Collection /></el-icon>题库管理</div>
+      <div class="mp-quick-action" @click="emit('navigate', '/exam/analysis')"><el-icon><DataAnalysis /></el-icon>成绩分析</div>
+    </div>
+
     <!-- 统计卡片网格 -->
     <div class="mp-stat-grid">
       <!-- 学生数据 -->
@@ -113,9 +121,13 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue';
 import { ElMessage } from 'element-plus';
-import { UserFilled, User, Avatar, EditPen, Calendar, Document, Tickets, Histogram, PieChart, TrendCharts } from '@element-plus/icons-vue';
+import { UserFilled, User, Avatar, EditPen, Calendar, Document, Tickets, Histogram, PieChart, TrendCharts, Plus, Bell, Collection, DataAnalysis } from '@element-plus/icons-vue';
 import { getJson } from '../api/request';
+import { useChartAutoResize } from '../composables/useChartAutoResize';
 import * as echarts from 'echarts';
+
+const emit = defineEmits<{ navigate: [path: string] }>();
+const { register } = useChartAutoResize();
 
 interface OverviewData {
   totalStudents: number;
@@ -159,6 +171,7 @@ onMounted(async () => {
 function renderCharts() {
   if (teacherSubjectChart.value) {
     const chart = echarts.init(teacherSubjectChart.value);
+    register(chart, teacherSubjectChart.value);
     chart.setOption({
       tooltip: { trigger: 'axis', backgroundColor: 'rgba(255,255,255,0.95)', borderColor: '#e8e8e8', textStyle: { color: '#333' } },
       xAxis: { type: 'category', data: data.value.teacherSubjects.map(s => s.name), axisLabel: { rotate: 30, color: '#666' }, axisLine: { lineStyle: { color: '#e8e8e8' } } },
@@ -170,6 +183,7 @@ function renderCharts() {
 
   if (studentGradeChart.value) {
     const chart = echarts.init(studentGradeChart.value);
+    register(chart, studentGradeChart.value);
     chart.setOption({
       tooltip: { trigger: 'item', backgroundColor: 'rgba(255,255,255,0.95)', borderColor: '#e8e8e8', textStyle: { color: '#333' } },
       color: ['#4f46e5', '#16a34a', '#d97706', '#dc2626', '#7c3aed', '#0891b2'],
@@ -184,6 +198,7 @@ function renderCharts() {
 
   if (examTrendChart.value) {
     const chart = echarts.init(examTrendChart.value);
+    register(chart, examTrendChart.value);
     chart.setOption({
       tooltip: { trigger: 'axis', backgroundColor: 'rgba(255,255,255,0.95)', borderColor: '#e8e8e8', textStyle: { color: '#333' } },
       legend: { data: ['考试总数', '通过数'], top: 0, textStyle: { color: '#666' } },

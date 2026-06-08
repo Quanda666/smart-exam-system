@@ -3,6 +3,14 @@
     <!-- 问候语 -->
     <h2 class="mp-greeting">{{ greeting }}，老师</h2>
 
+    <!-- 快捷操作入口 -->
+    <div class="mp-quick-actions">
+      <div class="mp-quick-action" @click="emit('navigate', '/reviews')"><el-icon><DocumentChecked /></el-icon>批阅试卷</div>
+      <div class="mp-quick-action" @click="emit('navigate', '/papers')"><el-icon><Document /></el-icon>组卷</div>
+      <div class="mp-quick-action" @click="emit('navigate', '/exam-tasks')"><el-icon><Calendar /></el-icon>考试任务</div>
+      <div class="mp-quick-action" @click="emit('navigate', '/teacher/analysis')"><el-icon><DataAnalysis /></el-icon>学情分析</div>
+    </div>
+
     <!-- 统计卡片网格 -->
     <div class="mp-stat-grid">
       <!-- 我的考试 -->
@@ -96,9 +104,13 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue';
 import { ElMessage } from 'element-plus';
-import { EditPen, Clock, DocumentChecked, Document, Files, PieChart, Calendar, Tickets } from '@element-plus/icons-vue';
+import { EditPen, Clock, DocumentChecked, Document, Files, PieChart, Calendar, Tickets, DataAnalysis } from '@element-plus/icons-vue';
 import { getJson } from '../api/request';
+import { useChartAutoResize } from '../composables/useChartAutoResize';
 import * as echarts from 'echarts';
+
+const emit = defineEmits<{ navigate: [path: string] }>();
+const { register } = useChartAutoResize();
 
 interface TeacherOverview {
   myExams: number; pendingReviews: number; myPapers: number;
@@ -127,6 +139,7 @@ onMounted(async () => {
     await (new Promise(r => setTimeout(r, 100)));
     if (scoreDistChart.value) {
       const chart = echarts.init(scoreDistChart.value);
+      register(chart, scoreDistChart.value);
       chart.setOption({
         tooltip: { trigger: 'item', backgroundColor: 'rgba(255,255,255,0.95)', borderColor: '#e8e8e8', textStyle: { color: '#333' } },
         series: [{
