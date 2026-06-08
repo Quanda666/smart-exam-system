@@ -1,6 +1,8 @@
 package com.smartexam.auth;
 
 import com.smartexam.dto.auth.AuthUser;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +19,8 @@ import java.util.UUID;
  */
 @Component
 public class TokenStore {
+
+    private static final Logger log = LoggerFactory.getLogger(TokenStore.class);
 
     private static final int TOKEN_TTL_HOURS = 8;
 
@@ -44,6 +48,8 @@ public class TokenStore {
 
     /**
      * 查找有效的会话（从数据库读取 + 重建 AuthUser）。
+     * <p>SQL 表名/列名以真实 schema 为准，并与 {@link com.smartexam.service.AuthService} 登录时的查询保持一致：
+     * 角色关联表为 sys_user_role、角色编码列为 role_code、用户启用状态列为 status（无 enabled / profile 列）。
      */
     public Optional<TokenSession> findValid(String token) {
         if (token == null || token.isBlank()) {
@@ -51,56 +57,56 @@ public class TokenStore {
         }
 
         try {
-            // 查询 token 记录
-            Map<String, Object> tokenRecord = jdbcTemplate.queryForMap(
-                "SELECT user_id, expires_at FROM user_token WHERE token = ?",
-                token
-            );
+            // token 记录：用 queryForList 判空处理"未登录"这一正常路径，避免用异常充当控制流
+            List<Map<String, Object>> tokenRows = jdbcTemplate.queryForList(
+                    "SELECT user_id, expires_at FROM user_token WHERE token = ?", token);
+            if (tokenRows.isEmpty()) {
+                return Optional.empty();
+            }
+            Map<String, Object> tokenRecord = tokenRows.get(0);
 
-            LocalDateTime expiresAt = ((java.sql.Timestamp) tokenRecord.get("expires_at")).toLocalDateTime();
-            if (expiresAt.isBefore(LocalDateTime.now())) {
-                // 已过期，删除记录
+            LocalDateTime expiresAt = toLocalDateTime(tokenRecord.get("expires_at"));
+            if (expiresAt == null || expiresAt.isBefore(LocalDateTime.now())) {
                 jdbcTemplate.update("DELETE FROM user_token WHERE token = ?", token);
                 return Optional.empty();
             }
 
-            // 重建 AuthUser（从 sys_user + user_roles 查询）
             Long userId = ((Number) tokenRecord.get("user_id")).longValue();
-            Map<String, Object> userRow = jdbcTemplate.queryForMap(
-                "SELECT id, username, real_name AS realName, profile FROM sys_user WHERE id = ? AND enabled = 1",
-                userId
-            );
 
-            List<String> roles = jdbcTemplate.queryForList(
-                "SELECT r.code FROM user_roles ur JOIN sys_role r ON ur.role_id = r.id WHERE ur.user_id = ?",
-                String.class,
-                userId
-            );
+            // 重建用户基础信息（启用且未删除）
+            List<Map<String, Object>> userRows = jdbcTemplate.queryForList(
+                    "SELECT id, username, real_name FROM sys_user WHERE id = ? AND status = 1 AND deleted = 0", userId);
+            if (userRows.isEmpty()) {
+                // 用户被禁用或删除，会话失效
+                return Optional.empty();
+            }
+            Map<String, Object> userRow = userRows.get(0);
 
+            // 重建角色（与 AuthService#findRoles 完全一致）
+            List<String> roles = jdbcTemplate.queryForList("""
+                    SELECT r.role_code
+                    FROM sys_role r
+                    JOIN sys_user_role ur ON ur.role_id = r.id
+                    WHERE ur.user_id = ? AND r.status = 1 AND r.deleted = 0
+                    ORDER BY r.id
+                    """, String.class, userId);
             if (roles.isEmpty()) {
                 return Optional.empty();
             }
 
-            // profile 字段可能为空
-            Map<String, Object> profile = new LinkedHashMap<>();
-            Object profileObj = userRow.get("profile");
-            if (profileObj instanceof String profileJson && profileJson != null && !profileJson.isBlank()) {
-                // 如果需要解析 JSON profile，这里简化处理（或使用 Jackson）
-                // 当前直接传空 Map，不影响核心功能
-            }
-
+            // profile 仅用于登录响应展示，鉴权链路不依赖（无业务代码调用 AuthUser#getProfile），重建时留空安全
             AuthUser user = new AuthUser(
-                ((Number) userRow.get("id")).longValue(),
-                (String) userRow.get("username"),
-                (String) userRow.get("realName"),
-                roles,
-                profile
-            );
+                    ((Number) userRow.get("id")).longValue(),
+                    (String) userRow.get("username"),
+                    (String) userRow.get("real_name"),
+                    roles,
+                    new LinkedHashMap<>());
 
             return Optional.of(new TokenSession(token, user, expiresAt));
-
         } catch (Exception e) {
-            // token 不存在或查询失败，返回空
+            // 校验过程发生异常（如数据库故障）：记录日志以便排查，按未登录处理，避免请求 500 风暴。
+            // 注意：不要在此静默吞掉异常而不记录，否则 SQL 错误会被伪装成"全站未登录"，极难定位。
+            log.error("Token 校验失败，按未登录处理：{}", e.getMessage(), e);
             return Optional.empty();
         }
     }
@@ -119,5 +125,21 @@ public class TokenStore {
      */
     private void clearExpiredTokens() {
         jdbcTemplate.update("DELETE FROM user_token WHERE expires_at < NOW()");
+    }
+
+    /**
+     * 兼容 JDBC 对 DATETIME 列的不同返回类型（Timestamp / LocalDateTime / 字符串）。
+     */
+    private static LocalDateTime toLocalDateTime(Object value) {
+        if (value instanceof java.sql.Timestamp ts) {
+            return ts.toLocalDateTime();
+        }
+        if (value instanceof LocalDateTime ldt) {
+            return ldt;
+        }
+        if (value instanceof String s && !s.isBlank()) {
+            return java.sql.Timestamp.valueOf(s.replace('T', ' ').substring(0, Math.min(19, s.length()))).toLocalDateTime();
+        }
+        return null;
     }
 }
