@@ -286,6 +286,17 @@ public class AuthService {
                 blankToNull(avatar), userId);
     }
 
+    /** 按需获取头像(avatar 存 base64 可达几百 KB,不放入 findProfile 避免拖垮数据库,仅个人中心按需拉) */
+    public String fetchAvatar(Long userId) {
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT avatar FROM sys_user WHERE id = ? AND deleted = 0 LIMIT 1", userId);
+        if (rows.isEmpty() || rows.get(0).get("avatar") == null) {
+            return null;
+        }
+        return (String) rows.get(0).get("avatar");
+    }
+
     /** 查询当前用户最近的登录记录（密码登录 + 验证码登录，二者 target 均为「认证」） */
     public List<Map<String, Object>> listLoginLogs(Long userId, int limit) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
@@ -372,9 +383,9 @@ public class AuthService {
         Map<String, Object> profile = new LinkedHashMap<>();
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
 
-        // 通用账户信息：邮箱、手机号与头像，供个人中心展示与安全状态判断
+        // 通用账户信息：邮箱、手机号(avatar 因存 base64 可达几百 KB,频繁 SELECT 会拖垮数据库/内存,改为按需独立接口)
         List<Map<String, Object>> baseRows = jdbcTemplate.queryForList("""
-                SELECT email, email_verified, phone, avatar
+                SELECT email, email_verified, phone
                 FROM sys_user
                 WHERE id = ? AND deleted = 0
                 LIMIT 1
@@ -389,9 +400,6 @@ public class AuthService {
             }
             if (base.get("phone") != null) {
                 profile.put("phone", base.get("phone"));
-            }
-            if (base.get("avatar") != null) {
-                profile.put("avatar", base.get("avatar"));
             }
         }
 

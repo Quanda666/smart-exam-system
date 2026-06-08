@@ -121,6 +121,10 @@ export function updateAvatar(avatar: string) {
   return putJson<{ updated: boolean }, { avatar: string }>('/api/auth/avatar', { avatar });
 }
 
+export function fetchAvatar() {
+  return getJson<{ avatar: string }>('/api/auth/avatar');
+}
+
 export interface LoginLog {
   action?: string;
   ip?: string;

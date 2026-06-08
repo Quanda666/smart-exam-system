@@ -130,6 +130,13 @@ public class AuthController {
         return ApiResponse.ok("头像已更新", Map.of("updated", true));
     }
 
+    @GetMapping("/avatar")
+    public ApiResponse<Map<String, Object>> fetchAvatar() {
+        AuthUser user = AuthContext.requireSession().getUser();
+        String avatar = authService.fetchAvatar(user.getId());
+        return ApiResponse.ok(Map.of("avatar", avatar != null ? avatar : ""));
+    }
+
     @GetMapping("/login-logs")
     public ApiResponse<List<Map<String, Object>>> loginLogs() {
         AuthUser user = AuthContext.requireSession().getUser();

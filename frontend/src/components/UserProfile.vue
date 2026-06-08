@@ -236,7 +236,7 @@ import type { UploadFile } from 'element-plus';
 import {
   User, ArrowDown, Lock, Message, Picture, Connection, SwitchButton, Upload, Setting
 } from '@element-plus/icons-vue';
-import { bindEmail, changePassword, fetchLoginLogs, sendBindCode, updateAvatar, updateProfile, type AuthUser, type LoginLog } from '../api/auth';
+import { bindEmail, changePassword, fetchAvatar, fetchLoginLogs, sendBindCode, updateAvatar, updateProfile, type AuthUser, type LoginLog } from '../api/auth';
 import { formatDateTime } from '../utils/dateFormat';
 
 const SIDEBAR_PREF_KEY = 'pref_sidebar_collapsed';
@@ -258,7 +258,8 @@ function profileStr(key: string): string {
   return value == null ? '' : String(value);
 }
 
-const avatarUrl = computed(() => profileStr('avatar'));
+// avatar 不放 profile(base64 可达几百 KB,频繁拉会拖垮后端),改为下拉打开时按需独立拉取
+const avatarUrl = ref('');
 const userEmail = computed(() => profileStr('email'));
 const userPhone = computed(() => profileStr('phone'));
 const emailVerified = computed(() => props.user?.profile?.emailVerified === true);
@@ -310,10 +311,21 @@ const passwordChanging = ref(false);
 let emailTimer: ReturnType<typeof setInterval> | null = null;
 
 function handleDropdownVisibleChange(visible: boolean) {
-  // 每次展开都用最新 profile 回填可编辑表单，避免编辑后状态残留
+  // 每次展开都用最新 profile 回填可编辑表单，避免编辑后状态残留；同时按需拉取头像(避免登录时拉几百 KB base64 拖垮后端)
   if (visible && props.user) {
     profileForm.realName = props.user.realName;
     profileForm.phone = userPhone.value;
+    loadAvatarOnDemand();
+  }
+}
+
+async function loadAvatarOnDemand() {
+  try {
+    const response = await fetchAvatar();
+    avatarUrl.value = response.data.avatar || '';
+  } catch (error) {
+    // 头像拉取失败静默降级(不阻断下拉菜单打开),保持空头像
+    avatarUrl.value = '';
   }
 }
 
@@ -439,6 +451,7 @@ async function uploadAvatar() {
   avatarUploading.value = true;
   try {
     await updateAvatar(previewAvatar.value);
+    avatarUrl.value = previewAvatar.value;  // 立即更新本地头像,无需再拉接口
     emit('profileUpdated', { avatar: previewAvatar.value });
     avatarVisible.value = false;
     ElMessage.success('头像已更新');
