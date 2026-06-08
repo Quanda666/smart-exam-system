@@ -97,7 +97,7 @@
           <el-table-column v-if="canManageTeachingBase" label="操作" width="160">
             <template #default="scope">
               <el-button link type="primary" @click="editSubject(scope.row as SubjectInfo)">编辑</el-button>
-              <el-button link type="danger" @click="removeSubject(Number(scope.row.id))">删除</el-button>
+              <el-button v-if="canDeleteTeachingBase" link type="danger" @click="removeSubject(Number(scope.row.id))">删除</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -147,7 +147,7 @@
           <el-table-column v-if="canManageTeachingBase" label="操作" width="160">
             <template #default="scope">
               <el-button link type="primary" @click="editKnowledgePoint(scope.row as KnowledgePointInfo)">编辑</el-button>
-              <el-button link type="danger" @click="removeKnowledgePoint(Number(scope.row.id))">删除</el-button>
+              <el-button v-if="canDeleteTeachingBase" link type="danger" @click="removeKnowledgePoint(Number(scope.row.id))">删除</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -192,8 +192,11 @@
           </el-table-column>
           <el-table-column v-if="canManageTeachingBase" label="操作" width="160">
             <template #default="scope">
-              <el-button link type="primary" @click="editNotice(scope.row as NoticeInfo)">编辑</el-button>
-              <el-button link type="danger" @click="removeNotice(Number(scope.row.id))">删除</el-button>
+              <template v-if="canManageNotice(scope.row as NoticeInfo)">
+                <el-button link type="primary" @click="editNotice(scope.row as NoticeInfo)">编辑</el-button>
+                <el-button link type="danger" @click="removeNotice(Number(scope.row.id))">删除</el-button>
+              </template>
+              <span v-else style="color:#c0c4cc;font-size:12px;">—</span>
             </template>
           </el-table-column>
         </el-table>
@@ -233,6 +236,7 @@ import type { RoleCode } from '../api/auth';
 const props = defineProps<{
   path: string;
   role: RoleCode;
+  currentUserId?: number;
 }>();
 
 const activeTab = ref(tabFromPath(props.path));
@@ -265,6 +269,12 @@ const noticeForm = reactive({ title: '', content: '', status: 1 });
 
 const canManageClasses = computed(() => props.role === 'ADMIN');
 const canManageTeachingBase = computed(() => props.role === 'ADMIN' || props.role === 'TEACHER');
+// 科目/知识点删除为破坏性操作（影响题库/试卷引用），收紧为仅管理员，与班级一致
+const canDeleteTeachingBase = computed(() => props.role === 'ADMIN');
+// 公告仅发布者本人或管理员可编辑/删除
+function canManageNotice(row: NoticeInfo) {
+  return props.role === 'ADMIN' || (row.publisherId != null && row.publisherId === props.currentUserId);
+}
 const canViewClasses = computed(() => props.role === 'ADMIN' || props.role === 'TEACHER');
 const canViewSubjects = computed(() => props.role === 'ADMIN' || props.role === 'TEACHER' || props.role === 'STUDENT');
 

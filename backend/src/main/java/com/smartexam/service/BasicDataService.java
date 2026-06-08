@@ -236,8 +236,9 @@ public class BasicDataService {
         }
     }
 
-    public Map<String, Object> updateNotice(Long id, NoticeRequest request) {
+    public Map<String, Object> updateNotice(Long id, NoticeRequest request, AuthUser user) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        requireNoticeOwner(jdbcTemplate, id, user);
         try {
             int rows = jdbcTemplate.update("""
                     UPDATE notice
@@ -253,13 +254,33 @@ public class BasicDataService {
         }
     }
 
-    public Map<String, Object> deleteNotice(Long id) {
+    public Map<String, Object> deleteNotice(Long id, AuthUser user) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        requireNoticeOwner(jdbcTemplate, id, user);
         int rows = jdbcTemplate.update("UPDATE notice SET deleted = 1 WHERE id = ? AND deleted = 0", id);
         if (rows == 0) {
             throw new IllegalArgumentException("公告不存在");
         }
         return Map.of("deleted", true, "id", id);
+    }
+
+    /**
+     * 公告归属校验：仅发布者本人或管理员可修改/删除，避免教师互相删改公告。
+     * 与 PaperService#requirePaperOwner / QuestionBankService 的归属隔离策略保持一致。
+     */
+    private void requireNoticeOwner(JdbcTemplate jdbcTemplate, Long id, AuthUser user) {
+        List<Map<String, Object>> owners = jdbcTemplate.queryForList(
+                "SELECT publisher_id FROM notice WHERE id = ? AND deleted = 0", id);
+        if (owners.isEmpty()) {
+            throw new IllegalArgumentException("公告不存在");
+        }
+        if (user != null && user.hasRole("ADMIN")) {
+            return;
+        }
+        Object publisherId = owners.get(0).get("publisher_id");
+        if (user == null || publisherId == null || !publisherId.toString().equals(String.valueOf(user.getId()))) {
+            throw new IllegalArgumentException("只能管理本人发布的公告");
+        }
     }
 
     private Map<String, Object> getClassById(Long id) {

@@ -251,7 +251,7 @@
         />
 
         <div class="content-body">
-        <BasicDataPanel v-if="isBasicPath && user" :path="currentPath" :role="user.primaryRole" />
+        <BasicDataPanel v-if="isBasicPath && user" :path="currentPath" :role="user.primaryRole" :current-user-id="user.id" />
         <QuestionBankPanel v-else-if="isQuestionBankPath && user" :role="user.primaryRole" />
         <PaperPanel v-else-if="isPaperPath && user" :role="user.primaryRole" />
         <ReviewPanel v-else-if="isReviewPath && user" :role="user.primaryRole" />

@@ -81,7 +81,7 @@ public class BasicDataController {
 
     @DeleteMapping("/subjects/{id}")
     public ApiResponse<Map<String, Object>> deleteSubject(@PathVariable Long id) {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        roleAccessService.requireRole("ADMIN");
         return ApiResponse.ok("科目删除成功", basicDataService.deleteSubject(id));
     }
 
@@ -108,7 +108,7 @@ public class BasicDataController {
 
     @DeleteMapping("/knowledge-points/{id}")
     public ApiResponse<Map<String, Object>> deleteKnowledgePoint(@PathVariable Long id) {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        roleAccessService.requireRole("ADMIN");
         return ApiResponse.ok("知识点删除成功", basicDataService.deleteKnowledgePoint(id));
     }
 
@@ -127,14 +127,14 @@ public class BasicDataController {
 
     @PutMapping("/notices/{id}")
     public ApiResponse<Map<String, Object>> updateNotice(@PathVariable Long id, @Valid @RequestBody NoticeRequest request) {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok("公告更新成功", basicDataService.updateNotice(id, request));
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        return ApiResponse.ok("公告更新成功", basicDataService.updateNotice(id, request, user));
     }
 
     @DeleteMapping("/notices/{id}")
     public ApiResponse<Map<String, Object>> deleteNotice(@PathVariable Long id) {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok("公告删除成功", basicDataService.deleteNotice(id));
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        return ApiResponse.ok("公告删除成功", basicDataService.deleteNotice(id, user));
     }
 
     @GetMapping("/summary")
