@@ -36,10 +36,10 @@ public class AuthService {
     private final TokenStore tokenStore;
     private final MenuService menuService;
     private final LoginAttemptGuard loginAttemptGuard;
-    private final EmailService emailService;
+    private final EmailServiceV2 emailService;
 
     public AuthService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider, TokenStore tokenStore, MenuService menuService,
-                       LoginAttemptGuard loginAttemptGuard, EmailService emailService) {
+                       LoginAttemptGuard loginAttemptGuard, EmailServiceV2 emailService) {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
         this.tokenStore = tokenStore;
         this.menuService = menuService;
