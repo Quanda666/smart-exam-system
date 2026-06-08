@@ -5,8 +5,12 @@
         <el-table :data="pendingExams" border stripe>
           <el-table-column prop="examName" label="考试名称" min-width="200" />
           <el-table-column prop="subjectName" label="所属科目" width="150" />
-          <el-table-column prop="startTime" label="开始时间" width="180" />
-          <el-table-column prop="endTime" label="结束时间" width="180" />
+          <el-table-column label="开始时间" width="180">
+            <template #default="scope">{{ formatDateTime(scope.row.startTime) }}</template>
+          </el-table-column>
+          <el-table-column label="结束时间" width="180">
+            <template #default="scope">{{ formatDateTime(scope.row.endTime) }}</template>
+          </el-table-column>
           <el-table-column prop="durationMinutes" label="考试时长（分钟）" width="160" />
           <el-table-column label="操作" width="120" fixed="right">
             <template #default="scope">
@@ -26,7 +30,9 @@
         <el-table :data="activeExams" border stripe>
           <el-table-column prop="examName" label="考试名称" min-width="200" />
           <el-table-column prop="subjectName" label="所属科目" width="150" />
-          <el-table-column prop="endTime" label="结束时间" width="180" />
+          <el-table-column label="结束时间" width="180">
+            <template #default="scope">{{ formatDateTime(scope.row.endTime) }}</template>
+          </el-table-column>
           <el-table-column label="操作" width="120" fixed="right">
             <template #default="scope">
               <el-button type="success" @click="startExam(scope.row as StudentExamInfo)">继续答题</el-button>
@@ -39,7 +45,9 @@
         <el-table :data="finishedExams" border stripe>
           <el-table-column prop="examName" label="考试名称" min-width="200" />
           <el-table-column prop="subjectName" label="所属科目" width="150" />
-          <el-table-column prop="submitTime" label="交卷时间" width="180" />
+          <el-table-column label="交卷时间" width="180">
+            <template #default="scope">{{ formatDateTime(scope.row.submitTime) }}</template>
+          </el-table-column>
            <el-table-column prop="score" label="得分" width="100" />
           <el-table-column label="操作" width="120" fixed="right">
             <template #default="scope">
@@ -57,6 +65,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { listStudentExams, type StudentExamInfo } from '../api/exam';
 import { ElMessage } from 'element-plus';
+import { formatDateTime } from '../utils/dateFormat';
 
 const activeList = ref('pending');
 

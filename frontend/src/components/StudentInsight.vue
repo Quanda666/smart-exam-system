@@ -103,7 +103,9 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="submitTime" label="交卷时间" width="180" />
+          <el-table-column label="交卷时间" width="180">
+            <template #default="s">{{ formatDateTime(s.row.submitTime) }}</template>
+          </el-table-column>
         </el-table>
       </div>
     </el-drawer>
@@ -124,6 +126,7 @@ import {
 } from '../api/insight';
 import { useChartAutoResize } from '../composables/useChartAutoResize';
 import { exportToCsv } from '../utils/exportCsv';
+import { formatDateTime } from '../utils/dateFormat';
 
 const classes = ref<ClassInfo[]>([]);
 const classId = ref<number | null>(null);

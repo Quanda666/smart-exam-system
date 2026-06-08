@@ -21,8 +21,12 @@
       <el-table-column prop="examName" label="考试名称" min-width="170" />
       <el-table-column prop="subjectName" label="科目" width="120" />
       <el-table-column prop="paperName" label="试卷" min-width="140" />
-      <el-table-column prop="startTime" label="开始时间" width="170" />
-      <el-table-column prop="endTime" label="结束时间" width="170" />
+      <el-table-column label="开始时间" width="180">
+        <template #default="scope">{{ formatDateTime(scope.row.startTime) }}</template>
+      </el-table-column>
+      <el-table-column label="结束时间" width="180">
+        <template #default="scope">{{ formatDateTime(scope.row.endTime) }}</template>
+      </el-table-column>
       <el-table-column label="时长" width="90">
         <template #default="scope">{{ scope.row.durationMinutes }} 分钟</template>
       </el-table-column>
@@ -116,6 +120,7 @@ import { Search, Plus } from '@element-plus/icons-vue';
 import { closeExam, createExam, deleteExam, exportExamScores, listTeacherExams, updateExam, type ExamInfo } from '../api/exam';
 import { listPapers, type PaperInfo } from '../api/paper';
 import { listClasses, type ClassInfo } from '../api/basic';
+import { formatDateTime } from '../utils/dateFormat';
 
 const exams = ref<ExamInfo[]>([]);
 const currentPage = ref(1);

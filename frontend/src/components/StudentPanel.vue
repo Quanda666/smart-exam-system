@@ -10,7 +10,9 @@
           <el-table-column prop="examName" label="考试名称" min-width="200"/>
           <el-table-column prop="subjectName" label="科目" />
           <el-table-column prop="score" label="分数" />
-          <el-table-column prop="submitTime" label="提交时间" />
+          <el-table-column label="提交时间" width="180">
+            <template #default="scope">{{ formatDateTime(scope.row.submitTime) }}</template>
+          </el-table-column>
           <el-table-column label="操作">
             <template #default="scope">
               <el-button link type="primary" @click="viewResult(scope.row.attemptId)">查看详情</el-button>
@@ -24,7 +26,9 @@
           <el-table-column prop="stem" label="题干" show-overflow-tooltip min-width="250" />
           <el-table-column prop="questionType" label="题型" />
           <el-table-column prop="wrongCount" label="错误次数" />
-          <el-table-column prop="lastWrongTime" label="最近错误时间" />
+          <el-table-column label="最近错误时间" width="180">
+            <template #default="scope">{{ formatDateTime(scope.row.lastWrongTime) }}</template>
+          </el-table-column>
           <el-table-column label="操作">
             <template #default="scope">
               <el-button link type="primary" @click="aiExplainWrong(scope.row as WrongQuestion)">AI讲解</el-button>
@@ -43,7 +47,7 @@
       <div v-if="examResult" class="result-drawer">
         <el-descriptions :title="examResult.gradeInfo.examName" :column="2" border>
           <el-descriptions-item label="总分">{{ examResult.gradeInfo.score }}</el-descriptions-item>
-          <el-descriptions-item label="交卷时间">{{ examResult.gradeInfo.submitTime }}</el-descriptions-item>
+          <el-descriptions-item label="交卷时间">{{ formatDateTime(examResult.gradeInfo.submitTime) }}</el-descriptions-item>
         </el-descriptions>
         <el-divider />
         <div v-for="(answer, index) in examResult.answers" :key="index" class="answer-block">
@@ -66,6 +70,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import * as echarts from 'echarts';
 import ExamList from './ExamList.vue';
 import ExamTaking from './ExamTaking.vue';
+import { formatDateTime } from '../utils/dateFormat';
 
 const props = defineProps<{ path?: string }>();
 
