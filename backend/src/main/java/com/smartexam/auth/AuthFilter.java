@@ -24,7 +24,8 @@ public class AuthFilter extends OncePerRequestFilter {
             "/api/auth/login-by-code",
             "/api/auth/send-login-code",
             "/api/auth/register",
-            "/api/auth/register-options"
+            "/api/auth/register-options",
+            "/api/diagnostic/smtp-test"
     );
 
     private final TokenStore tokenStore;
