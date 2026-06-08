@@ -229,7 +229,9 @@ public class AuthService {
 
         // 异步发送邮件（不阻塞 HTTP 请求，避免 SMTP 超时导致 502）
         if (emailService.isConfigured()) {
+            log.info("验证码已存入数据库，准备异步发送邮件至: {}", email);
             emailService.sendVerificationCodeAsync(email, code);
+            log.info("异步邮件任务已提交");
         } else {
             log.warn("邮件服务未配置，验证码已生成但仅记录在数据库: {} -> {}", email, code);
         }

@@ -70,7 +70,9 @@ public class EmailService {
      */
     @Async
     public void sendVerificationCodeAsync(String to, String code) {
-        sendVerificationCode(to, code);
+        log.info("【异步任务】开始执行邮件发送，线程: {}", Thread.currentThread().getName());
+        boolean result = sendVerificationCode(to, code);
+        log.info("【异步任务】邮件发送结果: {}, 目标: {}", result ? "成功" : "失败", to);
     }
 
     private String buildEmailBody(String code) {
