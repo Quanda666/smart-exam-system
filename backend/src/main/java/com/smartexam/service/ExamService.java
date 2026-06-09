@@ -198,7 +198,10 @@ public class ExamService {
 
         Long examId = ((Number) attempt.get("exam_id")).longValue();
         Map<String, Object> exam = jt.queryForMap("""
-                SELECT e.*, p.total_score, p.paper_name
+                SELECT e.*, e.id AS examId, e.paper_id AS paperId, e.exam_name AS examName,
+                       e.start_time AS startTime, e.end_time AS endTime,
+                       e.duration_minutes AS durationMinutes, p.total_score AS totalScore,
+                       p.paper_name AS paperName
                 FROM exam e
                 JOIN paper p ON e.paper_id = p.id
                 WHERE e.id = ?
@@ -226,7 +229,7 @@ public class ExamService {
         }
         exam.put("questions", questions);
 
-        Integer durationMinutes = exam.get("duration_minutes") == null ? null : ((Number) exam.get("duration_minutes")).intValue();
+        Integer durationMinutes = exam.get("durationMinutes") == null ? null : ((Number) exam.get("durationMinutes")).intValue();
         if (durationMinutes != null) {
             Long elapsed = jt.queryForObject("""
                     SELECT TIMESTAMPDIFF(SECOND, start_time, NOW())

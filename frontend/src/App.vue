@@ -1,5 +1,10 @@
 <template>
-  <ExamTaking v-if="takingExam" :attempt-id="takingExam.attemptId" @submit-success="finishExam" />
+  <ExamTaking
+    v-if="takingExam"
+    :attempt-id="takingExam.attemptId"
+    @submit-success="finishExam"
+    @leave-exam="leaveExam"
+  />
   <main v-else class="app-shell">
     <section v-if="initializing" class="app-loading" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:14px;color:#909399;">
       <el-icon class="is-loading" :size="34"><Loading /></el-icon>
@@ -314,6 +319,7 @@ const codeCountdown = ref(0);
 const codeSending = ref(false);
 const codeLoginLoading = ref(false);
 let codeTimer: ReturnType<typeof setInterval> | null = null;
+const ACTIVE_EXAM_ATTEMPT_KEY = 'smart_exam_active_attempt_id';
 
 const takingExam = ref<{ attemptId: number } | null>(null);
 const loginLoading = ref(false);
@@ -422,6 +428,13 @@ async function restoreSession() {
     const response = await fetchCurrentUser();
     user.value = response.data.user;
     menus.value = response.data.menus;
+    const activeAttemptId = readActiveAttemptId();
+    if (activeAttemptId && response.data.user.primaryRole === 'STUDENT') {
+      currentPath.value = '/student/exams';
+      window.history.replaceState({}, '', '/student/exams');
+      takingExam.value = { attemptId: activeAttemptId };
+      return;
+    }
     navigateTo(resolveLandingPath(response.data.defaultPath), 'replace');
   } catch (error) {
     clearToken();
@@ -514,6 +527,7 @@ async function handleLogout() {
     // 即使后端退出失败，前端也清除本地状态，避免残留 token 影响后续登录。
   }
   clearToken();
+  clearActiveAttemptId();
   user.value = null;
   menus.value = [];
   currentPath.value = '/login';
@@ -522,11 +536,47 @@ async function handleLogout() {
 }
 
 function finishExam() {
+  clearActiveAttemptId();
   takingExam.value = null;
 }
 
 function startStudentExam(exam: { attemptId: number }) {
+  storeActiveAttemptId(exam.attemptId);
   takingExam.value = { attemptId: exam.attemptId };
+}
+
+function leaveExam() {
+  clearActiveAttemptId();
+  takingExam.value = null;
+  if (user.value) {
+    navigateTo('/student/exams', 'replace');
+  }
+}
+
+function storeActiveAttemptId(attemptId: number) {
+  try {
+    sessionStorage.setItem(ACTIVE_EXAM_ATTEMPT_KEY, String(attemptId));
+  } catch {
+    // sessionStorage 不可用时，刷新恢复能力降级，但不影响考试作答。
+  }
+}
+
+function readActiveAttemptId() {
+  try {
+    const raw = sessionStorage.getItem(ACTIVE_EXAM_ATTEMPT_KEY);
+    const parsed = raw ? Number(raw) : 0;
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearActiveAttemptId() {
+  try {
+    sessionStorage.removeItem(ACTIVE_EXAM_ATTEMPT_KEY);
+  } catch {
+    // 忽略浏览器存储异常。
+  }
 }
 
 function resolveLandingPath(defaultPath: string) {
@@ -575,6 +625,9 @@ onMounted(async () => {
 
   // 响应浏览器前进/后退：URL 已由浏览器更新，按当前 path 切换页面（silent 不再回写 history）
   window.addEventListener('popstate', () => {
+    if (takingExam.value) {
+      return;
+    }
     if (user.value) {
       navigateTo(window.location.pathname, 'silent');
     }

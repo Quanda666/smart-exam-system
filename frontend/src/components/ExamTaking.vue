@@ -11,6 +11,7 @@
           <el-icon><AlarmClock /></el-icon>
           <span>{{ formattedTime }}</span>
         </div>
+        <el-button plain :icon="Close" @click="confirmLeaveExam">退出考试</el-button>
       </div>
     </div>
     <div class="exam-layout">
@@ -80,13 +81,16 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { startExam, submitExam, saveExamDraft, type ExamDetail } from '../api/exam';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { AlarmClock } from '@element-plus/icons-vue';
+import { AlarmClock, Close } from '@element-plus/icons-vue';
 
 const props = defineProps<{
   attemptId: number;
 }>();
 
-const emit = defineEmits(['submit-success']);
+const emit = defineEmits<{
+  (e: 'submit-success'): void;
+  (e: 'leave-exam'): void;
+}>();
 interface LocalExamDraft {
   answers: Record<number, any>;
   savedAt: string;
@@ -105,6 +109,8 @@ let timer: any;
 let autoSaveTimer: any;
 let retrySaveTimer: any;
 let draftHydrated = false;
+let allowPageLeave = false;
+let leaveConfirmOpen = false;
 
 const currentQuestion = computed(() => examDetails.value?.questions[currentQuestionIndex.value]);
 const currentQuestionId = computed(() => currentQuestion.value ? questionKey(currentQuestion.value) : 0);
@@ -161,10 +167,14 @@ onMounted(async () => {
       : (examDetails.value?.durationMinutes || 0) * 60;
     startTimer();
     startAutoSave();
+    bindHistoryGuard();
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('popstate', handlePopState);
     document.addEventListener('visibilitychange', handleVisibilityChange);
   } catch (error) {
     ElMessage.error('进入考试失败，可能考试已结束或您已参加过');
+    allowPageLeave = true;
+    emit('leave-exam');
   }
 });
 
@@ -173,6 +183,7 @@ onUnmounted(() => {
   clearInterval(autoSaveTimer);
   clearTimeout(retrySaveTimer);
   window.removeEventListener('beforeunload', handleBeforeUnload);
+  window.removeEventListener('popstate', handlePopState);
   document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 
@@ -222,7 +233,7 @@ const persistDraft = async (manual: boolean) => {
 };
 
 const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-  if (!hasUnsavedChanges.value) {
+  if (allowPageLeave) {
     return;
   }
   event.preventDefault();
@@ -316,6 +327,31 @@ const confirmSubmit = () => {
     .catch(() => {});
 };
 
+const confirmLeaveExam = async () => {
+  if (leaveConfirmOpen) {
+    return;
+  }
+  leaveConfirmOpen = true;
+  try {
+    await ElMessageBox.confirm(
+      '正在考试中，离开前会先尝试保存草稿。下次进入可继续作答。',
+      '确认退出考试？',
+      {
+        confirmButtonText: '保存并退出',
+        cancelButtonText: '继续考试',
+        type: 'warning'
+      }
+    );
+    await persistDraft(false);
+    allowPageLeave = true;
+    emit('leave-exam');
+  } catch {
+    // 继续考试。
+  } finally {
+    leaveConfirmOpen = false;
+  }
+};
+
 const submit = async (autoSubmit: boolean) => {
   clearInterval(timer);
   clearInterval(autoSaveTimer);
@@ -331,6 +367,7 @@ const submit = async (autoSubmit: boolean) => {
     });
     
     await submitExam(props.attemptId, { answers: finalAnswers });
+    allowPageLeave = true;
     clearLocalDraft();
     if(autoSubmit) {
         ElMessage.warning('考试时间到，已自动为您交卷！');
@@ -405,6 +442,22 @@ function clearLocalDraft() {
   } catch {
     // 忽略浏览器存储异常。
   }
+}
+
+function bindHistoryGuard() {
+  try {
+    window.history.pushState({ smartExamGuard: props.attemptId }, '', window.location.href);
+  } catch {
+    // History API 不可用时，仅保留刷新/关闭提醒。
+  }
+}
+
+function handlePopState() {
+  if (allowPageLeave) {
+    return;
+  }
+  bindHistoryGuard();
+  confirmLeaveExam();
 }
 
 function hasAnyAnswer(value: Record<number, any>) {
@@ -529,8 +582,9 @@ function sameAnswers(a: Record<number, any>, b: Record<number, any>) {
 }
 .option-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
+  max-width: 860px;
 }
 .option-card {
   display: grid;
