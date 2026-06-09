@@ -74,8 +74,8 @@ CREATE DATABASE IF NOT EXISTS smart_exam_system
 | `OPENAI_MODEL` | `gpt-4o-mini` | 模型名称 |
 | `AI_MOCK_ENABLED` | `true` | AI 模拟模式 |
 | `AI_TIMEOUT_SECONDS` | `30` | AI 请求超时 |
-| `UPLOAD_MAX_FILE_SIZE` | `12MB` | 单文件上传限制 |
-| `UPLOAD_MAX_REQUEST_SIZE` | `14MB` | 上传请求限制 |
+| `UPLOAD_MAX_FILE_SIZE` | `25MB` | 单文件上传限制 |
+| `UPLOAD_MAX_REQUEST_SIZE` | `28MB` | 上传请求限制 |
 | `RESEND_API_KEY` | 空 | Resend API Key |
 | `RESEND_FROM_EMAIL` | 空 | 验证码发件邮箱 |
 

@@ -70,7 +70,7 @@
       <div class="ai-material-strip">
         <div class="ai-material-title">
           <span>课程材料生成</span>
-          <small>上传 txt / Word / PDF，按题型数量生成题库草稿</small>
+          <small>上传 txt / Word / PPT / PDF，按题型数量生成题库草稿</small>
         </div>
         <div class="ai-material-counts">
           <label v-for="item in questionTypes" :key="item.value" class="ai-count-item">
@@ -81,8 +81,8 @@
         <el-button type="primary" :icon="Upload" :loading="aiMaterialGenerating" @click="pickMaterialDocument">上传材料生成</el-button>
       </div>
 
-      <input ref="questionDocInputRef" class="hidden-file-input" type="file" accept=".txt,.text,.md,.doc,.docx,.pdf" @change="handleQuestionDocumentSelected" />
-      <input ref="materialDocInputRef" class="hidden-file-input" type="file" accept=".txt,.text,.md,.doc,.docx,.pdf" @change="handleMaterialDocumentSelected" />
+      <input ref="questionDocInputRef" class="hidden-file-input" type="file" accept=".txt,.text,.md,.doc,.docx,.ppt,.pptx,.pdf" @change="handleQuestionDocumentSelected" />
+      <input ref="materialDocInputRef" class="hidden-file-input" type="file" accept=".txt,.text,.md,.doc,.docx,.ppt,.pptx,.pdf" @change="handleMaterialDocumentSelected" />
 
       <el-form class="question-form" :model="questionForm" label-position="top">
         <el-form-item label="所属科目">

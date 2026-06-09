@@ -20,7 +20,7 @@ import java.util.zip.ZipInputStream;
 @Service
 public class DocumentTextExtractorService {
 
-    private static final int MAX_FILE_BYTES = 12 * 1024 * 1024;
+    private static final int MAX_FILE_BYTES = 25 * 1024 * 1024;
     private static final int MAX_TEXT_LENGTH = 80_000;
     private static final Pattern XML_TAG = Pattern.compile("<[^>]+>");
     private static final Pattern CONTROL_CHARS = Pattern.compile("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]+");
@@ -30,7 +30,7 @@ public class DocumentTextExtractorService {
             throw new IllegalArgumentException("请上传文档文件");
         }
         if (file.getSize() > MAX_FILE_BYTES) {
-            throw new IllegalArgumentException("文档不能超过12MB");
+            throw new IllegalArgumentException("文档不能超过25MB");
         }
         try {
             byte[] bytes = file.getBytes();
@@ -39,8 +39,9 @@ public class DocumentTextExtractorService {
             String text = switch (extension) {
                 case "txt", "text", "md" -> decodePlainText(bytes);
                 case "docx" -> extractDocx(bytes);
+                case "pptx" -> extractPptx(bytes);
                 case "pdf" -> extractPdf(bytes);
-                case "doc" -> extractLegacyDoc(bytes);
+                case "doc", "ppt" -> extractLegacyOffice(bytes);
                 default -> decodePlainText(bytes);
             };
             String normalized = normalizeText(text);
@@ -61,6 +62,25 @@ public class DocumentTextExtractorService {
                 String name = entry.getName();
                 if (name.startsWith("word/") && name.endsWith(".xml")
                         && (name.contains("document") || name.contains("header") || name.contains("footer"))) {
+                    String xml = new String(readAll(zip), StandardCharsets.UTF_8);
+                    builder.append(xmlToText(xml)).append('\n');
+                }
+            }
+        }
+        return builder.toString();
+    }
+
+    private String extractPptx(byte[] bytes) throws IOException {
+        StringBuilder builder = new StringBuilder();
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(bytes))) {
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                String name = entry.getName();
+                if (name.startsWith("ppt/") && name.endsWith(".xml")
+                        && (name.startsWith("ppt/slides/")
+                        || name.startsWith("ppt/notesSlides/")
+                        || name.startsWith("ppt/slideMasters/")
+                        || name.startsWith("ppt/slideLayouts/"))) {
                     String xml = new String(readAll(zip), StandardCharsets.UTF_8);
                     builder.append(xmlToText(xml)).append('\n');
                 }
@@ -104,7 +124,7 @@ public class DocumentTextExtractorService {
         return extracted;
     }
 
-    private String extractLegacyDoc(byte[] bytes) {
+    private String extractLegacyOffice(byte[] bytes) {
         String utf16 = new String(bytes, StandardCharsets.UTF_16LE);
         String combined = extractReadableRuns(utf16) + "\n" + extractBinaryStrings(bytes);
         return combined;
@@ -124,7 +144,10 @@ public class DocumentTextExtractorService {
                 .replaceAll("<w:tab[^>]*/>", "\t")
                 .replaceAll("<w:br[^>]*/>", "\n")
                 .replaceAll("</w:p>", "\n")
-                .replaceAll("</w:tr>", "\n");
+                .replaceAll("</w:tr>", "\n")
+                .replaceAll("<a:br[^>]*/>", "\n")
+                .replaceAll("</a:p>", "\n")
+                .replaceAll("</a:tr>", "\n");
         text = XML_TAG.matcher(text).replaceAll("");
         return unescapeXml(text);
     }

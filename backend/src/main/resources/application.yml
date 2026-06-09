@@ -11,8 +11,8 @@ spring:
     name: smart-exam-backend
   servlet:
     multipart:
-      max-file-size: ${UPLOAD_MAX_FILE_SIZE:12MB}
-      max-request-size: ${UPLOAD_MAX_REQUEST_SIZE:14MB}
+      max-file-size: ${UPLOAD_MAX_FILE_SIZE:25MB}
+      max-request-size: ${UPLOAD_MAX_REQUEST_SIZE:28MB}
   lifecycle:
     timeout-per-shutdown-phase: 30s
   sql:
