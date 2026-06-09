@@ -77,6 +77,17 @@ DEALLOCATE PREPARE stmt;
 
 SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS
                     WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'teacher_profile'
+                      AND COLUMN_NAME = 'introduction');
+SET @ddl := IF(@col_exists = 0,
+  'ALTER TABLE teacher_profile ADD COLUMN introduction VARCHAR(1000) DEFAULT NULL COMMENT ''简介'' AFTER college',
+  'SELECT 1');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (SELECT COUNT(*) FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
                       AND TABLE_NAME = 'edu_class'
                       AND COLUMN_NAME = 'class_code');
 SET @ddl := IF(@col_exists = 0,

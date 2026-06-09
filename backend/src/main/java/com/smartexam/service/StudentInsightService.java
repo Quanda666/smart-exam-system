@@ -1,58 +1,87 @@
 package com.smartexam.service;
 
+import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.exception.DatabaseUnavailableException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 教师学情分析：从班级下钻到单个学生的成绩历史与趋势，补齐教师以学生为中心的工作流。
- */
 @Service
 public class StudentInsightService {
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
+    private final TeachingScopeService teachingScopeService;
 
-    public StudentInsightService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+    public StudentInsightService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
+                                 TeachingScopeService teachingScopeService) {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
+        this.teachingScopeService = teachingScopeService;
     }
 
-    /** 列出某班级的学生，附带其已完成考试数与平均分。 */
-    public List<Map<String, Object>> listClassStudents(Long classId) {
+    public List<Map<String, Object>> listClassStudents(Long classId, AuthUser user) {
+        if (!teachingScopeService.hasGlobalScope(user)
+                && !new LinkedHashSet<>(teachingScopeService.visibleClassIds(user)).contains(classId)) {
+            throw new IllegalArgumentException("Class is outside current teaching scope");
+        }
         JdbcTemplate jt = requireJdbcTemplate();
         return jt.queryForList("""
                 SELECT u.id AS userId, u.username, u.real_name AS realName, sp.student_no AS studentNo,
-                       u.status, c.class_name AS className,
+                       u.status, c.class_name AS className, scm.membership_type AS membershipType,
                        (SELECT COUNT(*) FROM exam_attempt ea WHERE ea.user_id = u.id AND ea.status = 5) AS completedCount,
                        (SELECT COALESCE(ROUND(AVG(ea.score), 2), 0) FROM exam_attempt ea WHERE ea.user_id = u.id AND ea.status = 5) AS avgScore
-                FROM student_profile sp
-                JOIN sys_user u ON u.id = sp.user_id AND u.deleted = 0
-                JOIN edu_class c ON c.id = sp.class_id
-                WHERE sp.class_id = ? AND sp.deleted = 0
+                FROM student_class_membership scm
+                JOIN sys_user u ON u.id = scm.student_user_id AND u.deleted = 0
+                LEFT JOIN student_profile sp ON sp.user_id = u.id AND sp.deleted = 0
+                JOIN edu_class c ON c.id = scm.class_id AND c.deleted = 0
+                WHERE scm.class_id = ?
+                  AND scm.deleted = 0
+                  AND scm.status = 1
                 ORDER BY sp.student_no, u.id
                 """, classId);
     }
 
-    /** 单个学生的档案 + 历次已完成考试成绩（按时间，供趋势图）+ 汇总统计。 */
-    public Map<String, Object> studentInsight(Long userId) {
+    public Map<String, Object> studentInsight(Long userId, AuthUser user) {
+        if (!teachingScopeService.canAccessStudent(user, userId)) {
+            throw new IllegalArgumentException("Student is outside current teaching scope");
+        }
         JdbcTemplate jt = requireJdbcTemplate();
         Map<String, Object> data = new LinkedHashMap<>();
 
         List<Map<String, Object>> profile = jt.queryForList("""
-                SELECT u.real_name AS realName, u.username, sp.student_no AS studentNo, c.class_name AS className
+                SELECT u.real_name AS realName, u.username, sp.student_no AS studentNo,
+                       sp.enrollment_year AS enrollmentYear, sp.college, sp.major,
+                       pc.class_name AS primaryClassName,
+                       (SELECT GROUP_CONCAT(CONCAT(c.class_name, ':', scm.membership_type) ORDER BY scm.membership_type, c.id SEPARATOR ',')
+                        FROM student_class_membership scm
+                        JOIN edu_class c ON c.id = scm.class_id AND c.deleted = 0
+                        WHERE scm.student_user_id = u.id AND scm.deleted = 0 AND scm.status = 1) AS classMemberships
                 FROM sys_user u
                 LEFT JOIN student_profile sp ON sp.user_id = u.id AND sp.deleted = 0
-                LEFT JOIN edu_class c ON c.id = sp.class_id
+                LEFT JOIN edu_class pc ON pc.id = COALESCE(sp.primary_class_id, sp.class_id) AND pc.deleted = 0
                 WHERE u.id = ? AND u.deleted = 0
                 """, userId);
         if (profile.isEmpty()) {
-            throw new IllegalArgumentException("学生不存在");
+            throw new IllegalArgumentException("Student not found");
         }
         data.put("student", profile.get(0));
+
+        data.put("courses", jt.queryForList("""
+                SELECT cc.id AS classCourseId, c.class_name AS className, co.course_name AS courseName,
+                       sce.enrollment_type AS enrollmentType, cc.term_name AS termName
+                FROM student_course_enrollment sce
+                JOIN class_course cc ON cc.id = sce.class_course_id AND cc.deleted = 0
+                JOIN edu_class c ON c.id = cc.class_id AND c.deleted = 0
+                JOIN edu_course co ON co.id = cc.course_id AND co.deleted = 0
+                WHERE sce.student_user_id = ?
+                  AND sce.deleted = 0
+                  AND sce.status = 1
+                ORDER BY cc.term_name, c.id, co.id
+                """, userId));
 
         data.put("exams", jt.queryForList("""
                 SELECT e.exam_name AS examName, s.subject_name AS subjectName, ea.score,
@@ -70,7 +99,8 @@ public class StudentInsightService {
                        COALESCE(ROUND(AVG(score), 2), 0) AS avgScore,
                        COALESCE(MAX(score), 0) AS maxScore,
                        COALESCE(MIN(score), 0) AS minScore
-                FROM exam_attempt WHERE user_id = ? AND status = 5 AND score IS NOT NULL
+                FROM exam_attempt
+                WHERE user_id = ? AND status = 5 AND score IS NOT NULL
                 """, userId));
 
         return data;
@@ -79,7 +109,7 @@ public class StudentInsightService {
     private JdbcTemplate requireJdbcTemplate() {
         JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
         if (jdbcTemplate == null) {
-            throw new DatabaseUnavailableException("数据库连接不可用，请检查本地或云端数据源配置");
+            throw new DatabaseUnavailableException("Database connection is unavailable");
         }
         return jdbcTemplate;
     }

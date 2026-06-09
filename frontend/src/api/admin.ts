@@ -11,8 +11,17 @@ export interface SystemUser {
   studentNo?: string;
   classId?: number;
   className?: string;
+  classType?: string;
+  classMemberships?: string;
+  enrollmentYear?: string;
+  studentCollege?: string;
+  studentMajor?: string;
   teacherNo?: string;
+  hireDate?: string;
   teacherTitle?: string;
+  teacherCollege?: string;
+  introduction?: string;
+  teachingAssignments?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -116,8 +125,14 @@ export interface CreateUserPayload {
   roleType: string;
   studentNo?: string;
   classId?: number | null;
+  electiveClassIds?: number[];
+  enrollmentYear?: string;
+  college?: string;
+  major?: string;
   teacherNo?: string;
+  hireDate?: string | null;
   title?: string;
+  introduction?: string;
   phone?: string;
   email?: string;
 }
@@ -131,8 +146,14 @@ export interface UpdateUserPayload {
   roleType: string;
   studentNo?: string;
   classId?: number | null;
+  electiveClassIds?: number[];
+  enrollmentYear?: string;
+  college?: string;
+  major?: string;
   teacherNo?: string;
+  hireDate?: string | null;
   title?: string;
+  introduction?: string;
   phone?: string;
   email?: string;
 }

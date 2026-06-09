@@ -36,8 +36,8 @@ public class ReviewController {
 
     @GetMapping("/attempt/{attemptId}")
     public ApiResponse<Map<String, Object>> getReviewDetails(@PathVariable Long attemptId) {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok(reviewService.getReviewDetails(attemptId));
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        return ApiResponse.ok(reviewService.getReviewDetails(attemptId, user));
     }
 
     @PostMapping("/attempt/{attemptId}")

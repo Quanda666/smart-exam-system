@@ -3,22 +3,29 @@ package com.smartexam.dto.basic;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public class ClassInfoRequest {
 
-    @NotBlank(message = "班级名称不能为空")
-    @Size(max = 128, message = "班级名称长度不能超过128个字符")
+    @NotBlank(message = "Class name is required")
+    @Size(max = 128, message = "Class name must be 128 characters or less")
     private String className;
 
-    @Size(max = 128, message = "专业长度不能超过128个字符")
+    @Size(max = 64, message = "Class code must be 64 characters or less")
+    private String classCode;
+
+    @Pattern(regexp = "^(MAJOR|ELECTIVE|TEMPORARY)$", message = "Class type must be MAJOR, ELECTIVE, or TEMPORARY")
+    private String classType = "MAJOR";
+
+    @Size(max = 128, message = "Major must be 128 characters or less")
     private String major;
 
-    @Size(max = 32, message = "年级长度不能超过32个字符")
+    @Size(max = 32, message = "Grade must be 32 characters or less")
     private String grade;
 
-    @Min(value = 0, message = "状态只能为0或1")
-    @Max(value = 1, message = "状态只能为0或1")
+    @Min(value = 0, message = "Status must be 0 or 1")
+    @Max(value = 1, message = "Status must be 0 or 1")
     private Integer status = 1;
 
     public String getClassName() {
@@ -27,6 +34,22 @@ public class ClassInfoRequest {
 
     public void setClassName(String className) {
         this.className = className;
+    }
+
+    public String getClassCode() {
+        return classCode;
+    }
+
+    public void setClassCode(String classCode) {
+        this.classCode = classCode;
+    }
+
+    public String getClassType() {
+        return classType;
+    }
+
+    public void setClassType(String classType) {
+        this.classType = classType == null || classType.isBlank() ? "MAJOR" : classType;
     }
 
     public String getMajor() {

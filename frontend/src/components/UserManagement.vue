@@ -81,8 +81,15 @@
         </el-table-column>
         <el-table-column label="档案信息" min-width="180">
           <template #default="scope">
-            <span v-if="scope.row.studentNo">学号：{{ scope.row.studentNo }}{{ scope.row.className ? ' / ' + scope.row.className : '' }}</span>
+            <span v-if="scope.row.studentNo">学号：{{ scope.row.studentNo }}{{ scope.row.className ? ' / 主班：' + scope.row.className : '' }}</span>
             <span v-else-if="scope.row.teacherNo">工号：{{ scope.row.teacherNo }}{{ scope.row.teacherTitle ? ' / ' + scope.row.teacherTitle : '' }}</span>
+            <span v-else class="mp-hint">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="关系摘要" min-width="220" show-overflow-tooltip>
+          <template #default="scope">
+            <span v-if="scope.row.classMemberships">{{ formatMemberships(scope.row.classMemberships) }}</span>
+            <span v-else-if="scope.row.teachingAssignments">{{ formatAssignments(scope.row.teachingAssignments) }}</span>
             <span v-else class="mp-hint">—</span>
           </template>
         </el-table-column>
@@ -142,16 +149,39 @@
         <el-form-item v-if="userForm.roleType === 'STUDENT'" label="学号" prop="studentNo">
           <el-input v-model="userForm.studentNo" placeholder="学号" />
         </el-form-item>
-        <el-form-item v-if="userForm.roleType === 'STUDENT'" label="班级">
-          <el-select v-model="userForm.classId" placeholder="选择班级" clearable style="width:100%">
+        <el-form-item v-if="userForm.roleType === 'STUDENT'" label="主班级">
+          <el-select v-model="userForm.classId" placeholder="选择主班级" clearable filterable style="width:100%">
             <el-option v-for="cls in classes" :key="cls.id" :label="cls.className" :value="cls.id" />
           </el-select>
+        </el-form-item>
+        <el-form-item v-if="userForm.roleType === 'STUDENT'" label="选修/临时班级">
+          <el-select v-model="userForm.electiveClassIds" multiple placeholder="选择选修或临时班级" clearable filterable style="width:100%">
+            <el-option v-for="cls in electiveClasses" :key="cls.id" :label="`${cls.className}${cls.classType ? ' / ' + classTypeText(cls.classType) : ''}`" :value="cls.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="userForm.roleType === 'STUDENT'" label="入学年份">
+          <el-input v-model="userForm.enrollmentYear" placeholder="例如：2023" />
+        </el-form-item>
+        <el-form-item v-if="userForm.roleType === 'STUDENT'" label="学院">
+          <el-input v-model="userForm.college" placeholder="学院" />
+        </el-form-item>
+        <el-form-item v-if="userForm.roleType === 'STUDENT'" label="专业">
+          <el-input v-model="userForm.major" placeholder="专业" />
         </el-form-item>
         <el-form-item v-if="userForm.roleType === 'TEACHER'" label="工号" prop="teacherNo">
           <el-input v-model="userForm.teacherNo" placeholder="工号" />
         </el-form-item>
+        <el-form-item v-if="userForm.roleType === 'TEACHER'" label="入职时间">
+          <el-date-picker v-model="userForm.hireDate" type="date" value-format="YYYY-MM-DD" placeholder="选择入职时间" style="width:100%" />
+        </el-form-item>
         <el-form-item v-if="userForm.roleType === 'TEACHER'" label="职称">
           <el-input v-model="userForm.title" placeholder="职称" />
+        </el-form-item>
+        <el-form-item v-if="userForm.roleType === 'TEACHER'" label="学院/部门">
+          <el-input v-model="userForm.college" placeholder="学院或部门" />
+        </el-form-item>
+        <el-form-item v-if="userForm.roleType === 'TEACHER'" label="简介">
+          <el-input v-model="userForm.introduction" type="textarea" :rows="2" placeholder="教师简介" />
         </el-form-item>
         <el-form-item label="手机" prop="phone">
           <el-input v-model="userForm.phone" placeholder="手机号" />
@@ -232,11 +262,19 @@ const userForm = reactive<CreateUserPayload>({
   roleType: 'STUDENT',
   studentNo: '',
   classId: null,
+  electiveClassIds: [],
+  enrollmentYear: '',
+  college: '',
+  major: '',
   teacherNo: '',
+  hireDate: null,
   title: '',
+  introduction: '',
   phone: '',
   email: ''
 });
+
+const electiveClasses = computed(() => classes.value.filter((cls) => cls.id !== userForm.classId));
 
 const userRules = computed<FormRules>(() => ({
   username: editingUser.value ? [] : [
@@ -346,7 +384,9 @@ async function exportUsers() {
       username: u.username,
       realName: u.realName,
       role: roleLabel(u.roleCodes),
-      profile: u.studentNo ? `学号:${u.studentNo}${u.className ? '/' + u.className : ''}` : (u.teacherNo ? `工号:${u.teacherNo}${u.teacherTitle ? '/' + u.teacherTitle : ''}` : ''),
+      profile: u.studentNo
+        ? `学号:${u.studentNo}${u.className ? '/主班:' + u.className : ''}${u.classMemberships ? '/归属:' + formatMemberships(u.classMemberships) : ''}`
+        : (u.teacherNo ? `工号:${u.teacherNo}${u.teacherTitle ? '/' + u.teacherTitle : ''}${u.teachingAssignments ? '/授课:' + formatAssignments(u.teachingAssignments) : ''}` : ''),
       phone: u.phone || '',
       email: u.email || '',
       status: u.status === 1 ? '启用' : '停用',
@@ -384,6 +424,56 @@ function roleTagType(codes?: string) {
   if (first === 'ADMIN') return 'danger';
   if (first === 'TEACHER') return 'warning';
   return 'success';
+}
+
+function classTypeText(type?: string) {
+  if (type === 'MAJOR') return '主专业班';
+  if (type === 'ELECTIVE') return '选修班';
+  if (type === 'TEMPORARY') return '临时班';
+  return type || '—';
+}
+
+function membershipTypeText(type?: string) {
+  if (type === 'PRIMARY') return '主班';
+  if (type === 'ELECTIVE') return '选修';
+  if (type === 'TEMPORARY') return '临时';
+  return type || '';
+}
+
+function teacherRoleText(role?: string) {
+  if (role === 'LECTURER') return '主讲';
+  if (role === 'ASSISTANT') return '助教';
+  return role || '';
+}
+
+function formatMemberships(raw?: string) {
+  if (!raw) return '';
+  return raw.split(',')
+    .map((item) => {
+      const [, name, type] = item.split(':');
+      return name ? `${name}${type ? `(${membershipTypeText(type)})` : ''}` : item;
+    })
+    .join('，');
+}
+
+function formatAssignments(raw?: string) {
+  if (!raw) return '';
+  return raw.split(',')
+    .map((item) => {
+      const [, name, role] = item.split(':');
+      return name ? `${name}${role ? `(${teacherRoleText(role)})` : ''}` : item;
+    })
+    .join('，');
+}
+
+function parseElectiveClassIds(raw?: string) {
+  if (!raw) return [];
+  return raw.split(',')
+    .map((item) => {
+      const [id, , type] = item.split(':');
+      return type === 'ELECTIVE' || type === 'TEMPORARY' ? Number(id) : null;
+    })
+    .filter((id): id is number => id != null && Number.isFinite(id));
 }
 
 async function toggleStatus(row: SystemUser) {
@@ -456,8 +546,14 @@ async function openEdit(row: SystemUser) {
   userForm.roleType = roleCode || 'STUDENT';
   userForm.studentNo = row.studentNo || '';
   userForm.classId = row.classId ?? null;
+  userForm.electiveClassIds = parseElectiveClassIds(row.classMemberships);
+  userForm.enrollmentYear = row.enrollmentYear || '';
+  userForm.college = row.studentCollege || row.teacherCollege || '';
+  userForm.major = row.studentMajor || '';
   userForm.teacherNo = row.teacherNo || '';
+  userForm.hireDate = row.hireDate || null;
   userForm.title = row.teacherTitle || '';
+  userForm.introduction = row.introduction || '';
   userForm.phone = row.phone || '';
   userForm.email = row.email || '';
   formRef.value?.clearValidate();
@@ -476,8 +572,14 @@ function resetUserForm() {
   userForm.roleType = 'STUDENT';
   userForm.studentNo = '';
   userForm.classId = null;
+  userForm.electiveClassIds = [];
+  userForm.enrollmentYear = '';
+  userForm.college = '';
+  userForm.major = '';
   userForm.teacherNo = '';
+  userForm.hireDate = null;
   userForm.title = '';
+  userForm.introduction = '';
   userForm.phone = '';
   userForm.email = '';
 }
@@ -493,8 +595,14 @@ async function confirmUser() {
         roleType: userForm.roleType,
         studentNo: userForm.studentNo || undefined,
         classId: userForm.classId,
+        electiveClassIds: userForm.roleType === 'STUDENT' ? userForm.electiveClassIds : [],
+        enrollmentYear: userForm.roleType === 'STUDENT' ? userForm.enrollmentYear || undefined : undefined,
+        college: userForm.college || undefined,
+        major: userForm.roleType === 'STUDENT' ? userForm.major || undefined : undefined,
         teacherNo: userForm.teacherNo || undefined,
+        hireDate: userForm.roleType === 'TEACHER' ? userForm.hireDate || null : null,
         title: userForm.title || undefined,
+        introduction: userForm.roleType === 'TEACHER' ? userForm.introduction || undefined : undefined,
         phone: userForm.phone || undefined,
         email: userForm.email || undefined
       };

@@ -4,34 +4,38 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 public class ExamRequest {
 
-    @NotNull(message = "试卷ID不能为空")
+    @NotNull(message = "Paper id is required")
     private Long paperId;
 
-    @NotBlank(message = "考试名称不能为空")
-    @Size(max = 128, message = "考试名称长度不能超过128个字符")
+    @NotBlank(message = "Exam name is required")
+    @Size(max = 128, message = "Exam name must be 128 characters or less")
     private String examName;
 
-    @Size(max = 512, message = "考试说明长度不能超过512个字符")
+    @Size(max = 512, message = "Description must be 512 characters or less")
     private String description;
 
-    @NotNull(message = "开始时间不能为空")
+    @NotNull(message = "Start time is required")
     private LocalDateTime startTime;
 
-    @NotNull(message = "结束时间不能为空")
+    @NotNull(message = "End time is required")
     private LocalDateTime endTime;
 
-    @NotNull(message = "考试时长不能为空")
-    @Min(value = 1, message = "考试时长必须大于0")
+    @NotNull(message = "Duration is required")
+    @Min(value = 1, message = "Duration must be greater than 0")
     private Integer durationMinutes;
 
-    @NotNull(message = "必须指定考试班级")
-    @Size(min = 1, message = "至少要有一个考试班级")
-    private List<Long> classIds;
+    private List<Long> classIds = new ArrayList<>();
+
+    private List<Long> classCourseIds = new ArrayList<>();
+
+    private List<Long> studentUserIds = new ArrayList<>();
 
     public Long getPaperId() {
         return paperId;
@@ -86,6 +90,22 @@ public class ExamRequest {
     }
 
     public void setClassIds(List<Long> classIds) {
-        this.classIds = classIds;
+        this.classIds = classIds == null ? new ArrayList<>() : classIds;
+    }
+
+    public List<Long> getClassCourseIds() {
+        return classCourseIds;
+    }
+
+    public void setClassCourseIds(List<Long> classCourseIds) {
+        this.classCourseIds = classCourseIds == null ? new ArrayList<>() : classCourseIds;
+    }
+
+    public List<Long> getStudentUserIds() {
+        return studentUserIds;
+    }
+
+    public void setStudentUserIds(List<Long> studentUserIds) {
+        this.studentUserIds = studentUserIds == null ? new ArrayList<>() : studentUserIds;
     }
 }

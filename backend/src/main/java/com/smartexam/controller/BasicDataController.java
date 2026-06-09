@@ -1,12 +1,15 @@
 package com.smartexam.controller;
 
-import com.smartexam.auth.AuthContext;
 import com.smartexam.common.ApiResponse;
 import com.smartexam.dto.auth.AuthUser;
+import com.smartexam.dto.basic.ClassCourseRequest;
 import com.smartexam.dto.basic.ClassInfoRequest;
+import com.smartexam.dto.basic.CourseRequest;
 import com.smartexam.dto.basic.KnowledgePointRequest;
 import com.smartexam.dto.basic.NoticeRequest;
+import com.smartexam.dto.basic.StudentClassMembershipRequest;
 import com.smartexam.dto.basic.SubjectRequest;
+import com.smartexam.dto.basic.TeachingAssignmentRequest;
 import com.smartexam.service.BasicDataService;
 import com.smartexam.service.RoleAccessService;
 import jakarta.validation.Valid;
@@ -38,26 +41,115 @@ public class BasicDataController {
     @GetMapping("/classes")
     public ApiResponse<List<Map<String, Object>>> listClasses(@RequestParam(required = false) String keyword,
                                                               @RequestParam(required = false) Integer status) {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok(basicDataService.listClasses(keyword, status));
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER", "STUDENT");
+        return ApiResponse.ok(basicDataService.listClasses(keyword, status, user));
     }
 
     @PostMapping("/classes")
     public ApiResponse<Map<String, Object>> createClass(@Valid @RequestBody ClassInfoRequest request) {
         roleAccessService.requireRole("ADMIN");
-        return ApiResponse.ok("班级创建成功", basicDataService.createClass(request));
+        return ApiResponse.ok("Class created", basicDataService.createClass(request));
     }
 
     @PutMapping("/classes/{id}")
     public ApiResponse<Map<String, Object>> updateClass(@PathVariable Long id, @Valid @RequestBody ClassInfoRequest request) {
         roleAccessService.requireRole("ADMIN");
-        return ApiResponse.ok("班级更新成功", basicDataService.updateClass(id, request));
+        return ApiResponse.ok("Class updated", basicDataService.updateClass(id, request));
     }
 
     @DeleteMapping("/classes/{id}")
     public ApiResponse<Map<String, Object>> deleteClass(@PathVariable Long id) {
         roleAccessService.requireRole("ADMIN");
-        return ApiResponse.ok("班级删除成功", basicDataService.deleteClass(id));
+        return ApiResponse.ok("Class deleted", basicDataService.deleteClass(id));
+    }
+
+    @GetMapping("/courses")
+    public ApiResponse<List<Map<String, Object>>> listCourses(@RequestParam(required = false) String keyword,
+                                                              @RequestParam(required = false) Integer status) {
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER", "STUDENT");
+        return ApiResponse.ok(basicDataService.listCourses(keyword, status, user));
+    }
+
+    @PostMapping("/courses")
+    public ApiResponse<Map<String, Object>> createCourse(@Valid @RequestBody CourseRequest request) {
+        roleAccessService.requireRole("ADMIN");
+        return ApiResponse.ok("Course created", basicDataService.createCourse(request));
+    }
+
+    @PutMapping("/courses/{id}")
+    public ApiResponse<Map<String, Object>> updateCourse(@PathVariable Long id, @Valid @RequestBody CourseRequest request) {
+        roleAccessService.requireRole("ADMIN");
+        return ApiResponse.ok("Course updated", basicDataService.updateCourse(id, request));
+    }
+
+    @DeleteMapping("/courses/{id}")
+    public ApiResponse<Map<String, Object>> deleteCourse(@PathVariable Long id) {
+        roleAccessService.requireRole("ADMIN");
+        return ApiResponse.ok("Course deleted", basicDataService.deleteCourse(id));
+    }
+
+    @GetMapping("/class-courses")
+    public ApiResponse<List<Map<String, Object>>> listClassCourses(@RequestParam(required = false) String keyword,
+                                                                   @RequestParam(required = false) Integer status) {
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER", "STUDENT");
+        return ApiResponse.ok(basicDataService.listClassCourses(keyword, status, user));
+    }
+
+    @PostMapping("/class-courses")
+    public ApiResponse<Map<String, Object>> createClassCourse(@Valid @RequestBody ClassCourseRequest request) {
+        roleAccessService.requireRole("ADMIN");
+        return ApiResponse.ok("Class course created", basicDataService.createClassCourse(request));
+    }
+
+    @PutMapping("/class-courses/{id}")
+    public ApiResponse<Map<String, Object>> updateClassCourse(@PathVariable Long id,
+                                                              @Valid @RequestBody ClassCourseRequest request) {
+        roleAccessService.requireRole("ADMIN");
+        return ApiResponse.ok("Class course updated", basicDataService.updateClassCourse(id, request));
+    }
+
+    @DeleteMapping("/class-courses/{id}")
+    public ApiResponse<Map<String, Object>> deleteClassCourse(@PathVariable Long id) {
+        roleAccessService.requireRole("ADMIN");
+        return ApiResponse.ok("Class course deleted", basicDataService.deleteClassCourse(id));
+    }
+
+    @GetMapping("/teaching-assignments")
+    public ApiResponse<List<Map<String, Object>>> listTeachingAssignments(@RequestParam(required = false) Long teacherUserId,
+                                                                          @RequestParam(required = false) Long classCourseId) {
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        return ApiResponse.ok(basicDataService.listTeachingAssignments(teacherUserId, classCourseId, user));
+    }
+
+    @PostMapping("/teaching-assignments")
+    public ApiResponse<Map<String, Object>> createTeachingAssignment(@Valid @RequestBody TeachingAssignmentRequest request) {
+        roleAccessService.requireRole("ADMIN");
+        return ApiResponse.ok("Teaching assignment created", basicDataService.createTeachingAssignment(request));
+    }
+
+    @DeleteMapping("/teaching-assignments/{id}")
+    public ApiResponse<Map<String, Object>> deleteTeachingAssignment(@PathVariable Long id) {
+        roleAccessService.requireRole("ADMIN");
+        return ApiResponse.ok("Teaching assignment deleted", basicDataService.deleteTeachingAssignment(id));
+    }
+
+    @GetMapping("/student-memberships")
+    public ApiResponse<List<Map<String, Object>>> listStudentMemberships(@RequestParam(required = false) Long studentUserId,
+                                                                         @RequestParam(required = false) Long classId) {
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER", "STUDENT");
+        return ApiResponse.ok(basicDataService.listStudentMemberships(studentUserId, classId, user));
+    }
+
+    @PostMapping("/student-memberships")
+    public ApiResponse<Map<String, Object>> createStudentMembership(@Valid @RequestBody StudentClassMembershipRequest request) {
+        roleAccessService.requireRole("ADMIN");
+        return ApiResponse.ok("Student membership saved", basicDataService.createStudentMembership(request));
+    }
+
+    @DeleteMapping("/student-memberships/{id}")
+    public ApiResponse<Map<String, Object>> deleteStudentMembership(@PathVariable Long id) {
+        roleAccessService.requireRole("ADMIN");
+        return ApiResponse.ok("Student membership deleted", basicDataService.deleteStudentMembership(id));
     }
 
     @GetMapping("/subjects")
@@ -70,19 +162,19 @@ public class BasicDataController {
     @PostMapping("/subjects")
     public ApiResponse<Map<String, Object>> createSubject(@Valid @RequestBody SubjectRequest request) {
         roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok("科目创建成功", basicDataService.createSubject(request));
+        return ApiResponse.ok("Subject created", basicDataService.createSubject(request));
     }
 
     @PutMapping("/subjects/{id}")
     public ApiResponse<Map<String, Object>> updateSubject(@PathVariable Long id, @Valid @RequestBody SubjectRequest request) {
         roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok("科目更新成功", basicDataService.updateSubject(id, request));
+        return ApiResponse.ok("Subject updated", basicDataService.updateSubject(id, request));
     }
 
     @DeleteMapping("/subjects/{id}")
     public ApiResponse<Map<String, Object>> deleteSubject(@PathVariable Long id) {
         roleAccessService.requireRole("ADMIN");
-        return ApiResponse.ok("科目删除成功", basicDataService.deleteSubject(id));
+        return ApiResponse.ok("Subject deleted", basicDataService.deleteSubject(id));
     }
 
     @GetMapping("/knowledge-points")
@@ -96,55 +188,50 @@ public class BasicDataController {
     @PostMapping("/knowledge-points")
     public ApiResponse<Map<String, Object>> createKnowledgePoint(@Valid @RequestBody KnowledgePointRequest request) {
         roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok("知识点创建成功", basicDataService.createKnowledgePoint(request));
+        return ApiResponse.ok("Knowledge point created", basicDataService.createKnowledgePoint(request));
     }
 
     @PutMapping("/knowledge-points/{id}")
     public ApiResponse<Map<String, Object>> updateKnowledgePoint(@PathVariable Long id,
                                                                  @Valid @RequestBody KnowledgePointRequest request) {
         roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok("知识点更新成功", basicDataService.updateKnowledgePoint(id, request));
+        return ApiResponse.ok("Knowledge point updated", basicDataService.updateKnowledgePoint(id, request));
     }
 
     @DeleteMapping("/knowledge-points/{id}")
     public ApiResponse<Map<String, Object>> deleteKnowledgePoint(@PathVariable Long id) {
         roleAccessService.requireRole("ADMIN");
-        return ApiResponse.ok("知识点删除成功", basicDataService.deleteKnowledgePoint(id));
+        return ApiResponse.ok("Knowledge point deleted", basicDataService.deleteKnowledgePoint(id));
     }
 
     @GetMapping("/notices")
     public ApiResponse<List<Map<String, Object>>> listNotices(@RequestParam(required = false) String keyword,
                                                               @RequestParam(required = false) Integer status) {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER", "STUDENT");
-        return ApiResponse.ok(basicDataService.listNotices(keyword, status));
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER", "STUDENT");
+        return ApiResponse.ok(basicDataService.listNotices(keyword, status, user));
     }
 
     @PostMapping("/notices")
     public ApiResponse<Map<String, Object>> createNotice(@Valid @RequestBody NoticeRequest request) {
         AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok("公告创建成功", basicDataService.createNotice(request, user));
+        return ApiResponse.ok("Notice created", basicDataService.createNotice(request, user));
     }
 
     @PutMapping("/notices/{id}")
     public ApiResponse<Map<String, Object>> updateNotice(@PathVariable Long id, @Valid @RequestBody NoticeRequest request) {
         AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok("公告更新成功", basicDataService.updateNotice(id, request, user));
+        return ApiResponse.ok("Notice updated", basicDataService.updateNotice(id, request, user));
     }
 
     @DeleteMapping("/notices/{id}")
     public ApiResponse<Map<String, Object>> deleteNotice(@PathVariable Long id) {
         AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok("公告删除成功", basicDataService.deleteNotice(id, user));
+        return ApiResponse.ok("Notice deleted", basicDataService.deleteNotice(id, user));
     }
 
     @GetMapping("/summary")
     public ApiResponse<Map<String, Object>> summary() {
-        AuthContext.requireSession();
-        return ApiResponse.ok(Map.of(
-                "classes", basicDataService.listClasses(null, null).size(),
-                "subjects", basicDataService.listSubjects(null, null).size(),
-                "knowledgePoints", basicDataService.listKnowledgePoints(null, null, null).size(),
-                "notices", basicDataService.listNotices(null, null).size()
-        ));
+        AuthUser user = roleAccessService.requireLogin();
+        return ApiResponse.ok(basicDataService.summary(user));
     }
 }

@@ -44,7 +44,7 @@ public class OverviewService {
                 SELECT c.grade AS name, COUNT(sp.user_id) AS value
                 FROM student_profile sp
                 JOIN sys_user u ON u.id = sp.user_id AND u.deleted = 0
-                LEFT JOIN edu_class c ON c.id = sp.class_id
+                LEFT JOIN edu_class c ON c.id = COALESCE(sp.primary_class_id, sp.class_id)
                 GROUP BY c.grade
                 ORDER BY value DESC
                 """));
@@ -71,7 +71,7 @@ public class OverviewService {
         data.put("myExams", queryInt(jt, "SELECT COUNT(*) FROM exam WHERE deleted = 0 AND created_by = ?", user.getId()));
         // 待批阅试卷（status=1 表示已提交未批阅）
         data.put("pendingReviews", queryInt(jt,
-                "SELECT COUNT(*) FROM exam_attempt WHERE status = 1 AND exam_id IN (SELECT id FROM exam WHERE created_by = ? AND deleted = 0)",
+                "SELECT COUNT(*) FROM exam_attempt WHERE status = 4 AND exam_id IN (SELECT id FROM exam WHERE created_by = ? AND deleted = 0)",
                 user.getId()));
         // 我创建的试卷数
         data.put("myPapers", queryInt(jt, "SELECT COUNT(*) FROM paper WHERE deleted = 0 AND created_by = ?", user.getId()));
@@ -112,7 +112,7 @@ public class OverviewService {
                 user.getId()));
         // 已完成考试
         data.put("finishedExams", queryInt(jt,
-                "SELECT COUNT(*) FROM exam_attempt WHERE user_id = ? AND status = 2", user.getId()));
+                "SELECT COUNT(*) FROM exam_attempt WHERE user_id = ? AND status IN (2,4,5)", user.getId()));
         // 错题数
         data.put("wrongQuestions", queryInt(jt,
                 "SELECT COUNT(*) FROM wrong_question_book WHERE user_id = ?", user.getId()));

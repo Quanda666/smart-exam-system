@@ -3,6 +3,8 @@ import { deleteJson, getJson, postJson, putJson } from './request';
 export interface ClassInfo {
   id: number;
   className: string;
+  classCode?: string;
+  classType?: 'MAJOR' | 'ELECTIVE' | 'TEMPORARY';
   major: string;
   grade: string;
   status: number;
@@ -31,6 +33,68 @@ export interface KnowledgePointInfo {
   updatedAt?: string;
 }
 
+export interface CourseInfo {
+  id: number;
+  courseCode: string;
+  courseName: string;
+  subjectId?: number | null;
+  subjectName?: string;
+  credit?: number | null;
+  description?: string;
+  status: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ClassCourseInfo {
+  classCourseId: number;
+  classId: number;
+  className: string;
+  classCode?: string;
+  classType?: string;
+  courseId: number;
+  courseCode?: string;
+  courseName: string;
+  subjectId?: number | null;
+  subjectName?: string;
+  termName: string;
+  status: number;
+}
+
+export interface TeachingAssignmentInfo {
+  id: number;
+  teacherUserId: number;
+  teacherName: string;
+  teacherNo?: string;
+  classCourseId: number;
+  className: string;
+  courseName: string;
+  termName: string;
+  teacherRole: string;
+  status: number;
+}
+
+export interface StudentMembershipInfo {
+  id: number;
+  studentUserId: number;
+  studentName: string;
+  studentNo?: string;
+  classId: number;
+  className: string;
+  classType: string;
+  membershipType: 'PRIMARY' | 'ELECTIVE' | 'TEMPORARY';
+  source?: string;
+  status: number;
+}
+
+export interface NoticeTargetInfo {
+  id?: number;
+  noticeId?: number;
+  targetType: 'SYSTEM' | 'ROLE' | 'CLASS' | 'CLASS_COURSE' | 'USER';
+  targetId?: number;
+  targetCode?: string;
+}
+
 export interface NoticeInfo {
   id: number;
   title: string;
@@ -39,6 +103,8 @@ export interface NoticeInfo {
   publisherName?: string;
   publishTime?: string;
   status: number;
+  targets?: NoticeTargetInfo[];
+  targetSummary?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -77,6 +143,70 @@ export function updateClass(id: number, payload: Omit<ClassInfo, 'id'>) {
 
 export function deleteClass(id: number) {
   return deleteJson<DeleteResult>(`/api/basic/classes/${id}`);
+}
+
+export function listCourses(query?: BasicQuery) {
+  return getJson<CourseInfo[]>(`/api/basic/courses${queryString(query)}`);
+}
+
+export function createCourse(payload: Omit<CourseInfo, 'id' | 'subjectName'>) {
+  return postJson<CourseInfo, Omit<CourseInfo, 'id' | 'subjectName'>>('/api/basic/courses', payload);
+}
+
+export function updateCourse(id: number, payload: Omit<CourseInfo, 'id' | 'subjectName'>) {
+  return putJson<CourseInfo, Omit<CourseInfo, 'id' | 'subjectName'>>(`/api/basic/courses/${id}`, payload);
+}
+
+export function deleteCourse(id: number) {
+  return deleteJson<DeleteResult>(`/api/basic/courses/${id}`);
+}
+
+export function listClassCourses(query?: BasicQuery) {
+  return getJson<ClassCourseInfo[]>(`/api/basic/class-courses${queryString(query)}`);
+}
+
+export function createClassCourse(payload: { classId: number; courseId: number; termName: string; status: number }) {
+  return postJson<ClassCourseInfo, typeof payload>('/api/basic/class-courses', payload);
+}
+
+export function updateClassCourse(id: number, payload: { classId: number; courseId: number; termName: string; status: number }) {
+  return putJson<ClassCourseInfo, typeof payload>(`/api/basic/class-courses/${id}`, payload);
+}
+
+export function deleteClassCourse(id: number) {
+  return deleteJson<DeleteResult>(`/api/basic/class-courses/${id}`);
+}
+
+export function listTeachingAssignments(query: { teacherUserId?: number; classCourseId?: number } = {}) {
+  const params = new URLSearchParams();
+  if (query.teacherUserId) params.set('teacherUserId', String(query.teacherUserId));
+  if (query.classCourseId) params.set('classCourseId', String(query.classCourseId));
+  const value = params.toString();
+  return getJson<TeachingAssignmentInfo[]>(`/api/basic/teaching-assignments${value ? `?${value}` : ''}`);
+}
+
+export function createTeachingAssignment(payload: { teacherUserId: number; classCourseId: number; teacherRole: string }) {
+  return postJson<TeachingAssignmentInfo, typeof payload>('/api/basic/teaching-assignments', payload);
+}
+
+export function deleteTeachingAssignment(id: number) {
+  return deleteJson<DeleteResult>(`/api/basic/teaching-assignments/${id}`);
+}
+
+export function listStudentMemberships(query: { studentUserId?: number; classId?: number } = {}) {
+  const params = new URLSearchParams();
+  if (query.studentUserId) params.set('studentUserId', String(query.studentUserId));
+  if (query.classId) params.set('classId', String(query.classId));
+  const value = params.toString();
+  return getJson<StudentMembershipInfo[]>(`/api/basic/student-memberships${value ? `?${value}` : ''}`);
+}
+
+export function createStudentMembership(payload: { studentUserId: number; classId: number; membershipType: string; source?: string }) {
+  return postJson<StudentMembershipInfo, typeof payload>('/api/basic/student-memberships', payload);
+}
+
+export function deleteStudentMembership(id: number) {
+  return deleteJson<DeleteResult>(`/api/basic/student-memberships/${id}`);
 }
 
 export function listSubjects(query?: BasicQuery) {

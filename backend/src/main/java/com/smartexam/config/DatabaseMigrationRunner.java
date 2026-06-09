@@ -100,6 +100,8 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
                 "ALTER TABLE teacher_profile ADD COLUMN hire_date DATE DEFAULT NULL COMMENT '入职时间' AFTER teacher_no");
         addColumnIfMissing(jdbc, "teacher_profile", "college",
                 "ALTER TABLE teacher_profile ADD COLUMN college VARCHAR(128) DEFAULT NULL COMMENT '学院/部门' AFTER title");
+        addColumnIfMissing(jdbc, "teacher_profile", "introduction",
+                "ALTER TABLE teacher_profile ADD COLUMN introduction VARCHAR(1000) DEFAULT NULL COMMENT '简介' AFTER college");
         addIndexIfMissing(jdbc, "teacher_profile", "idx_teacher_no",
                 "ALTER TABLE teacher_profile ADD INDEX idx_teacher_no (teacher_no)");
 

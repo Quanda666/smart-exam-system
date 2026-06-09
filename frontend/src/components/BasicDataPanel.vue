@@ -23,6 +23,16 @@
           <el-form-item label="班级名称">
             <el-input v-model="classForm.className" placeholder="例如：23本科计科1班" />
           </el-form-item>
+          <el-form-item label="班级编码">
+            <el-input v-model="classForm.classCode" placeholder="例如：CS2023-01" />
+          </el-form-item>
+          <el-form-item label="班级类型">
+            <el-select v-model="classForm.classType">
+              <el-option label="主专业班级" value="MAJOR" />
+              <el-option label="选修临时班级" value="ELECTIVE" />
+              <el-option label="临时班级" value="TEMPORARY" />
+            </el-select>
+          </el-form-item>
           <el-form-item label="专业">
             <el-input v-model="classForm.major" placeholder="例如：计算机科学与技术" />
           </el-form-item>
@@ -44,6 +54,10 @@
         <el-table :data="classes" border>
           <el-table-column prop="id" label="ID" width="80" />
           <el-table-column prop="className" label="班级名称" min-width="160" />
+          <el-table-column prop="classCode" label="编码" width="130" />
+          <el-table-column label="类型" width="120">
+            <template #default="scope">{{ classTypeText(scope.row.classType) }}</template>
+          </el-table-column>
           <el-table-column prop="major" label="专业" min-width="160" />
           <el-table-column prop="grade" label="年级" width="120" />
           <el-table-column label="状态" width="100">
@@ -53,6 +67,165 @@
             <template #default="scope">
               <el-button link type="primary" @click="editClass(scope.row as ClassInfo)">编辑</el-button>
               <el-button link type="danger" @click="removeClass(Number(scope.row.id))">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-tab-pane>
+
+      <el-tab-pane v-if="canViewSubjects" label="课程管理" name="courses">
+        <div class="toolbar-line">
+          <el-input v-model="query.keyword" placeholder="按课程编码或名称搜索" clearable @keyup.enter="loadActiveData" />
+          <el-select v-model="query.status" placeholder="状态" clearable>
+            <el-option label="启用" :value="1" />
+            <el-option label="停用" :value="0" />
+          </el-select>
+          <el-button type="primary" @click="loadActiveData">查询</el-button>
+        </div>
+
+        <el-form v-if="canManageClassCourses" class="inline-editor" :model="courseForm" label-position="top">
+          <el-form-item label="课程编码">
+            <el-input v-model="courseForm.courseCode" placeholder="例如：CS101" />
+          </el-form-item>
+          <el-form-item label="课程名称">
+            <el-input v-model="courseForm.courseName" placeholder="例如：Java程序设计" />
+          </el-form-item>
+          <el-form-item label="关联科目">
+            <el-select v-model="courseForm.subjectId" placeholder="请选择科目" clearable>
+              <el-option v-for="subject in subjects" :key="subject.id" :label="subject.subjectName" :value="subject.id" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="学分">
+            <el-input-number v-model="courseForm.credit" :min="0" :max="99" :precision="1" />
+          </el-form-item>
+          <el-form-item label="状态">
+            <el-select v-model="courseForm.status">
+              <el-option label="启用" :value="1" />
+              <el-option label="停用" :value="0" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="课程描述">
+            <el-input v-model="courseForm.description" placeholder="课程说明" />
+          </el-form-item>
+          <el-form-item label="操作">
+            <el-button type="primary" @click="saveCourse">{{ editingCourseId ? '保存修改' : '新增课程' }}</el-button>
+            <el-button @click="resetCourseForm">重置</el-button>
+          </el-form-item>
+        </el-form>
+
+        <el-table :data="courses" border>
+          <el-table-column prop="id" label="ID" width="80" />
+          <el-table-column prop="courseCode" label="课程编码" width="130" />
+          <el-table-column prop="courseName" label="课程名称" min-width="160" />
+          <el-table-column prop="subjectName" label="科目" min-width="140" />
+          <el-table-column prop="credit" label="学分" width="90" />
+          <el-table-column label="状态" width="100">
+            <template #default="scope"><el-tag :type="scope.row.status === 1 ? 'success' : 'info'">{{ statusText(scope.row.status) }}</el-tag></template>
+          </el-table-column>
+          <el-table-column v-if="canManageClassCourses" label="操作" width="160">
+            <template #default="scope">
+              <el-button link type="primary" @click="editCourse(scope.row as CourseInfo)">编辑</el-button>
+              <el-button link type="danger" @click="removeCourse(Number(scope.row.id))">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-tab-pane>
+
+      <el-tab-pane v-if="canViewClasses" label="课程班管理" name="class-courses">
+        <div class="toolbar-line">
+          <el-input v-model="query.keyword" placeholder="按班级、课程或学期搜索" clearable @keyup.enter="loadActiveData" />
+          <el-select v-model="query.status" placeholder="状态" clearable>
+            <el-option label="启用" :value="1" />
+            <el-option label="停用" :value="0" />
+          </el-select>
+          <el-button type="primary" @click="loadActiveData">查询</el-button>
+        </div>
+
+        <el-form v-if="canManageClassCourses" class="inline-editor" :model="classCourseForm" label-position="top">
+          <el-form-item label="班级">
+            <el-select v-model="classCourseForm.classId" placeholder="请选择班级" filterable>
+              <el-option v-for="cls in classes" :key="cls.id" :label="cls.className" :value="cls.id" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="课程">
+            <el-select v-model="classCourseForm.courseId" placeholder="请选择课程" filterable>
+              <el-option v-for="course in courses" :key="course.id" :label="`${course.courseCode} / ${course.courseName}`" :value="course.id" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="学期">
+            <el-input v-model="classCourseForm.termName" placeholder="例如：2025-2026-1" />
+          </el-form-item>
+          <el-form-item label="状态">
+            <el-select v-model="classCourseForm.status">
+              <el-option label="启用" :value="1" />
+              <el-option label="停用" :value="0" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="操作">
+            <el-button type="primary" @click="saveClassCourse">{{ editingClassCourseId ? '保存修改' : '新增课程班' }}</el-button>
+            <el-button @click="resetClassCourseForm">重置</el-button>
+          </el-form-item>
+        </el-form>
+
+        <el-table :data="classCourses" border>
+          <el-table-column prop="classCourseId" label="ID" width="80" />
+          <el-table-column prop="className" label="班级" min-width="160" />
+          <el-table-column prop="courseName" label="课程" min-width="160" />
+          <el-table-column prop="subjectName" label="科目" min-width="130" />
+          <el-table-column prop="termName" label="学期" width="140" />
+          <el-table-column label="状态" width="100">
+            <template #default="scope"><el-tag :type="scope.row.status === 1 ? 'success' : 'info'">{{ statusText(scope.row.status) }}</el-tag></template>
+          </el-table-column>
+          <el-table-column v-if="canManageClassCourses" label="操作" width="160">
+            <template #default="scope">
+              <el-button link type="primary" @click="editClassCourse(scope.row as ClassCourseInfo)">编辑</el-button>
+              <el-button link type="danger" @click="removeClassCourse(Number(scope.row.classCourseId))">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-tab-pane>
+
+      <el-tab-pane v-if="canManageTeachingAssignments" label="授课分配" name="teaching-assignments">
+        <el-form class="inline-editor" :model="teachingForm" label-position="top">
+          <el-form-item label="教师">
+            <el-select v-model="teachingForm.teacherUserId" placeholder="请选择教师" filterable>
+              <el-option v-for="teacher in teachers" :key="teacher.id" :label="`${teacher.realName} / ${teacher.teacherNo || teacher.username}`" :value="teacher.id" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="课程班">
+            <el-select v-model="teachingForm.classCourseId" placeholder="请选择课程班" filterable>
+              <el-option
+                v-for="item in classCourses"
+                :key="item.classCourseId"
+                :label="`${item.className} / ${item.courseName} / ${item.termName}`"
+                :value="item.classCourseId"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="授课角色">
+            <el-select v-model="teachingForm.teacherRole">
+              <el-option label="主讲" value="LECTURER" />
+              <el-option label="助教" value="ASSISTANT" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="操作">
+            <el-button type="primary" @click="saveTeachingAssignment">保存分配</el-button>
+            <el-button @click="resetTeachingForm">重置</el-button>
+          </el-form-item>
+        </el-form>
+
+        <el-table :data="teachingAssignments" border>
+          <el-table-column prop="id" label="ID" width="80" />
+          <el-table-column prop="teacherName" label="教师" min-width="130" />
+          <el-table-column prop="teacherNo" label="工号" width="120" />
+          <el-table-column prop="className" label="班级" min-width="160" />
+          <el-table-column prop="courseName" label="课程" min-width="160" />
+          <el-table-column prop="termName" label="学期" width="140" />
+          <el-table-column label="角色" width="100">
+            <template #default="scope">{{ teacherRoleText(scope.row.teacherRole) }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="120">
+            <template #default="scope">
+              <el-button link type="danger" @click="removeTeachingAssignment(Number(scope.row.id))">移除</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -176,6 +349,24 @@
               <el-option label="停用" :value="0" />
             </el-select>
           </el-form-item>
+          <el-form-item label="推送范围">
+            <el-select v-model="noticeForm.targetMode" style="width:100%">
+              <el-option v-if="role === 'ADMIN'" label="全系统" value="SYSTEM" />
+              <el-option v-if="role === 'ADMIN'" label="仅教师" value="ROLE_TEACHER" />
+              <el-option v-if="role === 'ADMIN'" label="仅学生" value="ROLE_STUDENT" />
+              <el-option v-if="role === 'TEACHER'" label="我的课程班" value="CLASS_COURSE" />
+            </el-select>
+          </el-form-item>
+          <el-form-item v-if="noticeForm.targetMode === 'CLASS_COURSE'" label="课程班">
+            <el-select v-model="noticeForm.classCourseIds" multiple filterable placeholder="选择课程班" style="width:100%">
+              <el-option
+                v-for="item in classCourses"
+                :key="item.classCourseId"
+                :label="`${item.className} / ${item.courseName} / ${item.termName}`"
+                :value="item.classCourseId"
+              />
+            </el-select>
+          </el-form-item>
           <el-form-item label="操作">
             <el-button type="primary" @click="saveNotice">{{ editingNoticeId ? '保存修改' : '发布公告' }}</el-button>
             <el-button @click="resetNoticeForm">重置</el-button>
@@ -186,6 +377,7 @@
           <el-table-column prop="id" label="ID" width="80" />
           <el-table-column prop="title" label="标题" min-width="180" />
           <el-table-column prop="content" label="内容" min-width="260" show-overflow-tooltip />
+          <el-table-column prop="targetSummary" label="范围" min-width="180" show-overflow-tooltip />
           <el-table-column prop="publisherName" label="发布人" width="120" />
           <el-table-column label="状态" width="100">
             <template #default="scope"><el-tag :type="scope.row.status === 1 ? 'success' : 'info'">{{ scope.row.status === 1 ? '发布' : '停用' }}</el-tag></template>
@@ -210,27 +402,42 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   createClass,
+  createClassCourse,
+  createCourse,
   createKnowledgePoint,
   createNotice,
   createSubject,
+  createTeachingAssignment,
   deleteClass,
+  deleteClassCourse,
+  deleteCourse,
   deleteKnowledgePoint,
   deleteNotice,
   deleteSubject,
+  deleteTeachingAssignment,
   fetchBasicSummary,
   listClasses,
+  listClassCourses,
+  listCourses,
   listKnowledgePoints,
   listNotices,
   listSubjects,
+  listTeachingAssignments,
   updateClass,
+  updateClassCourse,
+  updateCourse,
   updateKnowledgePoint,
   updateNotice,
   updateSubject,
+  type ClassCourseInfo,
   type ClassInfo,
+  type CourseInfo,
   type KnowledgePointInfo,
   type NoticeInfo,
-  type SubjectInfo
+  type SubjectInfo,
+  type TeachingAssignmentInfo
 } from '../api/basic';
+import { listUsers, type SystemUser } from '../api/admin';
 import type { RoleCode } from '../api/auth';
 
 const props = defineProps<{
@@ -247,13 +454,45 @@ const query = reactive<{ keyword: string; status: number | null; subjectId: numb
 });
 
 const classes = ref<ClassInfo[]>([]);
+const courses = ref<CourseInfo[]>([]);
+const classCourses = ref<ClassCourseInfo[]>([]);
+const teachingAssignments = ref<TeachingAssignmentInfo[]>([]);
+const teachers = ref<SystemUser[]>([]);
 const subjects = ref<SubjectInfo[]>([]);
 const knowledgePoints = ref<KnowledgePointInfo[]>([]);
 const notices = ref<NoticeInfo[]>([]);
-const summary = ref<Record<string, number>>({ classes: 0, subjects: 0, knowledgePoints: 0, notices: 0 });
+const summary = ref<Record<string, number>>({ classes: 0, courses: 0, classCourses: 0, subjects: 0, knowledgePoints: 0, notices: 0 });
 
 const editingClassId = ref<number | null>(null);
-const classForm = reactive({ className: '', major: '', grade: '', status: 1 });
+const classForm = reactive<{ className: string; classCode: string; classType: NonNullable<ClassInfo['classType']>; major: string; grade: string; status: number }>({
+  className: '',
+  classCode: '',
+  classType: 'MAJOR',
+  major: '',
+  grade: '',
+  status: 1
+});
+const editingCourseId = ref<number | null>(null);
+const courseForm = reactive<{ courseCode: string; courseName: string; subjectId: number | null; credit: number | null; description: string; status: number }>({
+  courseCode: '',
+  courseName: '',
+  subjectId: null,
+  credit: null,
+  description: '',
+  status: 1
+});
+const editingClassCourseId = ref<number | null>(null);
+const classCourseForm = reactive<{ classId: number | null; courseId: number | null; termName: string; status: number }>({
+  classId: null,
+  courseId: null,
+  termName: '默认学期',
+  status: 1
+});
+const teachingForm = reactive<{ teacherUserId: number | null; classCourseId: number | null; teacherRole: string }>({
+  teacherUserId: null,
+  classCourseId: null,
+  teacherRole: 'LECTURER'
+});
 const editingSubjectId = ref<number | null>(null);
 const subjectForm = reactive({ subjectName: '', description: '', status: 1 });
 const editingKnowledgeId = ref<number | null>(null);
@@ -265,9 +504,17 @@ const knowledgeForm = reactive<{ subjectId: number | null; parentId: number | nu
   status: 1
 });
 const editingNoticeId = ref<number | null>(null);
-const noticeForm = reactive({ title: '', content: '', status: 1 });
+const noticeForm = reactive<{ title: string; content: string; status: number; targetMode: string; classCourseIds: number[] }>({
+  title: '',
+  content: '',
+  status: 1,
+  targetMode: props.role === 'TEACHER' ? 'CLASS_COURSE' : 'SYSTEM',
+  classCourseIds: []
+});
 
 const canManageClasses = computed(() => props.role === 'ADMIN');
+const canManageClassCourses = computed(() => props.role === 'ADMIN');
+const canManageTeachingAssignments = computed(() => props.role === 'ADMIN');
 const canManageTeachingBase = computed(() => props.role === 'ADMIN' || props.role === 'TEACHER');
 // 科目/知识点删除为破坏性操作（影响题库/试卷引用），收紧为仅管理员，与班级一致
 const canDeleteTeachingBase = computed(() => props.role === 'ADMIN');
@@ -280,6 +527,8 @@ const canViewSubjects = computed(() => props.role === 'ADMIN' || props.role === 
 
 const summaryCards = computed(() => [
   { label: '班级', value: summary.value.classes || 0, remark: '支撑考试任务发布' },
+  { label: '课程', value: summary.value.courses || 0, remark: '承载科目下的教学内容' },
+  { label: '课程班', value: summary.value.classCourses || 0, remark: '连接班级、课程与教师' },
   { label: '科目', value: summary.value.subjects || 0, remark: '支撑题库归类' },
   { label: '知识点', value: summary.value.knowledgePoints || 0, remark: '支撑组卷与错题分析' },
   { label: '公告', value: summary.value.notices || 0, remark: '支撑考试通知' }
@@ -299,7 +548,7 @@ onMounted(async () => {
 });
 
 async function loadBootstrapData() {
-  await Promise.all([loadSubjects(), loadSummary()]);
+  await Promise.all([loadSubjects(), loadCourses(), loadClasses(), loadClassCourses(), loadTeachers(), loadSummary()]);
   await loadActiveData();
 }
 
@@ -315,6 +564,9 @@ async function loadSummary() {
 async function loadActiveData() {
   try {
     if (activeTab.value === 'classes') await loadClasses();
+    if (activeTab.value === 'courses') await loadCourses();
+    if (activeTab.value === 'class-courses') await loadClassCourses();
+    if (activeTab.value === 'teaching-assignments') await loadTeachingAssignments();
     if (activeTab.value === 'subjects') await loadSubjects();
     if (activeTab.value === 'knowledge-points') await loadKnowledgePoints();
     if (activeTab.value === 'notices') await loadNotices();
@@ -327,6 +579,51 @@ async function loadActiveData() {
 async function loadClasses() {
   const response = await listClasses({ keyword: query.keyword, status: query.status });
   classes.value = response.data;
+  if (!classCourseForm.classId) {
+    classCourseForm.classId = classes.value[0]?.id ?? null;
+  }
+}
+
+async function loadCourses() {
+  const response = await listCourses({
+    keyword: activeTab.value === 'courses' ? query.keyword : undefined,
+    status: activeTab.value === 'courses' ? query.status : null
+  });
+  courses.value = response.data;
+  if (!classCourseForm.courseId) {
+    classCourseForm.courseId = courses.value[0]?.id ?? null;
+  }
+}
+
+async function loadClassCourses() {
+  if (props.role === 'STUDENT') return;
+  const response = await listClassCourses({
+    keyword: activeTab.value === 'class-courses' ? query.keyword : undefined,
+    status: activeTab.value === 'class-courses' ? query.status : 1
+  });
+  classCourses.value = response.data;
+  if (!teachingForm.classCourseId) {
+    teachingForm.classCourseId = classCourses.value[0]?.classCourseId ?? null;
+  }
+  if (props.role === 'TEACHER' && noticeForm.classCourseIds.length === 0) {
+    noticeForm.classCourseIds = classCourses.value.map((item) => item.classCourseId);
+  }
+}
+
+async function loadTeachingAssignments() {
+  if (!canManageTeachingAssignments.value) return;
+  await Promise.all([loadClassCourses(), loadTeachers()]);
+  const response = await listTeachingAssignments();
+  teachingAssignments.value = response.data;
+}
+
+async function loadTeachers() {
+  if (!canManageTeachingAssignments.value) return;
+  const response = await listUsers({ role: 'TEACHER', status: 1, page: 1, size: 1000 });
+  teachers.value = response.data.list;
+  if (!teachingForm.teacherUserId) {
+    teachingForm.teacherUserId = teachers.value[0]?.id ?? null;
+  }
 }
 
 async function loadSubjects() {
@@ -363,6 +660,19 @@ function statusText(status: number) {
   return status === 1 ? '启用' : '停用';
 }
 
+function classTypeText(type?: string) {
+  if (type === 'MAJOR') return '主专业班';
+  if (type === 'ELECTIVE') return '选修班';
+  if (type === 'TEMPORARY') return '临时班';
+  return type || '—';
+}
+
+function teacherRoleText(role?: string) {
+  if (role === 'LECTURER') return '主讲';
+  if (role === 'ASSISTANT') return '助教';
+  return role || '—';
+}
+
 async function saveClass() {
   const payload = { ...classForm };
   if (editingClassId.value) {
@@ -380,6 +690,8 @@ async function saveClass() {
 function editClass(row: ClassInfo) {
   editingClassId.value = row.id;
   classForm.className = row.className;
+  classForm.classCode = row.classCode || '';
+  classForm.classType = row.classType || 'MAJOR';
   classForm.major = row.major;
   classForm.grade = row.grade;
   classForm.status = row.status;
@@ -396,9 +708,138 @@ async function removeClass(id: number) {
 function resetClassForm() {
   editingClassId.value = null;
   classForm.className = '';
+  classForm.classCode = '';
+  classForm.classType = 'MAJOR';
   classForm.major = '';
   classForm.grade = '';
   classForm.status = 1;
+}
+
+async function saveCourse() {
+  if (!courseForm.courseCode || !courseForm.courseName) {
+    ElMessage.warning('请填写课程编码和课程名称');
+    return;
+  }
+  const payload = { ...courseForm };
+  if (editingCourseId.value) {
+    await updateCourse(editingCourseId.value, payload);
+    ElMessage.success('课程已更新');
+  } else {
+    await createCourse(payload);
+    ElMessage.success('课程已新增');
+  }
+  resetCourseForm();
+  await loadCourses();
+  await loadSummary();
+}
+
+function editCourse(row: CourseInfo) {
+  editingCourseId.value = row.id;
+  courseForm.courseCode = row.courseCode;
+  courseForm.courseName = row.courseName;
+  courseForm.subjectId = row.subjectId ?? null;
+  courseForm.credit = row.credit ?? null;
+  courseForm.description = row.description || '';
+  courseForm.status = row.status;
+}
+
+async function removeCourse(id: number) {
+  await confirmDelete('确认删除该课程吗？');
+  await deleteCourse(id);
+  ElMessage.success('课程已删除');
+  await loadCourses();
+  await loadClassCourses();
+  await loadSummary();
+}
+
+function resetCourseForm() {
+  editingCourseId.value = null;
+  courseForm.courseCode = '';
+  courseForm.courseName = '';
+  courseForm.subjectId = null;
+  courseForm.credit = null;
+  courseForm.description = '';
+  courseForm.status = 1;
+}
+
+async function saveClassCourse() {
+  const classId = classCourseForm.classId;
+  const courseId = classCourseForm.courseId;
+  if (!classId || !courseId || !classCourseForm.termName) {
+    ElMessage.warning('请选择班级、课程并填写学期');
+    return;
+  }
+  const payload = {
+    classId,
+    courseId,
+    termName: classCourseForm.termName,
+    status: classCourseForm.status
+  };
+  if (editingClassCourseId.value) {
+    await updateClassCourse(editingClassCourseId.value, payload);
+    ElMessage.success('课程班已更新');
+  } else {
+    await createClassCourse(payload);
+    ElMessage.success('课程班已新增');
+  }
+  resetClassCourseForm();
+  await loadClassCourses();
+  await loadSummary();
+}
+
+function editClassCourse(row: ClassCourseInfo) {
+  editingClassCourseId.value = row.classCourseId;
+  classCourseForm.classId = row.classId;
+  classCourseForm.courseId = row.courseId;
+  classCourseForm.termName = row.termName;
+  classCourseForm.status = row.status;
+}
+
+async function removeClassCourse(id: number) {
+  await confirmDelete('确认删除该课程班吗？');
+  await deleteClassCourse(id);
+  ElMessage.success('课程班已删除');
+  await loadClassCourses();
+  await loadTeachingAssignments();
+  await loadSummary();
+}
+
+function resetClassCourseForm() {
+  editingClassCourseId.value = null;
+  classCourseForm.classId = classes.value[0]?.id ?? null;
+  classCourseForm.courseId = courses.value[0]?.id ?? null;
+  classCourseForm.termName = '默认学期';
+  classCourseForm.status = 1;
+}
+
+async function saveTeachingAssignment() {
+  const teacherUserId = teachingForm.teacherUserId;
+  const classCourseId = teachingForm.classCourseId;
+  if (!teacherUserId || !classCourseId) {
+    ElMessage.warning('请选择教师和课程班');
+    return;
+  }
+  await createTeachingAssignment({
+    teacherUserId,
+    classCourseId,
+    teacherRole: teachingForm.teacherRole
+  });
+  ElMessage.success('授课分配已保存');
+  resetTeachingForm();
+  await loadTeachingAssignments();
+}
+
+async function removeTeachingAssignment(id: number) {
+  await confirmDelete('确认移除该授课分配吗？');
+  await deleteTeachingAssignment(id);
+  ElMessage.success('授课分配已移除');
+  await loadTeachingAssignments();
+}
+
+function resetTeachingForm() {
+  teachingForm.teacherUserId = teachers.value[0]?.id ?? null;
+  teachingForm.classCourseId = classCourses.value[0]?.classCourseId ?? null;
+  teachingForm.teacherRole = 'LECTURER';
 }
 
 async function saveSubject() {
@@ -483,7 +924,17 @@ function resetKnowledgeForm() {
 }
 
 async function saveNotice() {
-  const payload = { ...noticeForm };
+  const targets = buildNoticeTargets();
+  if (targets.length === 0) {
+    ElMessage.warning('请选择公告推送范围');
+    return;
+  }
+  const payload = {
+    title: noticeForm.title,
+    content: noticeForm.content,
+    status: noticeForm.status,
+    targets
+  };
   if (editingNoticeId.value) {
     await updateNotice(editingNoticeId.value, payload);
     ElMessage.success('公告已更新');
@@ -501,6 +952,7 @@ function editNotice(row: NoticeInfo) {
   noticeForm.title = row.title;
   noticeForm.content = row.content;
   noticeForm.status = row.status;
+  applyNoticeTargets(row);
 }
 
 async function removeNotice(id: number) {
@@ -516,6 +968,58 @@ function resetNoticeForm() {
   noticeForm.title = '';
   noticeForm.content = '';
   noticeForm.status = 1;
+  noticeForm.targetMode = props.role === 'TEACHER' ? 'CLASS_COURSE' : 'SYSTEM';
+  noticeForm.classCourseIds = props.role === 'TEACHER' ? classCourses.value.map((item) => item.classCourseId) : [];
+}
+
+function buildNoticeTargets(): NonNullable<NoticeInfo['targets']> {
+  if (noticeForm.targetMode === 'SYSTEM') {
+    return [{ targetType: 'SYSTEM', targetId: 0, targetCode: '' }];
+  }
+  if (noticeForm.targetMode === 'ROLE_TEACHER') {
+    return [{ targetType: 'ROLE', targetId: 0, targetCode: 'TEACHER' }];
+  }
+  if (noticeForm.targetMode === 'ROLE_STUDENT') {
+    return [{ targetType: 'ROLE', targetId: 0, targetCode: 'STUDENT' }];
+  }
+  if (noticeForm.targetMode === 'CLASS_COURSE') {
+    return noticeForm.classCourseIds.map((id) => ({ targetType: 'CLASS_COURSE', targetId: id, targetCode: '' }));
+  }
+  return [];
+}
+
+function applyNoticeTargets(row: NoticeInfo) {
+  const targets = row.targets || [];
+  const first = targets[0];
+  if (!first) {
+    resetNoticeForm();
+    editingNoticeId.value = row.id;
+    noticeForm.title = row.title;
+    noticeForm.content = row.content;
+    noticeForm.status = row.status;
+    return;
+  }
+  if (first.targetType === 'SYSTEM') {
+    noticeForm.targetMode = 'SYSTEM';
+    noticeForm.classCourseIds = [];
+    return;
+  }
+  if (first.targetType === 'ROLE' && first.targetCode === 'TEACHER') {
+    noticeForm.targetMode = 'ROLE_TEACHER';
+    noticeForm.classCourseIds = [];
+    return;
+  }
+  if (first.targetType === 'ROLE' && first.targetCode === 'STUDENT') {
+    noticeForm.targetMode = 'ROLE_STUDENT';
+    noticeForm.classCourseIds = [];
+    return;
+  }
+  if (targets.some((target) => target.targetType === 'CLASS_COURSE')) {
+    noticeForm.targetMode = 'CLASS_COURSE';
+    noticeForm.classCourseIds = targets
+      .filter((target) => target.targetType === 'CLASS_COURSE' && target.targetId)
+      .map((target) => Number(target.targetId));
+  }
 }
 
 async function confirmDelete(message: string) {
@@ -528,6 +1032,9 @@ async function confirmDelete(message: string) {
 
 function tabFromPath(path: string) {
   if (path.includes('classes')) return 'classes';
+  if (path.includes('class-courses')) return 'class-courses';
+  if (path.includes('courses')) return 'courses';
+  if (path.includes('teaching-assignments')) return 'teaching-assignments';
   if (path.includes('subjects')) return 'subjects';
   if (path.includes('knowledge-points')) return 'knowledge-points';
   if (path.includes('notices')) return 'notices';

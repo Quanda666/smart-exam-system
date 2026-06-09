@@ -1,23 +1,30 @@
 package com.smartexam.dto.basic;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class NoticeRequest {
 
-    @NotBlank(message = "公告标题不能为空")
-    @Size(max = 128, message = "公告标题长度不能超过128个字符")
+    @NotBlank(message = "Notice title is required")
+    @Size(max = 128, message = "Notice title must be 128 characters or less")
     private String title;
 
-    @NotBlank(message = "公告内容不能为空")
-    @Size(max = 2000, message = "公告内容长度不能超过2000个字符")
+    @NotBlank(message = "Notice content is required")
+    @Size(max = 2000, message = "Notice content must be 2000 characters or less")
     private String content;
 
-    @Min(value = 0, message = "状态只能为0或1")
-    @Max(value = 1, message = "状态只能为0或1")
+    @Min(value = 0, message = "Status must be 0 or 1")
+    @Max(value = 1, message = "Status must be 0 or 1")
     private Integer status = 1;
+
+    @Valid
+    private List<NoticeTargetRequest> targets = new ArrayList<>();
 
     public String getTitle() {
         return title;
@@ -41,5 +48,13 @@ public class NoticeRequest {
 
     public void setStatus(Integer status) {
         this.status = status == null ? 1 : status;
+    }
+
+    public List<NoticeTargetRequest> getTargets() {
+        return targets;
+    }
+
+    public void setTargets(List<NoticeTargetRequest> targets) {
+        this.targets = targets == null ? new ArrayList<>() : targets;
     }
 }

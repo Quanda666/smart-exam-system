@@ -95,11 +95,16 @@
         <el-form-item label="考试时长（分钟）" required>
           <el-input-number v-model="form.durationMinutes" :min="1" :max="600" />
         </el-form-item>
-        <el-form-item v-if="!editingId" label="参考班级" required>
-          <el-select v-model="form.classIds" multiple placeholder="请选择参加考试的班级" style="width: 100%">
-            <el-option v-for="cls in classes" :key="cls.id" :label="cls.className" :value="cls.id" />
+        <el-form-item v-if="!editingId" label="参考课程班" required>
+          <el-select v-model="form.classCourseIds" multiple placeholder="请选择参加考试的课程班" style="width: 100%" filterable>
+            <el-option
+              v-for="item in classCourses"
+              :key="item.classCourseId"
+              :label="`${item.className} / ${item.courseName} / ${item.termName}`"
+              :value="item.classCourseId"
+            />
           </el-select>
-          <div v-if="classes.length === 0" class="form-hint">暂无可用班级，请先到「班级管理」创建班级。</div>
+          <div v-if="classCourses.length === 0" class="form-hint">暂无可用课程班，请先完成班级、课程和授课分配。</div>
         </el-form-item>
         <el-alert v-else type="info" :closable="false" show-icon class="edit-tip">
           编辑仅调整考试安排（名称/说明/时间/时长），不修改试卷与参考班级；如需更换试卷或班级，请删除后重新发布。
@@ -119,7 +124,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { Search, Plus } from '@element-plus/icons-vue';
 import { closeExam, createExam, deleteExam, exportExamScores, listTeacherExams, updateExam, type ExamInfo } from '../api/exam';
 import { listPapers, type PaperInfo } from '../api/paper';
-import { listClasses, type ClassInfo } from '../api/basic';
+import { listClassCourses, type ClassCourseInfo } from '../api/basic';
 import { formatDateTime } from '../utils/dateFormat';
 
 const exams = ref<ExamInfo[]>([]);
@@ -127,7 +132,7 @@ const currentPage = ref(1);
 const pageSize = ref(10);
 const totalExams = ref(0);
 const papers = ref<PaperInfo[]>([]);
-const classes = ref<ClassInfo[]>([]);
+const classCourses = ref<ClassCourseInfo[]>([]);
 const loading = ref(false);
 const submitting = ref(false);
 const dialogVisible = ref(false);
@@ -173,7 +178,7 @@ const form = reactive<{
   startTime: string;
   endTime: string;
   durationMinutes: number;
-  classIds: number[];
+  classCourseIds: number[];
 }>({
   paperId: null,
   examName: '',
@@ -181,7 +186,7 @@ const form = reactive<{
   startTime: '',
   endTime: '',
   durationMinutes: 60,
-  classIds: []
+  classCourseIds: []
 });
 
 onMounted(loadExams);
@@ -217,7 +222,7 @@ function resetForm() {
   form.startTime = '';
   form.endTime = '';
   form.durationMinutes = 60;
-  form.classIds = [];
+  form.classCourseIds = [];
 }
 
 async function openCreate() {
@@ -226,12 +231,12 @@ async function openCreate() {
   resetForm();
   dialogVisible.value = true;
   try {
-    const [paperResponse, classResponse] = await Promise.all([
+    const [paperResponse, classCourseResponse] = await Promise.all([
       listPapers({ status: 1 }),
-      listClasses({ status: 1 })
+      listClassCourses({ status: 1 })
     ]);
     papers.value = paperResponse.data.list;
-    classes.value = classResponse.data;
+    classCourses.value = classCourseResponse.data;
   } catch (error) {
     ElMessage.warning(error instanceof Error ? error.message : '试卷或班级加载失败');
   }
@@ -246,7 +251,7 @@ function openEdit(row: ExamInfo) {
   form.startTime = row.startTime;
   form.endTime = row.endTime;
   form.durationMinutes = row.durationMinutes;
-  form.classIds = [];
+  form.classCourseIds = [];
   dialogVisible.value = true;
 }
 
@@ -281,7 +286,7 @@ async function submit() {
         submitting.value = false;
         return;
       }
-      if (form.classIds.length === 0) {
+      if (form.classCourseIds.length === 0) {
         ElMessage.warning('请至少选择一个参考班级');
         submitting.value = false;
         return;
@@ -293,7 +298,7 @@ async function submit() {
         startTime: form.startTime,
         endTime: form.endTime,
         durationMinutes: form.durationMinutes,
-        classIds: form.classIds
+        classCourseIds: form.classCourseIds
       });
       ElMessage.success('考试任务已发布');
     }

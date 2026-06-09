@@ -13,6 +13,9 @@ export interface ExamInfo {
   status: number;
   paperName?: string;
   subjectName?: string;
+  targetSummary?: string;
+  attemptCount?: number;
+  submittedCount?: number;
 }
 
 export interface StudentExamInfo {
@@ -37,7 +40,9 @@ export interface ExamPayload {
   startTime: string;
   endTime: string;
   durationMinutes: number;
-  classIds: number[];
+  classIds?: number[];
+  classCourseIds?: number[];
+  studentUserIds?: number[];
 }
 
 export interface AnswerPayload {
