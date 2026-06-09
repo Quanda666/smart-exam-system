@@ -48,9 +48,13 @@
             {{ index + 1 }}
           </button>
         </div>
+        <div :class="['save-status', saveState]">
+          {{ saveStateText }}
+        </div>
         <div class="nav-footer">
           <el-button type="primary" @click="prevQuestion" :disabled="currentQuestionIndex === 0">上一题</el-button>
           <el-button type="primary" @click="nextQuestion" :disabled="currentQuestionIndex === (examDetails?.questions?.length || 0) - 1">下一题</el-button>
+          <el-button type="primary" plain :loading="saveState === 'saving'" @click="persistDraft(true)">保存草稿</el-button>
           <el-button type="success" @click="confirmSubmit">交卷</el-button>
         </div>
       </div>
@@ -59,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { startExam, submitExam, saveExamDraft, type ExamDetail } from '../api/exam';
 import type { PaperQuestionInfo as QuestionInExam } from '../api/paper';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -75,8 +79,12 @@ const examDetails = ref<ExamDetail | null>(null);
 const currentQuestionIndex = ref(0);
 const answers = ref<Record<number, any>>({});
 const timeLeft = ref(0);
+const saveState = ref<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+const lastSavedAt = ref('');
+const hasUnsavedChanges = ref(false);
 let timer: any;
 let autoSaveTimer: any;
+let retrySaveTimer: any;
 
 const currentQuestion = computed(() => examDetails.value?.questions[currentQuestionIndex.value]);
 
@@ -85,6 +93,26 @@ const formattedTime = computed(() => {
   const seconds = timeLeft.value % 60;
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 });
+
+const saveStateText = computed(() => {
+  if (saveState.value === 'saving') {
+    return '正在保存草稿...';
+  }
+  if (saveState.value === 'saved') {
+    return lastSavedAt.value ? `草稿已保存 ${lastSavedAt.value}` : '草稿已保存';
+  }
+  if (saveState.value === 'failed') {
+    return '草稿保存失败，网络恢复后会自动重试';
+  }
+  return hasUnsavedChanges.value ? '有未保存作答' : '草稿自动保存已开启';
+});
+
+watch(answers, () => {
+  hasUnsavedChanges.value = true;
+  if (saveState.value === 'saved') {
+    saveState.value = 'idle';
+  }
+}, { deep: true });
 
 onMounted(async () => {
   try {
@@ -104,6 +132,8 @@ onMounted(async () => {
       : (examDetails.value?.durationMinutes || 0) * 60;
     startTimer();
     startAutoSave();
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
   } catch (error) {
     ElMessage.error('进入考试失败，可能考试已结束或您已参加过');
   }
@@ -112,6 +142,9 @@ onMounted(async () => {
 onUnmounted(() => {
   clearInterval(timer);
   clearInterval(autoSaveTimer);
+  clearTimeout(retrySaveTimer);
+  window.removeEventListener('beforeunload', handleBeforeUnload);
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 
 const startTimer = () => {
@@ -127,10 +160,48 @@ const startTimer = () => {
 
 const startAutoSave = () => {
   autoSaveTimer = setInterval(() => {
-    saveExamDraft(props.attemptId, JSON.stringify(answers.value)).catch(() => {
-      // 自动暂存失败静默忽略，不打断答题
-    });
+    persistDraft(false);
   }, 20000);
+};
+
+const persistDraft = async (manual: boolean) => {
+  if (!examDetails.value) {
+    return;
+  }
+  clearTimeout(retrySaveTimer);
+  saveState.value = 'saving';
+  try {
+    await saveExamDraft(props.attemptId, JSON.stringify(answers.value));
+    hasUnsavedChanges.value = false;
+    saveState.value = 'saved';
+    lastSavedAt.value = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (manual) {
+      ElMessage.success('草稿已保存');
+    }
+  } catch (error) {
+    saveState.value = 'failed';
+    hasUnsavedChanges.value = true;
+    retrySaveTimer = setTimeout(() => {
+      persistDraft(false);
+    }, 5000);
+    if (manual) {
+      ElMessage.error('草稿保存失败，稍后会自动重试');
+    }
+  }
+};
+
+const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+  if (!hasUnsavedChanges.value) {
+    return;
+  }
+  event.preventDefault();
+  event.returnValue = '';
+};
+
+const handleVisibilityChange = () => {
+  if (document.visibilityState === 'hidden' && hasUnsavedChanges.value) {
+    persistDraft(false);
+  }
 };
 
 const isObjective = (type: string | undefined) => !!type && ['SINGLE_CHOICE', 'MULTIPLE_CHOICE', 'TRUE_FALSE'].includes(type);
@@ -162,6 +233,7 @@ const confirmSubmit = () => {
 const submit = async (autoSubmit: boolean) => {
   clearInterval(timer);
   clearInterval(autoSaveTimer);
+  clearTimeout(retrySaveTimer);
   try {
     const finalAnswers = { ...answers.value };
     // Process checkbox answers
@@ -238,6 +310,27 @@ const submit = async (autoSubmit: boolean) => {
   grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
   gap: 10px;
   margin-bottom: auto;
+}
+.save-status {
+  margin: 14px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #f4f7fb;
+  color: #5f6b7a;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.save-status.saving {
+  background: #ecf5ff;
+  color: #337ecc;
+}
+.save-status.saved {
+  background: #f0f9eb;
+  color: #529b2e;
+}
+.save-status.failed {
+  background: #fef0f0;
+  color: #c45656;
 }
 .nav-item {
   width: 40px;

@@ -46,6 +46,7 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
         ensureSysUserAvatarColumn(jdbc);
         ensureEmailVerificationTable(jdbc);
         ensureV4Columns(jdbc);
+        ensureQuestionSourceColumns(jdbc);
         ensureV4Tables(jdbc);
         backfillV4Data(jdbc);
     }
@@ -113,6 +114,18 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
                 "ALTER TABLE edu_class ADD INDEX idx_class_type (class_type)");
         addIndexIfMissing(jdbc, "exam_class", "idx_ec_class",
                 "ALTER TABLE exam_class ADD INDEX idx_ec_class (class_id)");
+    }
+
+    /** AI 题目进入题库后保留来源，方便审计和后续质量统计。 */
+    private void ensureQuestionSourceColumns(JdbcTemplate jdbc) {
+        addColumnIfMissing(jdbc, "question", "source_type",
+                "ALTER TABLE question ADD COLUMN source_type VARCHAR(32) NOT NULL DEFAULT 'MANUAL' "
+                        + "COMMENT '来源：MANUAL手动/AI_GENERATED生成/AI_IMPORTED识别/AI_MATERIAL材料生成' AFTER created_by");
+        addColumnIfMissing(jdbc, "question", "source_detail",
+                "ALTER TABLE question ADD COLUMN source_detail VARCHAR(255) DEFAULT NULL "
+                        + "COMMENT '来源说明，如上传文件名或生成入口' AFTER source_type");
+        addIndexIfMissing(jdbc, "question", "idx_question_source",
+                "ALTER TABLE question ADD INDEX idx_question_source (source_type)");
     }
 
     /** V4.0：创建课程、开课、授课、选课、公告目标、考试目标等新关系表。 */

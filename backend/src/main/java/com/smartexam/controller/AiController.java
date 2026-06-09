@@ -62,7 +62,7 @@ public class AiController {
     @PostMapping("/questions/generate")
     public ApiResponse<List<AiGeneratedQuestion>> generateQuestionDrafts(@Valid @RequestBody GenerateQuestionBatchRequest request) {
         roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok(aiService.generateQuestionDrafts(request));
+        return ApiResponse.ok(withSource(aiService.generateQuestionDrafts(request), "AI_GENERATED", "AI 出题台"));
     }
 
     @PostMapping(value = "/questions/import-document", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -83,7 +83,7 @@ public class AiController {
         defaults.setDifficulty(difficulty);
         defaults.setDefaultScore(defaultScore);
         String text = documentTextExtractorService.extract(file);
-        return ApiResponse.ok(aiService.importQuestionsFromDocument(text, defaults));
+        return ApiResponse.ok(withSource(aiService.importQuestionsFromDocument(text, defaults), "AI_IMPORTED", sourceDetail(file, "题目文档识别")));
     }
 
     @PostMapping(value = "/questions/generate-from-material", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -111,7 +111,7 @@ public class AiController {
         request.setRequirements(requirements);
         request.setTypeCounts(typeCounts(singleChoiceCount, multipleChoiceCount, trueFalseCount, fillBlankCount, subjectiveCount));
         String text = documentTextExtractorService.extract(file);
-        return ApiResponse.ok(aiService.generateQuestionDraftsFromMaterial(text, request));
+        return ApiResponse.ok(withSource(aiService.generateQuestionDraftsFromMaterial(text, request), "AI_MATERIAL", sourceDetail(file, "课程材料生成")));
     }
 
     @PostMapping("/questions/save")
@@ -150,8 +150,24 @@ public class AiController {
         request.setAnalysis(draft.getAnalysis());
         request.setDefaultScore(draft.getDefaultScore());
         request.setStatus(0);
+        request.setSourceType(draft.getSourceType());
+        request.setSourceDetail(draft.getSourceDetail());
         request.setOptions(draft.getOptions().stream().map(this::toOptionRequest).toList());
         return request;
+    }
+
+    private List<AiGeneratedQuestion> withSource(List<AiGeneratedQuestion> questions, String sourceType, String sourceDetail) {
+        for (AiGeneratedQuestion question : questions) {
+            question.setSourceType(sourceType);
+            question.setSourceDetail(sourceDetail);
+        }
+        return questions;
+    }
+
+    private String sourceDetail(MultipartFile file, String fallback) {
+        String filename = file.getOriginalFilename();
+        String detail = filename == null || filename.isBlank() ? fallback : fallback + "：" + filename;
+        return detail.length() > 255 ? detail.substring(0, 255) : detail;
     }
 
     private QuestionOptionRequest toOptionRequest(AiGeneratedQuestionOption option) {

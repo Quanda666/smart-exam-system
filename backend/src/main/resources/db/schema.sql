@@ -13,7 +13,7 @@
 CREATE TABLE IF NOT EXISTS sys_user (
   id            BIGINT       NOT NULL AUTO_INCREMENT,
   username      VARCHAR(64)  NOT NULL COMMENT '登录用户名',
-  password_hash VARCHAR(160) NOT NULL COMMENT '密码哈希，格式 sha256$salt$hash 或 {noop}明文',
+  password_hash VARCHAR(160) NOT NULL COMMENT '密码哈希，优先 pbkdf2$iterations$salt$hash；兼容历史 sha256$salt$hash',
   real_name     VARCHAR(64)  NOT NULL COMMENT '真实姓名',
   phone         VARCHAR(32)  DEFAULT NULL,
   email         VARCHAR(128) DEFAULT NULL,
@@ -263,11 +263,14 @@ CREATE TABLE IF NOT EXISTS question (
   status             TINYINT       NOT NULL DEFAULT 0 COMMENT '0草稿 1已发布',
   deleted            TINYINT       NOT NULL DEFAULT 0,
   created_by         BIGINT        DEFAULT NULL,
+  source_type        VARCHAR(32)   NOT NULL DEFAULT 'MANUAL' COMMENT '来源：MANUAL手动/AI_GENERATED生成/AI_IMPORTED识别/AI_MATERIAL材料生成',
+  source_detail      VARCHAR(255)  DEFAULT NULL COMMENT '来源说明，如上传文件名或生成入口',
   created_at         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_question_subject (subject_id),
-  KEY idx_question_kp (knowledge_point_id)
+  KEY idx_question_kp (knowledge_point_id),
+  KEY idx_question_source (source_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='题目';
 
 CREATE TABLE IF NOT EXISTS question_option (
@@ -457,7 +460,7 @@ CREATE TABLE IF NOT EXISTS exam_answer_draft (
   UNIQUE KEY uk_draft_attempt (attempt_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='答题草稿（自动暂存）';
 
--- ---------- AI 预留（当前后端未直接读写，按主控文档预置结构） ----------
+-- ---------- AI 配置与调用审计 ----------
 
 CREATE TABLE IF NOT EXISTS ai_provider_config (
   id         BIGINT       NOT NULL AUTO_INCREMENT,
@@ -470,7 +473,7 @@ CREATE TABLE IF NOT EXISTS ai_provider_config (
   updated_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uk_ai_provider (provider)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 服务配置（预留）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 服务配置';
 
 CREATE TABLE IF NOT EXISTS ai_prompt_template (
   id            BIGINT       NOT NULL AUTO_INCREMENT,
@@ -483,7 +486,7 @@ CREATE TABLE IF NOT EXISTS ai_prompt_template (
   updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uk_prompt_code (template_code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 提示词模板（预留）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 提示词模板';
 
 CREATE TABLE IF NOT EXISTS ai_usage_log (
   id            BIGINT       NOT NULL AUTO_INCREMENT,
@@ -496,7 +499,7 @@ CREATE TABLE IF NOT EXISTS ai_usage_log (
   created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_ai_log_user (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 调用日志（预留）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 调用日志';
 
 -- ---------- V2.0: 邮箱验证 ----------
 

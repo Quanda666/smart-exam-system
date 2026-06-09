@@ -44,6 +44,8 @@ mysql -u root -p smart_exam_system < backend/src/main/resources/db/data.sql
 - AI：`ai_provider_config`、`ai_prompt_template`、`ai_usage_log`
 - 邮箱与会话：`email_verification`、`user_token`
 
+`question` 表保留 `source_type` 与 `source_detail`，用于追踪手动题、AI 直接生成、题目文档识别和课程材料生成来源。
+
 ## 初始数据
 
 `data.sql` 写入基础角色、初始管理员、示例班级、科目、课程、课程班、知识点、公告与 AI 提示词模板。

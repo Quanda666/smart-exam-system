@@ -27,6 +27,8 @@ export interface QuestionInfo {
   status: number;
   createdBy?: number;
   creatorName?: string;
+  sourceType?: string;
+  sourceDetail?: string | null;
   createdAt?: string;
   updatedAt?: string;
   options: QuestionOption[];
@@ -42,6 +44,8 @@ export interface QuestionPayload {
   analysis: string;
   defaultScore: number;
   status: number;
+  sourceType?: string;
+  sourceDetail?: string | null;
   options: QuestionOption[];
 }
 

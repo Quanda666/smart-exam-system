@@ -66,6 +66,7 @@ public class AuthService {
             throw new IllegalArgumentException("账号或密码错误");
         }
 
+        upgradePasswordHashIfNeeded(longValue(userRow.get("id")), request.getPassword(), passwordHash);
         loginAttemptGuard.recordSuccess(username);
         AuthUser user = buildAuthUser(userRow);
         TokenSession session = tokenStore.create(user);
@@ -347,6 +348,19 @@ public class AuthService {
             throw new IllegalArgumentException("账号已被禁用，请联系管理员");
         }
         return row;
+    }
+
+    private void upgradePasswordHashIfNeeded(Long userId, String rawPassword, String storedHash) {
+        if (userId == null || !PasswordHashUtil.needsRehash(storedHash)) {
+            return;
+        }
+        try {
+            requireJdbcTemplate().update(
+                    "UPDATE sys_user SET password_hash = ? WHERE id = ?",
+                    PasswordHashUtil.encode(rawPassword), userId);
+        } catch (Exception ex) {
+            log.warn("密码哈希自动升级失败，用户ID={}，不影响本次登录：{}", userId, ex.getMessage());
+        }
     }
 
     private List<String> findRoles(Long userId) {

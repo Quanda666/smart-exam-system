@@ -53,7 +53,7 @@ CREATE DATABASE IF NOT EXISTS smart_exam_system
 | 阅卷 | `/api/reviews/pending`, `/api/reviews/attempt/{id}` |
 | 学生反馈 | `/api/student/grades`, `/api/student/exam-result/{id}`, `/api/student/wrong-questions`, `/api/student/mastery` |
 | 分析画像 | `/api/analysis/overview`, `/api/analysis/teacher`, `/api/insight/classes/{classId}/students`, `/api/insight/students/{userId}` |
-| 监控日志 | `/api/monitor/cheat-event`, `/api/monitor/cheat-events/{id}`, `/api/monitor/logs` |
+| 监控日志 | `/api/monitor/cheat-event`, `/api/monitor/cheat-events/{id}`, `/api/monitor/logs`, `/api/monitor/ai-logs` |
 | 系统管理 | `/api/system/users`, `/api/system/roles` |
 | 通知 | `/api/notifications/my`, `/api/notifications/unread-count`, `/api/notifications/{id}/read`, `/api/notifications/read-all` |
 
@@ -80,6 +80,7 @@ CREATE DATABASE IF NOT EXISTS smart_exam_system
 | `RESEND_FROM_EMAIL` | 空 | 验证码发件邮箱 |
 
 邮件发送使用 `EmailServiceV3` 调用 Resend HTTP API，不再使用 SMTP 配置。
+密码存储优先使用 PBKDF2 哈希，历史 SHA-256 哈希会在用户密码登录成功后自动升级。
 
 ## 初始账号
 

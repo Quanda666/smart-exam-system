@@ -202,6 +202,14 @@
           </template>
         </el-table-column>
         <el-table-column prop="creatorName" label="创建人" width="120" />
+        <el-table-column label="来源" width="150">
+          <template #default="scope">
+            <div class="source-cell" :title="scope.row.sourceDetail || sourceText(scope.row.sourceType)">
+              <el-tag size="small" :type="sourceTag(scope.row.sourceType)">{{ sourceText(scope.row.sourceType) }}</el-tag>
+              <small v-if="scope.row.sourceDetail">{{ scope.row.sourceDetail }}</small>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column v-if="canManageQuestions" label="操作" width="230" fixed="right">
           <template #default="scope">
             <el-button link type="primary" @click="editQuestion(scope.row as QuestionInfo)">编辑</el-button>
@@ -376,6 +384,8 @@ const questionForm = reactive<QuestionPayload>({
   analysis: '',
   defaultScore: 5,
   status: 0,
+  sourceType: 'MANUAL',
+  sourceDetail: null,
   options: defaultOptions('SINGLE_CHOICE')
 });
 
@@ -571,6 +581,8 @@ function editQuestion(row: QuestionInfo) {
   questionForm.analysis = row.analysis || '';
   questionForm.defaultScore = Number(row.defaultScore || 5);
   questionForm.status = row.status;
+  questionForm.sourceType = row.sourceType || 'MANUAL';
+  questionForm.sourceDetail = row.sourceDetail || null;
   questionForm.options = row.options?.length
     ? row.options.map((option) => ({ ...option, correct: isCorrectOption(option.correct) }))
     : defaultOptions(row.questionType);
@@ -664,7 +676,9 @@ async function exportQuestions() {
         ? (q.options || []).filter((o) => isCorrectOption(o.correct)).map((o) => o.optionLabel).join('')
         : (q.correctAnswer || ''),
       status: statusText(q.status),
-      creator: q.creatorName || ''
+      creator: q.creatorName || '',
+      source: sourceText(q.sourceType),
+      sourceDetail: q.sourceDetail || ''
     }));
     exportToCsv(`题库_${new Date().toISOString().slice(0, 10)}`, [
       { key: 'id', label: 'ID' },
@@ -676,7 +690,9 @@ async function exportQuestions() {
       { key: 'score', label: '分值' },
       { key: 'answer', label: '答案' },
       { key: 'status', label: '状态' },
-      { key: 'creator', label: '创建人' }
+      { key: 'creator', label: '创建人' },
+      { key: 'source', label: '来源' },
+      { key: 'sourceDetail', label: '来源说明' }
     ], rows);
     ElMessage.success(`已导出 ${rows.length} 道题目`);
   } catch (error) {
@@ -697,6 +713,8 @@ function resetQuestionForm() {
   questionForm.analysis = '';
   questionForm.defaultScore = 5;
   questionForm.status = 0;
+  questionForm.sourceType = 'MANUAL';
+  questionForm.sourceDetail = null;
   questionForm.options = defaultOptions('SINGLE_CHOICE');
 }
 
@@ -720,6 +738,23 @@ function difficultyTag(value: string) {
   if (value === 'EASY') return 'success';
   if (value === 'MEDIUM') return 'warning';
   return 'danger';
+}
+
+function sourceText(sourceType?: string) {
+  const map: Record<string, string> = {
+    MANUAL: '手动',
+    AI_GENERATED: 'AI生成',
+    AI_IMPORTED: '文档识别',
+    AI_MATERIAL: '材料生成'
+  };
+  return map[sourceType || 'MANUAL'] || '手动';
+}
+
+function sourceTag(sourceType?: string) {
+  if (sourceType === 'AI_GENERATED') return 'success';
+  if (sourceType === 'AI_IMPORTED') return 'warning';
+  if (sourceType === 'AI_MATERIAL') return 'primary';
+  return 'info';
 }
 
 function statusText(status: number) {
@@ -887,6 +922,8 @@ function setQuestionForm(payload: QuestionPayload) {
   questionForm.analysis = payload.analysis || '';
   questionForm.defaultScore = Number(payload.defaultScore || 5);
   questionForm.status = payload.status ?? 0;
+  questionForm.sourceType = payload.sourceType || 'MANUAL';
+  questionForm.sourceDetail = payload.sourceDetail || null;
   questionForm.options = payload.options?.length
     ? payload.options.map((option) => ({ ...option, correct: isCorrectOption(option.correct) }))
     : defaultOptions(payload.questionType);
@@ -903,6 +940,8 @@ function normalizeAiDraft(draft: AiGeneratedQuestion): AiGeneratedQuestion {
     analysis: draft.analysis || '',
     defaultScore: Number(draft.defaultScore || questionForm.defaultScore || 5),
     status: 0,
+    sourceType: draft.sourceType || 'AI_GENERATED',
+    sourceDetail: draft.sourceDetail || null,
     options: draft.options || []
   };
   if (isObjectiveType(normalized.questionType)) {
@@ -1083,6 +1122,20 @@ function correctAnswerText(question: QuestionPayload) {
 
 .ai-draft-meta strong {
   color: #111827;
+}
+
+.source-cell {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.source-cell small {
+  overflow: hidden;
+  color: #6b7280;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .question-pagination {

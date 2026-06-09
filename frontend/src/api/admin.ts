@@ -61,6 +61,23 @@ export interface OperationLog {
   created_at?: string;
 }
 
+export interface AiUsageLog {
+  id: number;
+  userId?: number;
+  userName?: string;
+  scene?: string;
+  prompt?: string;
+  response?: string;
+  success: number | boolean;
+  errorMessage?: string;
+  createdAt?: string;
+}
+
+export interface AiUsageLogQuery {
+  scene?: string;
+  success?: boolean | null;
+}
+
 export interface RoleStat {
   roleCode: string;
   roleName: string;
@@ -168,6 +185,15 @@ export function listRoles() {
 
 export function listOperationLogs(page = 1, size = 10) {
   return getJson<PageResult<OperationLog>>(`/api/monitor/logs?page=${page}&size=${size}`);
+}
+
+export function listAiUsageLogs(page = 1, size = 10, query: AiUsageLogQuery = {}) {
+  const params = new URLSearchParams();
+  params.set('page', String(page));
+  params.set('size', String(size));
+  if (query.scene) params.set('scene', query.scene);
+  if (query.success !== undefined && query.success !== null) params.set('success', String(query.success));
+  return getJson<PageResult<AiUsageLog>>(`/api/monitor/ai-logs?${params.toString()}`);
 }
 
 export function fetchAnalysisOverview() {

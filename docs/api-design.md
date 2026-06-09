@@ -97,7 +97,7 @@
 
 | 分组 | 路径 |
 |---|---|
-| 监控日志 | `/api/monitor/cheat-event`, `/api/monitor/cheat-events/{attemptId}`, `/api/monitor/logs` |
+| 监控日志 | `/api/monitor/cheat-event`, `/api/monitor/cheat-events/{attemptId}`, `/api/monitor/logs`, `/api/monitor/ai-logs` |
 | 通知 | `/api/notifications/my`, `/api/notifications/unread-count`, `/api/notifications/{id}/read`, `/api/notifications/read-all` |
 | 用户管理 | `/api/system/users`, `/api/system/users/summary`, `/api/system/users/{id}/status`, `/api/system/users/{id}/password` |
 | 角色管理 | `/api/system/roles` |

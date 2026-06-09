@@ -90,13 +90,13 @@ class SmartExamApplicationTests {
         String token = loginAndExtractToken("admin", "admin123");
         assertThat(token).isNotBlank();
 
-        mockMvc.perform(get("/api/admin/overview")
+        mockMvc.perform(get("/api/overview/admin")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.role").value("ADMIN"));
 
-        mockMvc.perform(get("/api/student/overview")
+        mockMvc.perform(get("/api/overview/student")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))

@@ -2,6 +2,7 @@ package com.smartexam.controller;
 
 import com.smartexam.common.ApiResponse;
 import com.smartexam.common.PageResult;
+import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.dto.monitor.CheatEventRequest;
 import com.smartexam.service.MonitorService;
 import com.smartexam.service.RoleAccessService;
@@ -45,5 +46,14 @@ public class MonitorController {
                                                                           @RequestParam(defaultValue = "10") int size) {
         roleAccessService.requireRole("ADMIN");
         return ApiResponse.ok(monitorService.getOperationLogs(page, size));
+    }
+
+    @GetMapping("/ai-logs")
+    public ApiResponse<PageResult<Map<String, Object>>> getAiUsageLogs(@RequestParam(defaultValue = "1") int page,
+                                                                        @RequestParam(defaultValue = "10") int size,
+                                                                        @RequestParam(required = false) String scene,
+                                                                        @RequestParam(required = false) Boolean success) {
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        return ApiResponse.ok(monitorService.getAiUsageLogs(page, size, scene, success, user));
     }
 }

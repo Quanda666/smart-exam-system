@@ -3,6 +3,7 @@ package com.smartexam.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartexam.config.AiProperties;
+import com.smartexam.auth.AuthContext;
 import com.smartexam.dto.ai.AiGeneratedQuestion;
 import com.smartexam.dto.ai.AiGeneratedQuestionOption;
 import com.smartexam.dto.ai.GenerateQuestionBatchRequest;
@@ -14,6 +15,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -45,10 +48,14 @@ public class AiService {
     private final AiProperties aiProperties;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
-    public AiService(AiProperties aiProperties, ObjectMapper objectMapper) {
+    public AiService(AiProperties aiProperties,
+                     ObjectMapper objectMapper,
+                     ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
         this.aiProperties = aiProperties;
         this.objectMapper = objectMapper;
+        this.jdbcTemplateProvider = jdbcTemplateProvider;
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         int timeoutMs = Math.max(1, aiProperties.getTimeoutSeconds()) * 1000;
         factory.setConnectTimeout(timeoutMs);
@@ -58,12 +65,14 @@ public class AiService {
 
     public List<AiGeneratedQuestion> generateQuestionDrafts(GenerateQuestionBatchRequest request) {
         validateBatchRequest(request);
+        String prompt = buildQuestionDraftPrompt(request);
         if (isMockMode()) {
-            return buildLocalQuestionDrafts(request);
+            List<AiGeneratedQuestion> local = buildLocalQuestionDrafts(request);
+            logAiUsage("QUESTION_GENERATE_LOCAL", prompt, serializeForLog(local), true, null);
+            return local;
         }
 
-        String prompt = buildQuestionDraftPrompt(request);
-        String content = requestRemote(prompt, aiProperties.getApiKey());
+        String content = requestRemote("QUESTION_GENERATE", prompt, aiProperties.getApiKey());
         List<AiGeneratedQuestion> parsed = parseGeneratedQuestions(content);
         if (parsed.isEmpty()) {
             throw new IllegalStateException("AI 未返回可用题目草稿");
@@ -82,9 +91,10 @@ public class AiService {
 
     public List<AiGeneratedQuestion> importQuestionsFromDocument(String documentText, GenerateQuestionBatchRequest defaults) {
         validateDocumentDefaults(defaults);
+        String prompt = buildQuestionImportPrompt(documentText, defaults);
         if (!isMockMode()) {
             try {
-                List<AiGeneratedQuestion> parsed = parseGeneratedQuestions(requestRemote(buildQuestionImportPrompt(documentText, defaults), aiProperties.getApiKey()));
+                List<AiGeneratedQuestion> parsed = parseGeneratedQuestions(requestRemote("QUESTION_IMPORT", prompt, aiProperties.getApiKey()));
                 List<AiGeneratedQuestion> normalized = normalizeImportedQuestions(parsed, defaults);
                 if (!normalized.isEmpty()) {
                     return normalized;
@@ -98,15 +108,17 @@ public class AiService {
         if (local.isEmpty()) {
             throw new IllegalArgumentException("未识别到题目，请检查文档格式，建议使用“1.题干 + A.选项 + 答案 + 解析”的结构");
         }
+        logAiUsage("QUESTION_IMPORT_LOCAL", prompt, serializeForLog(local), true, null);
         return local;
     }
 
     public List<AiGeneratedQuestion> generateQuestionDraftsFromMaterial(String materialText, MaterialQuestionGenerationRequest request) {
         validateMaterialRequest(request);
         Map<String, Integer> typeCounts = normalizedTypeCounts(request.getTypeCounts());
+        String prompt = buildMaterialQuestionPrompt(materialText, request, typeCounts);
         if (!isMockMode()) {
             try {
-                List<AiGeneratedQuestion> parsed = parseGeneratedQuestions(requestRemote(buildMaterialQuestionPrompt(materialText, request, typeCounts), aiProperties.getApiKey()));
+                List<AiGeneratedQuestion> parsed = parseGeneratedQuestions(requestRemote("MATERIAL_GENERATE", prompt, aiProperties.getApiKey()));
                 List<AiGeneratedQuestion> normalized = normalizeMaterialQuestions(parsed, request, typeCounts);
                 if (hasRequestedCounts(normalized, typeCounts)) {
                     return normalized;
@@ -115,30 +127,37 @@ public class AiService {
                 // 模型输出不稳定时回退到本地草稿，老师仍然能继续微调。
             }
         }
-        return buildLocalMaterialQuestionDrafts(materialText, request, typeCounts);
+        List<AiGeneratedQuestion> local = buildLocalMaterialQuestionDrafts(materialText, request, typeCounts);
+        logAiUsage("MATERIAL_GENERATE_LOCAL", prompt, serializeForLog(local), true, null);
+        return local;
     }
 
     public String explainWrongQuestion(WrongQuestionExplainRequest request) {
+        String prompt = buildWrongQuestionPrompt(request);
         if (isMockMode()) {
-            return buildLocalWrongQuestionExplanation(request);
+            String local = buildLocalWrongQuestionExplanation(request);
+            logAiUsage("WRONG_QUESTION_EXPLAIN_LOCAL", prompt, local, true, null);
+            return local;
         }
-        return requestRemote(buildWrongQuestionPrompt(request), aiProperties.getApiKey());
+        return requestRemote("WRONG_QUESTION_EXPLAIN", prompt, aiProperties.getApiKey());
     }
 
     public String suggestReview(SuggestReviewRequest request) {
         String prompt = "请对以下主观题答案进行评分，并给出评语。\n题目：" + request.getQuestion()
                 + "\n参考答案：" + request.getCorrectAnswer() + "\n学生答案：" + request.getStudentAnswer();
-        return callAi(prompt);
+        return callAi("SUGGEST_REVIEW", prompt);
     }
 
-    private String callAi(String prompt) {
+    private String callAi(String scene, String prompt) {
         String apiKey = aiProperties.getApiKey();
         // 模拟模式或未配置 API Key：返回明确的模拟占位，不实际调用大模型
         if (aiProperties.isMockEnabled() || apiKey == null || apiKey.isBlank()) {
-            return "【AI 模拟回复】当前为模拟模式，未实际调用大模型。\n"
+            String local = "【AI 模拟回复】当前为模拟模式，未实际调用大模型。\n"
                     + "如需真实回复，请将 AI_MOCK_ENABLED 设为 false 并配置 OPENAI_API_KEY / OPENAI_BASE_URL / OPENAI_MODEL。";
+            logAiUsage(scene + "_LOCAL", prompt, local, true, null);
+            return local;
         }
-        return requestRemote(prompt, apiKey);
+        return requestRemote(scene, prompt, apiKey);
     }
 
     private boolean isMockMode() {
@@ -146,7 +165,7 @@ public class AiService {
         return aiProperties.isMockEnabled() || apiKey == null || apiKey.isBlank();
     }
 
-    private String requestRemote(String prompt, String apiKey) {
+    private String requestRemote(String scene, String prompt, String apiKey) {
         try {
             String url = aiProperties.getBaseUrl() + "/chat/completions";
 
@@ -164,10 +183,53 @@ public class AiService {
 
             ResponseEntity<Map> response = restTemplate.postForEntity(url, new HttpEntity<>(body, headers), Map.class);
             String content = extractContent(response.getBody());
-            return content == null || content.isBlank() ? "AI 未返回有效内容" : content;
+            String result = content == null || content.isBlank() ? "AI 未返回有效内容" : content;
+            logAiUsage(scene, prompt, result, true, null);
+            return result;
         } catch (Exception ex) {
+            logAiUsage(scene, prompt, null, false, ex.getMessage());
             throw new IllegalStateException("AI 服务调用失败：" + ex.getMessage(), ex);
         }
+    }
+
+    private void logAiUsage(String scene, String prompt, String response, boolean success, String errorMessage) {
+        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        if (jdbcTemplate == null) {
+            return;
+        }
+        try {
+            Long userId = AuthContext.getSession() == null ? null : AuthContext.getSession().getUser().getId();
+            jdbcTemplate.update("""
+                    INSERT INTO ai_usage_log (user_id, scene, prompt, response, success, error_message)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    userId,
+                    truncate(scene, 64),
+                    truncate(prompt, 8000),
+                    truncate(response, 8000),
+                    success ? 1 : 0,
+                    truncate(errorMessage, 500));
+        } catch (Exception ignore) {
+            // AI 日志不能影响主业务流程。
+        }
+    }
+
+    private String serializeForLog(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception ex) {
+            return value.toString();
+        }
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
     }
 
     @SuppressWarnings("unchecked")

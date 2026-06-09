@@ -47,6 +47,12 @@ public class AiGeneratedQuestion {
     @Max(value = 1, message = "状态只能为0或1")
     private Integer status = 0;
 
+    @Size(max = 32, message = "来源类型长度不能超过32个字符")
+    private String sourceType;
+
+    @Size(max = 255, message = "来源说明长度不能超过255个字符")
+    private String sourceDetail;
+
     @Valid
     private List<AiGeneratedQuestionOption> options = new ArrayList<>();
 
@@ -120,6 +126,22 @@ public class AiGeneratedQuestion {
 
     public void setStatus(Integer status) {
         this.status = status == null ? 0 : status;
+    }
+
+    public String getSourceType() {
+        return sourceType;
+    }
+
+    public void setSourceType(String sourceType) {
+        this.sourceType = sourceType;
+    }
+
+    public String getSourceDetail() {
+        return sourceDetail;
+    }
+
+    public void setSourceDetail(String sourceDetail) {
+        this.sourceDetail = sourceDetail;
     }
 
     public List<AiGeneratedQuestionOption> getOptions() {

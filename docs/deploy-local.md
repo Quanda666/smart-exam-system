@@ -110,7 +110,7 @@ mysql -u root -p smart_exam_system < backend/src/main/resources/db/data.sql
 - 注册学生账号，参加考试并交卷。
 - 教师批阅主观题，查看 AI 评分建议。
 - 学生查看成绩、错题本和 AI 错题讲解。
-- 管理员查看用户管理、角色管理、系统日志和异常事件。
+- 管理员查看用户管理、角色管理、系统日志、AI 调用日志和异常事件。
 
 ## 常见问题
 
