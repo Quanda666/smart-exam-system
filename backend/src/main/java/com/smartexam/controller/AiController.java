@@ -152,6 +152,12 @@ public class AiController {
         request.setStatus(0);
         request.setSourceType(draft.getSourceType());
         request.setSourceDetail(draft.getSourceDetail());
+        request.setMaterialId(draft.getMaterialId());
+        request.setSourcePage(draft.getSourcePage());
+        request.setSourceParagraph(draft.getSourceParagraph());
+        request.setSourceExcerpt(draft.getSourceExcerpt());
+        request.setAiModel(draft.getAiModel());
+        request.setPromptVersion(draft.getPromptVersion());
         request.setOptions(draft.getOptions().stream().map(this::toOptionRequest).toList());
         return request;
     }

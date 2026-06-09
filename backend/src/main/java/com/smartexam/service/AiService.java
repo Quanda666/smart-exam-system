@@ -37,6 +37,11 @@ import java.util.stream.Collectors;
 @Service
 public class AiService {
 
+    public static final String PROMPT_VERSION_QUESTION_GENERATE = "question-generate-v2";
+    public static final String PROMPT_VERSION_QUESTION_IMPORT = "question-import-v2";
+    public static final String PROMPT_VERSION_MATERIAL_GENERATE = "material-question-v2";
+    public static final String PROMPT_VERSION_MATERIAL_OUTLINE = "material-outline-v1";
+
     private static final List<String> OBJECTIVE_TYPES = List.of("SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE");
     private static final List<String> ALL_TYPES = List.of("SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_BLANK", "SUBJECTIVE");
     private static final List<String> ALL_DIFFICULTIES = List.of("EASY", "MEDIUM", "HARD");
@@ -69,7 +74,7 @@ public class AiService {
         if (isMockMode()) {
             List<AiGeneratedQuestion> local = buildLocalQuestionDrafts(request);
             logAiUsage("QUESTION_GENERATE_LOCAL", prompt, serializeForLog(local), true, null);
-            return local;
+            return stampQuestionRuntime(local, PROMPT_VERSION_QUESTION_GENERATE);
         }
 
         String content = requestRemote("QUESTION_GENERATE", prompt, aiProperties.getApiKey());
@@ -86,7 +91,7 @@ public class AiService {
         while (normalized.size() < count) {
             normalized.add(createLocalQuestionDraft(request, normalized.size() + 1));
         }
-        return normalized;
+        return stampQuestionRuntime(normalized, PROMPT_VERSION_QUESTION_GENERATE);
     }
 
     public List<AiGeneratedQuestion> importQuestionsFromDocument(String documentText, GenerateQuestionBatchRequest defaults) {
@@ -97,7 +102,7 @@ public class AiService {
                 List<AiGeneratedQuestion> parsed = parseGeneratedQuestions(requestRemote("QUESTION_IMPORT", prompt, aiProperties.getApiKey()));
                 List<AiGeneratedQuestion> normalized = normalizeImportedQuestions(parsed, defaults);
                 if (!normalized.isEmpty()) {
-                    return normalized;
+                    return stampQuestionRuntime(normalized, PROMPT_VERSION_QUESTION_IMPORT);
                 }
             } catch (Exception ignore) {
                 // 真实模型解析失败时继续走本地规则，避免导入入口直接不可用。
@@ -109,7 +114,7 @@ public class AiService {
             throw new IllegalArgumentException("未识别到题目，请检查文档格式，建议使用“1.题干 + A.选项 + 答案 + 解析”的结构");
         }
         logAiUsage("QUESTION_IMPORT_LOCAL", prompt, serializeForLog(local), true, null);
-        return local;
+        return stampQuestionRuntime(local, PROMPT_VERSION_QUESTION_IMPORT);
     }
 
     public List<AiGeneratedQuestion> generateQuestionDraftsFromMaterial(String materialText, MaterialQuestionGenerationRequest request) {
@@ -121,7 +126,7 @@ public class AiService {
                 List<AiGeneratedQuestion> parsed = parseGeneratedQuestions(requestRemote("MATERIAL_GENERATE", prompt, aiProperties.getApiKey()));
                 List<AiGeneratedQuestion> normalized = normalizeMaterialQuestions(parsed, request, typeCounts);
                 if (hasRequestedCounts(normalized, typeCounts)) {
-                    return normalized;
+                    return stampQuestionRuntime(normalized, PROMPT_VERSION_MATERIAL_GENERATE);
                 }
             } catch (Exception ignore) {
                 // 模型输出不稳定时回退到本地草稿，老师仍然能继续微调。
@@ -129,7 +134,7 @@ public class AiService {
         }
         List<AiGeneratedQuestion> local = buildLocalMaterialQuestionDrafts(materialText, request, typeCounts);
         logAiUsage("MATERIAL_GENERATE_LOCAL", prompt, serializeForLog(local), true, null);
-        return local;
+        return stampQuestionRuntime(local, PROMPT_VERSION_MATERIAL_GENERATE);
     }
 
     public String explainWrongQuestion(WrongQuestionExplainRequest request) {
@@ -146,6 +151,27 @@ public class AiService {
         String prompt = "请对以下主观题答案进行评分，并给出评语。\n题目：" + request.getQuestion()
                 + "\n参考答案：" + request.getCorrectAnswer() + "\n学生答案：" + request.getStudentAnswer();
         return callAi("SUGGEST_REVIEW", prompt);
+    }
+
+    public List<Map<String, Object>> generateMaterialOutline(String title, String materialText) {
+        String prompt = buildMaterialOutlinePrompt(title, materialText);
+        if (!isMockMode()) {
+            try {
+                List<Map<String, Object>> outline = parseMaterialOutline(requestRemote("MATERIAL_OUTLINE", prompt, aiProperties.getApiKey()));
+                if (!outline.isEmpty()) {
+                    return outline;
+                }
+            } catch (Exception ignore) {
+                // 大纲生成失败时走本地规则，资料库上传流程不能因此中断。
+            }
+        }
+        List<Map<String, Object>> local = buildLocalMaterialOutline(title, materialText);
+        logAiUsage("MATERIAL_OUTLINE_LOCAL", prompt, serializeForLog(local), true, null);
+        return local;
+    }
+
+    public String currentModel() {
+        return firstNonBlank(aiProperties.getModel(), "mock-local");
     }
 
     private String callAi(String scene, String prompt) {
@@ -352,6 +378,7 @@ public class AiService {
         return """
                 请根据课程材料生成在线考试题库草稿，只返回 JSON 数组，不要输出 Markdown。
                 每道题包含：subjectId, knowledgePointId, questionType, difficulty, stem, correctAnswer, analysis, defaultScore, status, options。
+                如课程材料中带有“[页x 段y]”标记，请同时返回 sourcePage、sourceParagraph、sourceExcerpt。
 
                 课程上下文：
                 - 科目：%s（ID=%d）
@@ -378,6 +405,136 @@ public class AiService {
                 blankToNull(request.getRequirements()) == null ? "" : "- 补充要求：" + request.getRequirements().trim(),
                 promptText(materialText)
         );
+    }
+
+    private String buildMaterialOutlinePrompt(String title, String materialText) {
+        return """
+                请为老师上传的课程资料生成知识点大纲，只返回 JSON 数组，不要输出 Markdown。
+                每个元素包含：title, summary, keywords, sourcePage, sourceParagraph。
+
+                要求：
+                - title 是可用于教学和出题的知识点名称。
+                - summary 用 1-2 句话概括该知识点考查价值。
+                - keywords 用逗号分隔 3-6 个关键词。
+                - sourcePage/sourceParagraph 尽量根据资料中的页码、幻灯片或段落位置填写；无法确定时填 1。
+                - 最多返回 12 个知识点，按资料顺序排列。
+
+                资料标题：%s
+                资料内容：
+                %s
+                """.formatted(firstNonBlank(title, "未命名资料"), promptText(materialText));
+    }
+
+    private List<Map<String, Object>> parseMaterialOutline(String content) {
+        try {
+            String json = extractJson(content);
+            JsonNode root = objectMapper.readTree(json);
+            JsonNode outlineNode = root.isArray() ? root : root.get("outline");
+            if (outlineNode == null || !outlineNode.isArray()) {
+                return List.of();
+            }
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (JsonNode node : outlineNode) {
+                String title = node.path("title").asText("");
+                if (blankToNull(title) == null) {
+                    continue;
+                }
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("title", truncate(title.trim(), 200));
+                item.put("summary", truncate(node.path("summary").asText(""), 1000));
+                item.put("keywords", truncate(node.path("keywords").asText(""), 500));
+                item.put("sourcePage", Math.max(1, node.path("sourcePage").asInt(1)));
+                item.put("sourceParagraph", Math.max(1, node.path("sourceParagraph").asInt(1)));
+                result.add(item);
+                if (result.size() >= 12) {
+                    break;
+                }
+            }
+            return result;
+        } catch (Exception ex) {
+            return List.of();
+        }
+    }
+
+    private List<Map<String, Object>> buildLocalMaterialOutline(String title, String materialText) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        String[] lines = safeText(materialText).split("\\R");
+        int paragraph = 0;
+        for (String raw : lines) {
+            String line = raw.replaceAll("\\s+", " ").trim();
+            if (line.isBlank()) {
+                continue;
+            }
+            paragraph++;
+            if (!looksLikeOutlineTitle(line)) {
+                continue;
+            }
+            result.add(outlineItem(line, "围绕“" + line + "”梳理概念、条件、过程与典型应用，可作为出题覆盖点。", paragraph));
+            if (result.size() >= 12) {
+                return result;
+            }
+        }
+        if (result.isEmpty()) {
+            String compact = safeText(materialText).replaceAll("\\s+", " ").trim();
+            if (compact.isBlank()) {
+                result.add(outlineItem(firstNonBlank(title, "课程核心内容"), "资料文本较少，建议教师补充讲义后再生成题目。", 1));
+            } else {
+                int chunkSize = Math.max(80, Math.min(220, compact.length() / 4));
+                for (int i = 0; i < compact.length() && result.size() < 6; i += chunkSize) {
+                    String part = compact.substring(i, Math.min(compact.length(), i + chunkSize));
+                    String itemTitle = inferOutlineTitle(part, result.size() + 1);
+                    result.add(outlineItem(itemTitle, "根据资料片段提炼的知识点，适合用于初步覆盖与教师复核。", result.size() + 1));
+                }
+            }
+        }
+        return result;
+    }
+
+    private boolean looksLikeOutlineTitle(String line) {
+        if (line.length() < 4 || line.length() > 60) {
+            return false;
+        }
+        if (line.endsWith("。") || line.endsWith("；") || line.endsWith(";")) {
+            return false;
+        }
+        return line.matches("^(第[一二三四五六七八九十\\d]+[章节].*|[一二三四五六七八九十]+[、.].*|\\d+(?:\\.\\d+)*[、.\\s].*|[#*-]+\\s*.+|.*(概述|原理|流程|机制|方法|应用|特性|结构|案例|总结))$");
+    }
+
+    private Map<String, Object> outlineItem(String title, String summary, int paragraph) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("title", truncate(cleanOutlineTitle(title), 200));
+        item.put("summary", truncate(summary, 1000));
+        item.put("keywords", truncate(extractKeywords(title), 500));
+        item.put("sourcePage", Math.max(1, (paragraph - 1) / 6 + 1));
+        item.put("sourceParagraph", Math.max(1, paragraph));
+        return item;
+    }
+
+    private String cleanOutlineTitle(String title) {
+        return safeText(title).replaceFirst("^[#*\\-\\s]+", "").replaceFirst("^\\d+(?:\\.\\d+)*[、.\\s]+", "").trim();
+    }
+
+    private String inferOutlineTitle(String text, int index) {
+        String cleaned = safeText(text).replaceAll("[，。！？；：,.!?;:].*", "").trim();
+        if (cleaned.length() >= 4 && cleaned.length() <= 24) {
+            return cleaned;
+        }
+        return "资料核心知识点 " + index;
+    }
+
+    private String extractKeywords(String text) {
+        String cleaned = cleanOutlineTitle(text).replaceAll("[^A-Za-z0-9\\u4e00-\\u9fa5]+", " ").trim();
+        String[] parts = cleaned.split("\\s+");
+        List<String> keywords = new ArrayList<>();
+        for (String part : parts) {
+            if (part.length() >= 2 && keywords.stream().noneMatch(part::equalsIgnoreCase)) {
+                keywords.add(part);
+            }
+            if (keywords.size() >= 6) {
+                break;
+            }
+        }
+        return keywords.isEmpty() ? cleaned : String.join(",", keywords);
     }
 
     private List<AiGeneratedQuestion> parseGeneratedQuestions(String content) {
@@ -510,6 +667,18 @@ public class AiService {
             normalized.setCorrectAnswer(truncate(firstNonBlank(normalized.getCorrectAnswer(), createLocalQuestionDraft(typedRequest, index).getCorrectAnswer()), 4000));
         }
         return normalized;
+    }
+
+    private List<AiGeneratedQuestion> stampQuestionRuntime(List<AiGeneratedQuestion> questions, String promptVersion) {
+        for (AiGeneratedQuestion question : questions) {
+            if (blankToNull(question.getAiModel()) == null) {
+                question.setAiModel(currentModel());
+            }
+            if (blankToNull(question.getPromptVersion()) == null) {
+                question.setPromptVersion(promptVersion);
+            }
+        }
+        return questions;
     }
 
     private List<AiGeneratedQuestionOption> normalizeObjectiveOptions(AiGeneratedQuestion question, GenerateQuestionBatchRequest request, int index) {
@@ -945,10 +1114,4 @@ public class AiService {
         return value == null ? "" : value;
     }
 
-    private String truncate(String value, int maxLength) {
-        if (value == null || value.length() <= maxLength) {
-            return value;
-        }
-        return value.substring(0, maxLength);
-    }
 }

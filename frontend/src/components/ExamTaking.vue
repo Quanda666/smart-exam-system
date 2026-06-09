@@ -74,6 +74,11 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits(['submit-success']);
+interface LocalExamDraft {
+  answers: Record<number, any>;
+  savedAt: string;
+  examName?: string;
+}
 
 const examDetails = ref<ExamDetail | null>(null);
 const currentQuestionIndex = ref(0);
@@ -85,8 +90,10 @@ const hasUnsavedChanges = ref(false);
 let timer: any;
 let autoSaveTimer: any;
 let retrySaveTimer: any;
+let draftHydrated = false;
 
 const currentQuestion = computed(() => examDetails.value?.questions[currentQuestionIndex.value]);
+const localDraftKey = computed(() => `smart_exam_local_draft_${props.attemptId}`);
 
 const formattedTime = computed(() => {
   const minutes = Math.floor(timeLeft.value / 60);
@@ -108,7 +115,11 @@ const saveStateText = computed(() => {
 });
 
 watch(answers, () => {
+  if (!draftHydrated) {
+    return;
+  }
   hasUnsavedChanges.value = true;
+  writeLocalDraft();
   if (saveState.value === 'saved') {
     saveState.value = 'idle';
   }
@@ -126,6 +137,8 @@ onMounted(async () => {
         // 草稿解析失败则忽略，按空白开始
       }
     }
+    await restoreLocalDraftIfNeeded();
+    draftHydrated = true;
     // 优先使用服务端剩余时间（基于开始时间计算），刷新不重置、也无法靠刷新刷时长
     timeLeft.value = response.data.remainingSeconds != null
       ? response.data.remainingSeconds
@@ -168,6 +181,7 @@ const persistDraft = async (manual: boolean) => {
   if (!examDetails.value) {
     return;
   }
+  writeLocalDraft();
   clearTimeout(retrySaveTimer);
   saveState.value = 'saving';
   try {
@@ -181,6 +195,7 @@ const persistDraft = async (manual: boolean) => {
   } catch (error) {
     saveState.value = 'failed';
     hasUnsavedChanges.value = true;
+    writeLocalDraft();
     retrySaveTimer = setTimeout(() => {
       persistDraft(false);
     }, 5000);
@@ -238,12 +253,14 @@ const submit = async (autoSubmit: boolean) => {
     const finalAnswers = { ...answers.value };
     // Process checkbox answers
      examDetails.value?.questions?.forEach(q => {
-      if (q.questionType === 'MULTIPLE_CHOICE' && Array.isArray(finalAnswers[q.questionId])) {
-        finalAnswers[q.questionId] = (finalAnswers[q.questionId] as string[]).sort().join('');
+      const questionId = Number((q as any).questionId ?? q.id);
+      if (q.questionType === 'MULTIPLE_CHOICE' && Array.isArray(finalAnswers[questionId])) {
+        finalAnswers[questionId] = (finalAnswers[questionId] as string[]).sort().join('');
       }
     });
     
     await submitExam(props.attemptId, { answers: finalAnswers });
+    clearLocalDraft();
     if(autoSubmit) {
         ElMessage.warning('考试时间到，已自动为您交卷！');
     } else {
@@ -252,8 +269,85 @@ const submit = async (autoSubmit: boolean) => {
     emit('submit-success');
   } catch (error) {
     ElMessage.error('交卷失败');
+    if (!autoSubmit && timeLeft.value > 0) {
+      startTimer();
+      startAutoSave();
+    }
   }
 };
+
+async function restoreLocalDraftIfNeeded() {
+  const localDraft = readLocalDraft();
+  if (!localDraft || !hasAnyAnswer(localDraft.answers)) {
+    return;
+  }
+  if (sameAnswers(localDraft.answers, answers.value)) {
+    return;
+  }
+  try {
+    await ElMessageBox.confirm(
+      `检测到本机保存的离线草稿（${new Date(localDraft.savedAt).toLocaleString()}），是否恢复？`,
+      '恢复本机草稿',
+      {
+        confirmButtonText: '恢复',
+        cancelButtonText: '保留服务器草稿',
+        type: 'warning'
+      }
+    );
+    answers.value = localDraft.answers;
+    hasUnsavedChanges.value = true;
+    saveState.value = 'idle';
+    ElMessage.success('已恢复本机草稿');
+  } catch {
+    writeLocalDraft();
+  }
+}
+
+function readLocalDraft(): LocalExamDraft | null {
+  try {
+    const raw = localStorage.getItem(localDraftKey.value);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as LocalExamDraft;
+    return parsed && parsed.answers ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalDraft() {
+  try {
+    localStorage.setItem(localDraftKey.value, JSON.stringify({
+      answers: answers.value,
+      savedAt: new Date().toISOString(),
+      examName: examDetails.value?.examName
+    }));
+  } catch {
+    // 浏览器存储不可用时，继续依赖服务端草稿。
+  }
+}
+
+function clearLocalDraft() {
+  try {
+    localStorage.removeItem(localDraftKey.value);
+  } catch {
+    // 忽略浏览器存储异常。
+  }
+}
+
+function hasAnyAnswer(value: Record<number, any>) {
+  return Object.values(value || {}).some((item) => {
+    if (Array.isArray(item)) {
+      return item.length > 0;
+    }
+    return item !== undefined && item !== null && String(item).trim() !== '';
+  });
+}
+
+function sameAnswers(a: Record<number, any>, b: Record<number, any>) {
+  return JSON.stringify(a || {}) === JSON.stringify(b || {});
+}
 
 </script>
 

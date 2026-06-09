@@ -202,11 +202,17 @@
           </template>
         </el-table-column>
         <el-table-column prop="creatorName" label="创建人" width="120" />
-        <el-table-column label="来源" width="150">
+        <el-table-column label="来源" width="190">
           <template #default="scope">
             <div class="source-cell" :title="scope.row.sourceDetail || sourceText(scope.row.sourceType)">
               <el-tag size="small" :type="sourceTag(scope.row.sourceType)">{{ sourceText(scope.row.sourceType) }}</el-tag>
               <small v-if="scope.row.sourceDetail">{{ scope.row.sourceDetail }}</small>
+              <small v-if="scope.row.sourcePage || scope.row.sourceParagraph">
+                页 {{ scope.row.sourcePage || '-' }} / 段 {{ scope.row.sourceParagraph || '-' }}
+              </small>
+              <small v-if="scope.row.aiModel || scope.row.promptVersion">
+                {{ scope.row.aiModel || 'AI' }} · {{ scope.row.promptVersion || 'prompt' }}
+              </small>
             </div>
           </template>
         </el-table-column>
@@ -386,6 +392,12 @@ const questionForm = reactive<QuestionPayload>({
   status: 0,
   sourceType: 'MANUAL',
   sourceDetail: null,
+  materialId: null,
+  sourcePage: null,
+  sourceParagraph: null,
+  sourceExcerpt: null,
+  aiModel: null,
+  promptVersion: null,
   options: defaultOptions('SINGLE_CHOICE')
 });
 
@@ -583,6 +595,12 @@ function editQuestion(row: QuestionInfo) {
   questionForm.status = row.status;
   questionForm.sourceType = row.sourceType || 'MANUAL';
   questionForm.sourceDetail = row.sourceDetail || null;
+  questionForm.materialId = row.materialId || null;
+  questionForm.sourcePage = row.sourcePage || null;
+  questionForm.sourceParagraph = row.sourceParagraph || null;
+  questionForm.sourceExcerpt = row.sourceExcerpt || null;
+  questionForm.aiModel = row.aiModel || null;
+  questionForm.promptVersion = row.promptVersion || null;
   questionForm.options = row.options?.length
     ? row.options.map((option) => ({ ...option, correct: isCorrectOption(option.correct) }))
     : defaultOptions(row.questionType);
@@ -678,7 +696,11 @@ async function exportQuestions() {
       status: statusText(q.status),
       creator: q.creatorName || '',
       source: sourceText(q.sourceType),
-      sourceDetail: q.sourceDetail || ''
+      sourceDetail: q.sourceDetail || '',
+      sourceLocation: q.sourcePage || q.sourceParagraph ? `页${q.sourcePage || '-'} / 段${q.sourceParagraph || '-'}` : '',
+      sourceExcerpt: q.sourceExcerpt || '',
+      aiModel: q.aiModel || '',
+      promptVersion: q.promptVersion || ''
     }));
     exportToCsv(`题库_${new Date().toISOString().slice(0, 10)}`, [
       { key: 'id', label: 'ID' },
@@ -692,7 +714,11 @@ async function exportQuestions() {
       { key: 'status', label: '状态' },
       { key: 'creator', label: '创建人' },
       { key: 'source', label: '来源' },
-      { key: 'sourceDetail', label: '来源说明' }
+      { key: 'sourceDetail', label: '来源说明' },
+      { key: 'sourceLocation', label: '来源页段' },
+      { key: 'sourceExcerpt', label: '来源片段' },
+      { key: 'aiModel', label: 'AI模型' },
+      { key: 'promptVersion', label: '提示词版本' }
     ], rows);
     ElMessage.success(`已导出 ${rows.length} 道题目`);
   } catch (error) {
@@ -715,6 +741,12 @@ function resetQuestionForm() {
   questionForm.status = 0;
   questionForm.sourceType = 'MANUAL';
   questionForm.sourceDetail = null;
+  questionForm.materialId = null;
+  questionForm.sourcePage = null;
+  questionForm.sourceParagraph = null;
+  questionForm.sourceExcerpt = null;
+  questionForm.aiModel = null;
+  questionForm.promptVersion = null;
   questionForm.options = defaultOptions('SINGLE_CHOICE');
 }
 
@@ -745,7 +777,8 @@ function sourceText(sourceType?: string) {
     MANUAL: '手动',
     AI_GENERATED: 'AI生成',
     AI_IMPORTED: '文档识别',
-    AI_MATERIAL: '材料生成'
+    AI_MATERIAL: '材料生成',
+    AI_RAG: '资料库/RAG'
   };
   return map[sourceType || 'MANUAL'] || '手动';
 }
@@ -754,6 +787,7 @@ function sourceTag(sourceType?: string) {
   if (sourceType === 'AI_GENERATED') return 'success';
   if (sourceType === 'AI_IMPORTED') return 'warning';
   if (sourceType === 'AI_MATERIAL') return 'primary';
+  if (sourceType === 'AI_RAG') return 'danger';
   return 'info';
 }
 
@@ -924,6 +958,12 @@ function setQuestionForm(payload: QuestionPayload) {
   questionForm.status = payload.status ?? 0;
   questionForm.sourceType = payload.sourceType || 'MANUAL';
   questionForm.sourceDetail = payload.sourceDetail || null;
+  questionForm.materialId = payload.materialId || null;
+  questionForm.sourcePage = payload.sourcePage || null;
+  questionForm.sourceParagraph = payload.sourceParagraph || null;
+  questionForm.sourceExcerpt = payload.sourceExcerpt || null;
+  questionForm.aiModel = payload.aiModel || null;
+  questionForm.promptVersion = payload.promptVersion || null;
   questionForm.options = payload.options?.length
     ? payload.options.map((option) => ({ ...option, correct: isCorrectOption(option.correct) }))
     : defaultOptions(payload.questionType);
@@ -942,6 +982,12 @@ function normalizeAiDraft(draft: AiGeneratedQuestion): AiGeneratedQuestion {
     status: 0,
     sourceType: draft.sourceType || 'AI_GENERATED',
     sourceDetail: draft.sourceDetail || null,
+    materialId: draft.materialId || null,
+    sourcePage: draft.sourcePage || null,
+    sourceParagraph: draft.sourceParagraph || null,
+    sourceExcerpt: draft.sourceExcerpt || null,
+    aiModel: draft.aiModel || null,
+    promptVersion: draft.promptVersion || null,
     options: draft.options || []
   };
   if (isObjectiveType(normalized.questionType)) {

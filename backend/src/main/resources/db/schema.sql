@@ -263,14 +263,21 @@ CREATE TABLE IF NOT EXISTS question (
   status             TINYINT       NOT NULL DEFAULT 0 COMMENT '0草稿 1已发布',
   deleted            TINYINT       NOT NULL DEFAULT 0,
   created_by         BIGINT        DEFAULT NULL,
-  source_type        VARCHAR(32)   NOT NULL DEFAULT 'MANUAL' COMMENT '来源：MANUAL手动/AI_GENERATED生成/AI_IMPORTED识别/AI_MATERIAL材料生成',
+  source_type        VARCHAR(32)   NOT NULL DEFAULT 'MANUAL' COMMENT '来源：MANUAL手动/AI_GENERATED生成/AI_IMPORTED识别/AI_MATERIAL材料生成/AI_RAG资料库生成',
   source_detail      VARCHAR(255)  DEFAULT NULL COMMENT '来源说明，如上传文件名或生成入口',
+  material_id        BIGINT        DEFAULT NULL COMMENT '来源资料 course_material.id',
+  source_page        INT           DEFAULT NULL COMMENT '来源页码/幻灯片序号',
+  source_paragraph   INT           DEFAULT NULL COMMENT '来源段落序号',
+  source_excerpt     VARCHAR(500)  DEFAULT NULL COMMENT '来源片段',
+  ai_model           VARCHAR(64)   DEFAULT NULL COMMENT '生成使用的 AI 模型',
+  prompt_version     VARCHAR(64)   DEFAULT NULL COMMENT '生成使用的提示词版本',
   created_at         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_question_subject (subject_id),
   KEY idx_question_kp (knowledge_point_id),
-  KEY idx_question_source (source_type)
+  KEY idx_question_source (source_type),
+  KEY idx_question_material (material_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='题目';
 
 CREATE TABLE IF NOT EXISTS question_option (
@@ -487,6 +494,53 @@ CREATE TABLE IF NOT EXISTS ai_prompt_template (
   PRIMARY KEY (id),
   UNIQUE KEY uk_prompt_code (template_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 提示词模板';
+
+CREATE TABLE IF NOT EXISTS course_material (
+  id           BIGINT       NOT NULL AUTO_INCREMENT,
+  subject_id   BIGINT       NOT NULL COMMENT '关联科目 edu_subject.id',
+  title        VARCHAR(200) NOT NULL COMMENT '资料标题',
+  file_name    VARCHAR(255) DEFAULT NULL COMMENT '原始文件名',
+  file_type    VARCHAR(32)  DEFAULT NULL COMMENT '文件扩展名',
+  content_text MEDIUMTEXT   COMMENT '抽取后的资料文本',
+  outline_json MEDIUMTEXT   COMMENT 'AI/规则生成的知识点大纲 JSON',
+  uploaded_by  BIGINT       DEFAULT NULL COMMENT '上传人 sys_user.id',
+  status       TINYINT      NOT NULL DEFAULT 1,
+  deleted      TINYINT      NOT NULL DEFAULT 0,
+  created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_material_subject (subject_id),
+  KEY idx_material_uploader (uploaded_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程资料库';
+
+CREATE TABLE IF NOT EXISTS course_material_chunk (
+  id           BIGINT       NOT NULL AUTO_INCREMENT,
+  material_id  BIGINT       NOT NULL COMMENT '课程资料 course_material.id',
+  chunk_order  INT          NOT NULL DEFAULT 0,
+  page_no      INT          NOT NULL DEFAULT 1 COMMENT '页码/幻灯片序号',
+  paragraph_no INT          NOT NULL DEFAULT 1 COMMENT '段落序号',
+  heading      VARCHAR(200) DEFAULT NULL,
+  content      TEXT         NOT NULL COMMENT '分段内容',
+  keywords     VARCHAR(500) DEFAULT NULL,
+  created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_material_chunk_material (material_id, chunk_order),
+  KEY idx_material_chunk_location (material_id, page_no, paragraph_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程资料分段';
+
+CREATE TABLE IF NOT EXISTS course_material_outline (
+  id               BIGINT       NOT NULL AUTO_INCREMENT,
+  material_id       BIGINT      NOT NULL COMMENT '课程资料 course_material.id',
+  outline_order     INT         NOT NULL DEFAULT 0,
+  title             VARCHAR(200) NOT NULL COMMENT '知识点标题',
+  summary           VARCHAR(1000) DEFAULT NULL COMMENT '知识点摘要',
+  keywords          VARCHAR(500) DEFAULT NULL COMMENT '关键词',
+  source_page       INT         DEFAULT NULL,
+  source_paragraph  INT         DEFAULT NULL,
+  created_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_material_outline_material (material_id, outline_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程资料知识点大纲';
 
 CREATE TABLE IF NOT EXISTS ai_usage_log (
   id            BIGINT       NOT NULL AUTO_INCREMENT,

@@ -48,6 +48,7 @@ CREATE DATABASE IF NOT EXISTS smart_exam_system
 | 基础数据 | `/api/basic/classes`, `/api/basic/courses`, `/api/basic/class-courses`, `/api/basic/teaching-assignments`, `/api/basic/student-memberships`, `/api/basic/subjects`, `/api/basic/knowledge-points`, `/api/basic/notices`, `/api/basic/summary` |
 | 题库 | `/api/questions`, `/api/questions/summary`, `/api/questions/{id}/status` |
 | AI | `/api/ai/status`, `/api/ai/questions/generate`, `/api/ai/questions/import-document`, `/api/ai/questions/generate-from-material`, `/api/ai/questions/save`, `/api/ai/wrong-question/explain`, `/api/ai/suggest-review` |
+| 资料库/RAG | `/api/materials`, `/api/materials/{id}`, `/api/materials/{id}/questions/generate` |
 | 试卷 | `/api/papers`, `/api/papers/generate`, `/api/papers/{id}/status` |
 | 考试 | `/api/exams`, `/api/exams/teacher`, `/api/exams/student`, `/api/exams/attempt/{id}/start`, `/api/exams/attempt/{id}/save`, `/api/exams/attempt/{id}/submit` |
 | 阅卷 | `/api/reviews/pending`, `/api/reviews/attempt/{id}` |

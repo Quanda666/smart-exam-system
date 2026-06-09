@@ -47,6 +47,7 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
         ensureEmailVerificationTable(jdbc);
         ensureV4Columns(jdbc);
         ensureQuestionSourceColumns(jdbc);
+        ensureRagTables(jdbc);
         ensureV4Tables(jdbc);
         backfillV4Data(jdbc);
     }
@@ -120,12 +121,80 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
     private void ensureQuestionSourceColumns(JdbcTemplate jdbc) {
         addColumnIfMissing(jdbc, "question", "source_type",
                 "ALTER TABLE question ADD COLUMN source_type VARCHAR(32) NOT NULL DEFAULT 'MANUAL' "
-                        + "COMMENT '来源：MANUAL手动/AI_GENERATED生成/AI_IMPORTED识别/AI_MATERIAL材料生成' AFTER created_by");
+                        + "COMMENT '来源：MANUAL手动/AI_GENERATED生成/AI_IMPORTED识别/AI_MATERIAL材料生成/AI_RAG资料库生成' AFTER created_by");
         addColumnIfMissing(jdbc, "question", "source_detail",
                 "ALTER TABLE question ADD COLUMN source_detail VARCHAR(255) DEFAULT NULL "
                         + "COMMENT '来源说明，如上传文件名或生成入口' AFTER source_type");
+        addColumnIfMissing(jdbc, "question", "material_id",
+                "ALTER TABLE question ADD COLUMN material_id BIGINT DEFAULT NULL COMMENT '来源资料 course_material.id' AFTER source_detail");
+        addColumnIfMissing(jdbc, "question", "source_page",
+                "ALTER TABLE question ADD COLUMN source_page INT DEFAULT NULL COMMENT '来源页码/幻灯片序号' AFTER material_id");
+        addColumnIfMissing(jdbc, "question", "source_paragraph",
+                "ALTER TABLE question ADD COLUMN source_paragraph INT DEFAULT NULL COMMENT '来源段落序号' AFTER source_page");
+        addColumnIfMissing(jdbc, "question", "source_excerpt",
+                "ALTER TABLE question ADD COLUMN source_excerpt VARCHAR(500) DEFAULT NULL COMMENT '来源片段' AFTER source_paragraph");
+        addColumnIfMissing(jdbc, "question", "ai_model",
+                "ALTER TABLE question ADD COLUMN ai_model VARCHAR(64) DEFAULT NULL COMMENT '生成使用的 AI 模型' AFTER source_excerpt");
+        addColumnIfMissing(jdbc, "question", "prompt_version",
+                "ALTER TABLE question ADD COLUMN prompt_version VARCHAR(64) DEFAULT NULL COMMENT '生成使用的提示词版本' AFTER ai_model");
         addIndexIfMissing(jdbc, "question", "idx_question_source",
                 "ALTER TABLE question ADD INDEX idx_question_source (source_type)");
+        addIndexIfMissing(jdbc, "question", "idx_question_material",
+                "ALTER TABLE question ADD INDEX idx_question_material (material_id)");
+    }
+
+    /** 资料库/RAG：课程资料、分段和知识点大纲。 */
+    private void ensureRagTables(JdbcTemplate jdbc) {
+        executeQuietly(jdbc, "创建 course_material 表", """
+                CREATE TABLE IF NOT EXISTS course_material (
+                  id           BIGINT       NOT NULL AUTO_INCREMENT,
+                  subject_id   BIGINT       NOT NULL COMMENT '关联科目 edu_subject.id',
+                  title        VARCHAR(200) NOT NULL COMMENT '资料标题',
+                  file_name    VARCHAR(255) DEFAULT NULL COMMENT '原始文件名',
+                  file_type    VARCHAR(32)  DEFAULT NULL COMMENT '文件扩展名',
+                  content_text MEDIUMTEXT   COMMENT '抽取后的资料文本',
+                  outline_json MEDIUMTEXT   COMMENT 'AI/规则生成的知识点大纲 JSON',
+                  uploaded_by  BIGINT       DEFAULT NULL COMMENT '上传人 sys_user.id',
+                  status       TINYINT      NOT NULL DEFAULT 1,
+                  deleted      TINYINT      NOT NULL DEFAULT 0,
+                  created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  updated_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                  PRIMARY KEY (id),
+                  KEY idx_material_subject (subject_id),
+                  KEY idx_material_uploader (uploaded_by)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程资料库'
+                """);
+        executeQuietly(jdbc, "创建 course_material_chunk 表", """
+                CREATE TABLE IF NOT EXISTS course_material_chunk (
+                  id           BIGINT       NOT NULL AUTO_INCREMENT,
+                  material_id  BIGINT       NOT NULL COMMENT '课程资料 course_material.id',
+                  chunk_order  INT          NOT NULL DEFAULT 0,
+                  page_no      INT          NOT NULL DEFAULT 1 COMMENT '页码/幻灯片序号',
+                  paragraph_no INT          NOT NULL DEFAULT 1 COMMENT '段落序号',
+                  heading      VARCHAR(200) DEFAULT NULL,
+                  content      TEXT         NOT NULL COMMENT '分段内容',
+                  keywords     VARCHAR(500) DEFAULT NULL,
+                  created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  PRIMARY KEY (id),
+                  KEY idx_material_chunk_material (material_id, chunk_order),
+                  KEY idx_material_chunk_location (material_id, page_no, paragraph_no)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程资料分段'
+                """);
+        executeQuietly(jdbc, "创建 course_material_outline 表", """
+                CREATE TABLE IF NOT EXISTS course_material_outline (
+                  id               BIGINT       NOT NULL AUTO_INCREMENT,
+                  material_id       BIGINT      NOT NULL COMMENT '课程资料 course_material.id',
+                  outline_order     INT         NOT NULL DEFAULT 0,
+                  title             VARCHAR(200) NOT NULL COMMENT '知识点标题',
+                  summary           VARCHAR(1000) DEFAULT NULL COMMENT '知识点摘要',
+                  keywords          VARCHAR(500) DEFAULT NULL COMMENT '关键词',
+                  source_page       INT         DEFAULT NULL,
+                  source_paragraph  INT         DEFAULT NULL,
+                  created_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  PRIMARY KEY (id),
+                  KEY idx_material_outline_material (material_id, outline_order)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程资料知识点大纲'
+                """);
     }
 
     /** V4.0：创建课程、开课、授课、选课、公告目标、考试目标等新关系表。 */

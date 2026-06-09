@@ -81,6 +81,9 @@ mysql -u root -p smart_exam_system < backend/src/main/resources/db/data.sql
 | `notification` | 通知 |
 | `ai_provider_config` | AI 服务配置记录 |
 | `ai_prompt_template` | AI 提示词模板 |
+| `course_material` | 课程资料库，保存上传资料文本和大纲 JSON |
+| `course_material_chunk` | 课程资料分段，记录页码/段落和片段内容 |
+| `course_material_outline` | 课程资料知识点大纲 |
 | `ai_usage_log` | AI 调用日志，记录场景、用户、提示词、响应和失败原因 |
 
 ## 设计约定
@@ -90,7 +93,7 @@ mysql -u root -p smart_exam_system < backend/src/main/resources/db/data.sql
 - `schema.sql` 包含旧库兼容说明，部分历史库缺列由启动迁移逻辑补齐。
 - 考试、答题、阅卷、错题和日志表保留时间字段，便于审计和统计。
 - AI 结果先进入业务草稿，不直接发布题目或决定主观题分数。
-- AI 草稿保存到题库时写入 `source_type`、`source_detail`，便于追溯直接生成、文档识别和课程材料生成来源。
+- AI 草稿保存到题库时写入 `source_type`、`source_detail`、`material_id`、`source_page`、`source_paragraph`、`source_excerpt`、`ai_model`、`prompt_version`，便于追溯直接生成、文档识别、课程材料生成和资料库/RAG 生成来源。
 - 用户密码优先使用 PBKDF2 哈希；历史 SHA-256 哈希在密码登录成功后自动升级。
 
 ## 初始数据

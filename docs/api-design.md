@@ -68,6 +68,10 @@
 | POST | `/api/ai/questions/save` | 保存 AI 草稿到题库 |
 | POST | `/api/ai/wrong-question/explain` | 错题 AI 讲解 |
 | POST | `/api/ai/suggest-review` | 主观题评分建议 |
+| POST | `/api/materials` | 上传课程资料，抽取文本并生成知识点大纲 |
+| GET | `/api/materials` | 资料库列表 |
+| GET | `/api/materials/{id}` | 资料详情、知识点大纲和分段 |
+| POST | `/api/materials/{id}/questions/generate` | 基于资料库分段检索生成题目草稿 |
 
 已移除旧接口：`/api/ai/generate-question`、`/api/ai/explain`。
 

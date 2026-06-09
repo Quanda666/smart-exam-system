@@ -41,10 +41,10 @@ mysql -u root -p smart_exam_system < backend/src/main/resources/db/data.sql
 - 学习反馈：`wrong_question_book`
 - 监控与日志：`cheat_event`、`operation_log`
 - 通知：`notification`
-- AI：`ai_provider_config`、`ai_prompt_template`、`ai_usage_log`
+- AI：`ai_provider_config`、`ai_prompt_template`、`course_material`、`course_material_chunk`、`course_material_outline`、`ai_usage_log`
 - 邮箱与会话：`email_verification`、`user_token`
 
-`question` 表保留 `source_type` 与 `source_detail`，用于追踪手动题、AI 直接生成、题目文档识别和课程材料生成来源。
+`question` 表保留来源类型、资料 ID、来源页码/段落、来源片段、AI 模型和提示词版本，用于追踪手动题、AI 直接生成、题目文档识别、课程材料生成和资料库/RAG 生成来源。
 
 ## 初始数据
 

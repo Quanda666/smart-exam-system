@@ -29,6 +29,12 @@ export interface QuestionInfo {
   creatorName?: string;
   sourceType?: string;
   sourceDetail?: string | null;
+  materialId?: number | null;
+  sourcePage?: number | null;
+  sourceParagraph?: number | null;
+  sourceExcerpt?: string | null;
+  aiModel?: string | null;
+  promptVersion?: string | null;
   createdAt?: string;
   updatedAt?: string;
   options: QuestionOption[];
@@ -46,6 +52,12 @@ export interface QuestionPayload {
   status: number;
   sourceType?: string;
   sourceDetail?: string | null;
+  materialId?: number | null;
+  sourcePage?: number | null;
+  sourceParagraph?: number | null;
+  sourceExcerpt?: string | null;
+  aiModel?: string | null;
+  promptVersion?: string | null;
   options: QuestionOption[];
 }
 

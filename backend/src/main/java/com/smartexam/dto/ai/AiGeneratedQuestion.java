@@ -53,6 +53,21 @@ public class AiGeneratedQuestion {
     @Size(max = 255, message = "来源说明长度不能超过255个字符")
     private String sourceDetail;
 
+    private Long materialId;
+
+    private Integer sourcePage;
+
+    private Integer sourceParagraph;
+
+    @Size(max = 500, message = "来源片段长度不能超过500个字符")
+    private String sourceExcerpt;
+
+    @Size(max = 64, message = "AI模型长度不能超过64个字符")
+    private String aiModel;
+
+    @Size(max = 64, message = "提示词版本长度不能超过64个字符")
+    private String promptVersion;
+
     @Valid
     private List<AiGeneratedQuestionOption> options = new ArrayList<>();
 
@@ -142,6 +157,54 @@ public class AiGeneratedQuestion {
 
     public void setSourceDetail(String sourceDetail) {
         this.sourceDetail = sourceDetail;
+    }
+
+    public Long getMaterialId() {
+        return materialId;
+    }
+
+    public void setMaterialId(Long materialId) {
+        this.materialId = materialId;
+    }
+
+    public Integer getSourcePage() {
+        return sourcePage;
+    }
+
+    public void setSourcePage(Integer sourcePage) {
+        this.sourcePage = sourcePage;
+    }
+
+    public Integer getSourceParagraph() {
+        return sourceParagraph;
+    }
+
+    public void setSourceParagraph(Integer sourceParagraph) {
+        this.sourceParagraph = sourceParagraph;
+    }
+
+    public String getSourceExcerpt() {
+        return sourceExcerpt;
+    }
+
+    public void setSourceExcerpt(String sourceExcerpt) {
+        this.sourceExcerpt = sourceExcerpt;
+    }
+
+    public String getAiModel() {
+        return aiModel;
+    }
+
+    public void setAiModel(String aiModel) {
+        this.aiModel = aiModel;
+    }
+
+    public String getPromptVersion() {
+        return promptVersion;
+    }
+
+    public void setPromptVersion(String promptVersion) {
+        this.promptVersion = promptVersion;
     }
 
     public List<AiGeneratedQuestionOption> getOptions() {

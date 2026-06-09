@@ -23,7 +23,7 @@ public class QuestionBankService {
     private static final List<String> OBJECTIVE_TYPES = List.of("SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE");
     private static final List<String> ALL_TYPES = List.of("SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_BLANK", "SUBJECTIVE");
     private static final List<String> ALL_DIFFICULTIES = List.of("EASY", "MEDIUM", "HARD");
-    private static final List<String> SOURCE_TYPES = List.of("MANUAL", "AI_GENERATED", "AI_IMPORTED", "AI_MATERIAL");
+    private static final List<String> SOURCE_TYPES = List.of("MANUAL", "AI_GENERATED", "AI_IMPORTED", "AI_MATERIAL", "AI_RAG");
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
@@ -42,6 +42,8 @@ public class QuestionBankService {
                        q.question_type AS questionType, q.difficulty, q.stem, q.correct_answer AS correctAnswer,
                        q.analysis, q.default_score AS defaultScore, q.status, q.created_by AS createdBy,
                        q.source_type AS sourceType, q.source_detail AS sourceDetail,
+                       q.material_id AS materialId, q.source_page AS sourcePage, q.source_paragraph AS sourceParagraph,
+                       q.source_excerpt AS sourceExcerpt, q.ai_model AS aiModel, q.prompt_version AS promptVersion,
                        u.real_name AS creatorName, q.created_at AS createdAt, q.updated_at AS updatedAt
                 FROM question q
                 JOIN edu_subject s ON s.id = q.subject_id
@@ -94,6 +96,8 @@ public class QuestionBankService {
                        q.question_type AS questionType, q.difficulty, q.stem, q.correct_answer AS correctAnswer,
                        q.analysis, q.default_score AS defaultScore, q.status, q.created_by AS createdBy,
                        q.source_type AS sourceType, q.source_detail AS sourceDetail,
+                       q.material_id AS materialId, q.source_page AS sourcePage, q.source_paragraph AS sourceParagraph,
+                       q.source_excerpt AS sourceExcerpt, q.ai_model AS aiModel, q.prompt_version AS promptVersion,
                        u.real_name AS creatorName, q.created_at AS createdAt, q.updated_at AS updatedAt
                 FROM question q
                 JOIN edu_subject s ON s.id = q.subject_id
@@ -122,12 +126,15 @@ public class QuestionBankService {
         try {
             jdbcTemplate.update("""
                     INSERT INTO question (subject_id, knowledge_point_id, question_type, difficulty, stem, correct_answer,
-                                          analysis, default_score, status, created_by, source_type, source_detail)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                          analysis, default_score, status, created_by, source_type, source_detail,
+                                          material_id, source_page, source_paragraph, source_excerpt, ai_model, prompt_version)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, request.getSubjectId(), request.getKnowledgePointId(), normalizeCode(request.getQuestionType()),
                     normalizeCode(request.getDifficulty()), trim(request.getStem()), trim(request.getCorrectAnswer()), trim(request.getAnalysis()),
                     request.getDefaultScore(), request.getStatus(), creator.getId(), questionSourceTypeOrDefault(request.getSourceType()),
-                    blankToNull(request.getSourceDetail()));
+                    blankToNull(request.getSourceDetail()), request.getMaterialId(), positiveOrNull(request.getSourcePage()),
+                    positiveOrNull(request.getSourceParagraph()), truncate(blankToNull(request.getSourceExcerpt()), 500),
+                    truncate(blankToNull(request.getAiModel()), 64), truncate(blankToNull(request.getPromptVersion()), 64));
             Long id = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
             replaceOptionsInDatabase(id, request.getOptions());
             return getQuestionById(id);
@@ -160,12 +167,17 @@ public class QuestionBankService {
                     UPDATE question
                     SET subject_id = ?, knowledge_point_id = ?, question_type = ?, difficulty = ?, stem = ?, correct_answer = ?,
                         analysis = ?, default_score = ?, status = ?, source_type = COALESCE(?, source_type),
-                        source_detail = COALESCE(?, source_detail)
+                        source_detail = COALESCE(?, source_detail), material_id = COALESCE(?, material_id),
+                        source_page = COALESCE(?, source_page), source_paragraph = COALESCE(?, source_paragraph),
+                        source_excerpt = COALESCE(?, source_excerpt), ai_model = COALESCE(?, ai_model),
+                        prompt_version = COALESCE(?, prompt_version)
                     WHERE id = ? AND deleted = 0
                     """, request.getSubjectId(), request.getKnowledgePointId(), normalizeCode(request.getQuestionType()),
                     normalizeCode(request.getDifficulty()), trim(request.getStem()), trim(request.getCorrectAnswer()), trim(request.getAnalysis()),
                     request.getDefaultScore(), request.getStatus(), questionSourceTypeOrNull(request.getSourceType()),
-                    blankToNull(request.getSourceDetail()), id);
+                    blankToNull(request.getSourceDetail()), request.getMaterialId(), positiveOrNull(request.getSourcePage()),
+                    positiveOrNull(request.getSourceParagraph()), truncate(blankToNull(request.getSourceExcerpt()), 500),
+                    truncate(blankToNull(request.getAiModel()), 64), truncate(blankToNull(request.getPromptVersion()), 64), id);
             if (rows == 0) {
                 throw new IllegalArgumentException("题目不存在");
             }
@@ -250,6 +262,8 @@ public class QuestionBankService {
                        q.question_type AS questionType, q.difficulty, q.stem, q.correct_answer AS correctAnswer,
                        q.analysis, q.default_score AS defaultScore, q.status, q.created_by AS createdBy,
                        q.source_type AS sourceType, q.source_detail AS sourceDetail,
+                       q.material_id AS materialId, q.source_page AS sourcePage, q.source_paragraph AS sourceParagraph,
+                       q.source_excerpt AS sourceExcerpt, q.ai_model AS aiModel, q.prompt_version AS promptVersion,
                        u.real_name AS creatorName, q.created_at AS createdAt, q.updated_at AS updatedAt
                 FROM question q
                 JOIN edu_subject s ON s.id = q.subject_id
@@ -339,6 +353,17 @@ public class QuestionBankService {
     private String blankToNull(String value) {
         String trimmed = trim(value);
         return trimmed == null || trimmed.isBlank() ? null : trimmed;
+    }
+
+    private Integer positiveOrNull(Integer value) {
+        return value == null || value <= 0 ? null : value;
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
     }
 
     /**
