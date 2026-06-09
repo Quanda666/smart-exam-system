@@ -330,6 +330,8 @@ CREATE TABLE IF NOT EXISTS exam (
   start_time       DATETIME     DEFAULT NULL,
   end_time         DATETIME     DEFAULT NULL,
   duration_minutes INT          DEFAULT NULL COMMENT '时长（分钟）',
+  max_attempts     INT          NOT NULL DEFAULT 1 COMMENT '允许考试次数',
+  pass_score       DECIMAL(10,2) DEFAULT NULL COMMENT '及格线',
   status           TINYINT      NOT NULL DEFAULT 0,
   deleted          TINYINT      NOT NULL DEFAULT 0,
   created_by       BIGINT       DEFAULT NULL,

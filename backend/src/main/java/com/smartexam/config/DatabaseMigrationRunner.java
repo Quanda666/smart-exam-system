@@ -46,6 +46,7 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
         ensureSysUserAvatarColumn(jdbc);
         ensureEmailVerificationTable(jdbc);
         ensureV4Columns(jdbc);
+        ensureExamPublishColumns(jdbc);
         ensureQuestionSourceColumns(jdbc);
         ensureRagTables(jdbc);
         ensureV4Tables(jdbc);
@@ -115,6 +116,14 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
                 "ALTER TABLE edu_class ADD INDEX idx_class_type (class_type)");
         addIndexIfMissing(jdbc, "exam_class", "idx_ec_class",
                 "ALTER TABLE exam_class ADD INDEX idx_ec_class (class_id)");
+    }
+
+    /** 考试发布流程设置：次数限制与及格线。 */
+    private void ensureExamPublishColumns(JdbcTemplate jdbc) {
+        addColumnIfMissing(jdbc, "exam", "max_attempts",
+                "ALTER TABLE exam ADD COLUMN max_attempts INT NOT NULL DEFAULT 1 COMMENT '允许考试次数' AFTER duration_minutes");
+        addColumnIfMissing(jdbc, "exam", "pass_score",
+                "ALTER TABLE exam ADD COLUMN pass_score DECIMAL(10,2) DEFAULT NULL COMMENT '及格线' AFTER max_attempts");
     }
 
     /** AI 题目进入题库后保留来源，方便审计和后续质量统计。 */

@@ -75,6 +75,7 @@ public class ExamService {
         List<Map<String, Object>> list = jt.queryForList("""
                 SELECT e.id, e.paper_id AS paperId, e.exam_name AS examName, e.description,
                        e.start_time AS startTime, e.end_time AS endTime, e.duration_minutes AS durationMinutes,
+                       e.max_attempts AS maxAttempts, e.pass_score AS passScore,
                        e.status, e.created_by AS createdBy, p.paper_name AS paperName, s.subject_name AS subjectName,
                        (SELECT GROUP_CONCAT(CONCAT(et.target_type, ':', et.target_id, ':', et.target_code) ORDER BY et.id SEPARATOR ',')
                         FROM exam_target et WHERE et.exam_id = e.id) AS targetSummary,
@@ -110,6 +111,7 @@ public class ExamService {
         List<Map<String, Object>> list = jt.queryForList("""
                 SELECT a.id AS attemptId, e.id AS examId, e.exam_name AS examName, e.description,
                        e.start_time AS startTime, e.end_time AS endTime, e.duration_minutes AS durationMinutes,
+                       e.max_attempts AS maxAttempts, e.pass_score AS passScore,
                        a.status, p.paper_name AS paperName, s.subject_name AS subjectName, a.score,
                        a.submit_time AS submitTime
                 FROM exam_attempt a
@@ -127,16 +129,37 @@ public class ExamService {
         return listStudentExams(user, 1, 200).getList();
     }
 
+    public List<Map<String, Object>> listTargetStudents(AuthUser user) {
+        JdbcTemplate jt = requireJdbcTemplate();
+        List<Long> studentIds = teachingScopeService.visibleStudentUserIds(user);
+        if (studentIds == null || studentIds.isEmpty()) {
+            return List.of();
+        }
+        String placeholders = String.join(",", studentIds.stream().map(id -> "?").toList());
+        return jt.queryForList("""
+                SELECT u.id AS userId, u.real_name AS realName, sp.student_no AS studentNo,
+                       c.class_name AS className, c.class_code AS classCode
+                FROM sys_user u
+                LEFT JOIN student_profile sp ON sp.user_id = u.id AND sp.deleted = 0
+                LEFT JOIN edu_class c ON c.id = sp.primary_class_id AND c.deleted = 0
+                WHERE u.deleted = 0 AND u.status = 1 AND u.id IN (
+                """ + placeholders + """
+                )
+                ORDER BY c.class_name, sp.student_no, u.real_name
+                """, studentIds.toArray());
+    }
+
     @Transactional
     public Map<String, Object> createExam(ExamRequest request, AuthUser creator) {
         validateExamRequest(request);
         JdbcTemplate jt = requireJdbcTemplate();
         List<TargetSpec> targets = normalizeExamTargets(request, creator);
         jt.update("""
-                INSERT INTO exam (paper_id, exam_name, description, start_time, end_time, duration_minutes, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO exam (paper_id, exam_name, description, start_time, end_time, duration_minutes, max_attempts, pass_score, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, request.getPaperId(), trim(request.getExamName()), trim(request.getDescription()),
-                request.getStartTime(), request.getEndTime(), request.getDurationMinutes(), creator.getId());
+                request.getStartTime(), request.getEndTime(), request.getDurationMinutes(), request.getMaxAttempts(),
+                request.getPassScore(), creator.getId());
         Long examId = jt.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
 
         for (TargetSpec target : targets) {
@@ -167,6 +190,9 @@ public class ExamService {
         JdbcTemplate jt = requireJdbcTemplate();
         Map<String, Object> exam = jt.queryForMap("""
                 SELECT e.*, p.paper_name AS paperName,
+                       e.paper_id AS paperId, e.exam_name AS examName, e.start_time AS startTime,
+                       e.end_time AS endTime, e.duration_minutes AS durationMinutes,
+                       e.max_attempts AS maxAttempts, e.pass_score AS passScore,
                        (SELECT GROUP_CONCAT(CONCAT(et.target_type, ':', et.target_id, ':', et.target_code) ORDER BY et.id SEPARATOR ',')
                         FROM exam_target et WHERE et.exam_id = e.id) AS targetSummary
                 FROM exam e
@@ -200,7 +226,8 @@ public class ExamService {
         Map<String, Object> exam = jt.queryForMap("""
                 SELECT e.*, e.id AS examId, e.paper_id AS paperId, e.exam_name AS examName,
                        e.start_time AS startTime, e.end_time AS endTime,
-                       e.duration_minutes AS durationMinutes, p.total_score AS totalScore,
+                       e.duration_minutes AS durationMinutes, e.max_attempts AS maxAttempts,
+                       e.pass_score AS passScore, p.total_score AS totalScore,
                        p.paper_name AS paperName
                 FROM exam e
                 JOIN paper p ON e.paper_id = p.id
@@ -338,10 +365,11 @@ public class ExamService {
         JdbcTemplate jt = requireJdbcTemplate();
         jt.update("""
                 UPDATE exam
-                SET exam_name = ?, description = ?, start_time = ?, end_time = ?, duration_minutes = ?
+                SET exam_name = ?, description = ?, start_time = ?, end_time = ?, duration_minutes = ?,
+                    max_attempts = ?, pass_score = ?
                 WHERE id = ? AND deleted = 0
                 """, trim(request.getExamName()), trim(request.getDescription()), request.getStartTime(),
-                request.getEndTime(), request.getDurationMinutes(), id);
+                request.getEndTime(), request.getDurationMinutes(), request.getMaxAttempts(), request.getPassScore(), id);
         return getExamById(id);
     }
 

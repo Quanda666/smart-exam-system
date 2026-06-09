@@ -10,6 +10,8 @@ export interface ExamInfo {
   startTime: string;
   endTime: string;
   durationMinutes: number;
+  maxAttempts?: number;
+  passScore?: number | null;
   status: number;
   paperName?: string;
   subjectName?: string;
@@ -26,11 +28,21 @@ export interface StudentExamInfo {
   startTime: string;
   endTime: string;
   durationMinutes: number;
+  maxAttempts?: number;
+  passScore?: number | null;
   status: number;
   paperName: string;
   subjectName: string;
   score?: number;
   submitTime?: string;
+}
+
+export interface ExamTargetStudentInfo {
+  userId: number;
+  realName: string;
+  studentNo?: string;
+  className?: string;
+  classCode?: string;
 }
 
 export interface ExamPayload {
@@ -40,6 +52,8 @@ export interface ExamPayload {
   startTime: string;
   endTime: string;
   durationMinutes: number;
+  maxAttempts: number;
+  passScore?: number | null;
   classIds?: number[];
   classCourseIds?: number[];
   studentUserIds?: number[];
@@ -52,6 +66,8 @@ export interface AnswerPayload {
 export interface ExamDetail extends PaperInfo {
   examName: string;
   durationMinutes: number;
+  maxAttempts?: number;
+  passScore?: number | null;
   questions: Array<PaperQuestionInfo & { options?: Array<Omit<QuestionOption, 'correct'> & { correct?: boolean | number }> }>;
   remainingSeconds?: number;
   draftAnswers?: string | null;
@@ -78,6 +94,10 @@ export function listStudentExams(page = 1, size = 10) {
   return getJson<PageResult<StudentExamInfo>>(`/api/exams/student?page=${page}&size=${size}`);
 }
 
+export function listExamTargetStudents() {
+  return getJson<ExamTargetStudentInfo[]>('/api/exams/targets/students');
+}
+
 export function createExam(payload: ExamPayload) {
   return postJson<ExamInfo, ExamPayload>('/api/exams', payload);
 }
@@ -88,6 +108,8 @@ export interface ExamUpdatePayload {
   startTime: string;
   endTime: string;
   durationMinutes: number;
+  maxAttempts: number;
+  passScore?: number | null;
 }
 
 export function updateExam(id: number, payload: ExamUpdatePayload) {

@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -52,6 +53,12 @@ public class ExamController {
                                                                           @RequestParam(defaultValue = "10") int size) {
         AuthUser user = roleAccessService.requireRole("STUDENT");
         return ApiResponse.ok(examService.listStudentExams(user, page, size));
+    }
+
+    @GetMapping("/targets/students")
+    public ApiResponse<List<Map<String, Object>>> listTargetStudents() {
+        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        return ApiResponse.ok(examService.listTargetStudents(user));
     }
 
     @PostMapping

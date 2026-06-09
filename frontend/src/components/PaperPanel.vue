@@ -149,8 +149,12 @@
               <el-select v-model="rule.difficulty" placeholder="难度" clearable>
                 <el-option v-for="item in difficulties" :key="item.value" :label="item.label" :value="item.value" />
               </el-select>
-              <el-input-number v-model="rule.count" :min="1" controls-position="right" />
+              <el-input-number v-model="rule.count" :min="0" controls-position="right" />
               <el-input-number v-model="rule.score" :min="0.5" :step="0.5" :precision="1" controls-position="right" />
+              <div :class="['rule-state', { shortage: Number(rule.count || 0) > ruleAvailableCount(rule) }]">
+                <span>可用 {{ ruleAvailableCount(rule) }} 题</span>
+                <strong>{{ Number(rule.count || 0) * Number(rule.score || 0) }} 分</strong>
+              </div>
               <el-button link type="danger" :icon="Close" @click="removeRule(index)">删除</el-button>
             </article>
           </div>
@@ -165,26 +169,48 @@
           </div>
         </div>
 
+        <div class="paper-blueprint">
+          <div
+            v-for="item in creationMode === 'manual' ? manualBlueprint : ruleBlueprint"
+            :key="item.value"
+            :class="['blueprint-chip', { active: item.count > 0 }]"
+          >
+            <strong>{{ item.label }}</strong>
+            <span>{{ item.count }} 题 / {{ item.score }} 分</span>
+          </div>
+        </div>
+
         <div v-if="creationMode === 'manual'" class="basket-scroll">
-          <article v-for="(question, index) in selectedQuestions" :key="question.questionId" class="basket-item">
-            <div class="basket-item-main">
-              <strong>{{ index + 1 }}. {{ question.stem }}</strong>
-              <span>{{ typeText(question.questionType) }} · {{ difficultyText(question.difficulty) }} · {{ question.knowledgePointName || '未指定知识点' }}</span>
+          <section v-for="group in selectedQuestionGroups" :key="group.value" class="basket-group">
+            <div class="basket-group-header">
+              <strong>{{ group.label }}</strong>
+              <span>{{ group.count }} 题 / {{ group.score }} 分</span>
             </div>
-            <div class="basket-item-actions">
-              <el-input-number v-model="question.score" size="small" :min="0.5" :step="0.5" :precision="1" />
-              <el-button link type="danger" :icon="Close" @click="removeSelectedQuestion(index)" />
-            </div>
-          </article>
+            <article v-for="item in group.items" :key="item.question.questionId" class="basket-item">
+              <div class="basket-item-main">
+                <strong>{{ item.index + 1 }}. {{ item.question.stem }}</strong>
+                <span>{{ difficultyText(item.question.difficulty) }} · {{ item.question.knowledgePointName || '未指定知识点' }}</span>
+              </div>
+              <div class="basket-item-actions">
+                <div class="basket-order-actions">
+                  <el-button link :icon="ArrowUp" :disabled="!canMoveSelectedQuestion(item.index, -1)" @click="moveSelectedQuestion(item.index, -1)" />
+                  <el-button link :icon="ArrowDown" :disabled="!canMoveSelectedQuestion(item.index, 1)" @click="moveSelectedQuestion(item.index, 1)" />
+                </div>
+                <el-input-number v-model="item.question.score" size="small" :min="0.5" :step="0.5" :precision="1" />
+                <el-button link type="danger" :icon="Close" @click="removeSelectedQuestion(item.index)" />
+              </div>
+            </article>
+          </section>
           <el-empty v-if="selectedQuestions.length === 0" description="尚未选择题目" :image-size="80" />
         </div>
 
         <div v-else class="basket-scroll">
-          <article v-for="(rule, index) in generateForm.rules" :key="index" class="rule-summary-item">
+          <article v-for="(rule, index) in activeGenerateRules" :key="index" class="rule-summary-item">
             <strong>{{ index + 1 }}. {{ typeText(rule.questionType) }}</strong>
             <span>{{ rule.knowledgePointId ? pointName(rule.knowledgePointId) : '不限知识点' }} · {{ difficultyText(rule.difficulty || undefined) }}</span>
-            <small>{{ rule.count }} 题 × {{ rule.score }} 分</small>
+            <small>{{ rule.count }} 题 × {{ rule.score }} 分 · 可用 {{ ruleAvailableCount(rule) }} 题</small>
           </article>
+          <el-empty v-if="activeGenerateRules.length === 0" description="尚未设置抽题数量" :image-size="80" />
         </div>
 
         <div class="basket-footer">
@@ -271,10 +297,16 @@
           <h3>{{ preview.paperName }}</h3>
           <span>{{ preview.subjectName }} · {{ preview.totalScore }} 分 · {{ preview.questionCount }} 题</span>
         </div>
-        <article v-for="question in preview.questions || []" :key="question.questionId" class="paper-preview-question">
-          <strong>{{ question.sortOrder }}. {{ question.stem }}（{{ question.score }}分）</strong>
-          <small>{{ typeText(question.questionType) }} · {{ difficultyText(question.difficulty) }} · {{ question.knowledgePointName || '未指定知识点' }}</small>
-        </article>
+        <section v-for="group in previewQuestionGroups" :key="group.value" class="paper-preview-group">
+          <div class="paper-preview-group-header">
+            <strong>{{ group.label }}</strong>
+            <span>{{ group.count }} 题 / {{ group.score }} 分</span>
+          </div>
+          <article v-for="question in group.items" :key="question.questionId" class="paper-preview-question">
+            <strong>{{ question.sortOrder }}. {{ question.stem }}（{{ question.score }}分）</strong>
+            <small>{{ difficultyText(question.difficulty) }} · {{ question.knowledgePointName || '未指定知识点' }}</small>
+          </article>
+        </section>
       </div>
     </el-drawer>
   </section>
@@ -284,6 +316,8 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
+  ArrowDown,
+  ArrowUp,
   Check,
   Close,
   Delete,
@@ -336,6 +370,7 @@ const difficulties: Array<{ label: string; value: Difficulty }> = [
 const subjects = ref<SubjectInfo[]>([]);
 const knowledgePoints = ref<KnowledgePointInfo[]>([]);
 const availableQuestions = ref<QuestionInfo[]>([]);
+const generateAvailableQuestions = ref<QuestionInfo[]>([]);
 const papers = ref<PaperInfo[]>([]);
 const currentPage = ref(1);
 const pageSize = ref(10);
@@ -381,14 +416,61 @@ const generateForm = reactive<GeneratePaperPayload>({
   paperName: '',
   description: '',
   status: 0,
-  rules: [defaultRule()]
+  rules: defaultRuleSet()
 });
 
 const canManagePapers = computed(() => props.role === 'ADMIN' || props.role === 'TEACHER');
 const manualTotalScore = computed(() => selectedQuestions.value.reduce((sum, item) => sum + Number(item.score || 0), 0));
-const ruleTotalCount = computed(() => generateForm.rules.reduce((sum, rule) => sum + Number(rule.count || 0), 0));
-const ruleTotalScore = computed(() => generateForm.rules.reduce((sum, rule) => sum + Number(rule.count || 0) * Number(rule.score || 0), 0));
+const activeGenerateRules = computed(() => generateForm.rules.filter((rule) => Number(rule.count || 0) > 0));
+const ruleTotalCount = computed(() => activeGenerateRules.value.reduce((sum, rule) => sum + Number(rule.count || 0), 0));
+const ruleTotalScore = computed(() => activeGenerateRules.value.reduce((sum, rule) => sum + Number(rule.count || 0) * Number(rule.score || 0), 0));
 const selectedQuestionIds = computed(() => new Set(selectedQuestions.value.map((item) => item.questionId)));
+const manualBlueprint = computed(() => questionTypes.map((type) => {
+  const items = selectedQuestions.value.filter((question) => question.questionType === type.value);
+  return {
+    label: type.label,
+    value: type.value,
+    count: items.length,
+    score: items.reduce((sum, question) => sum + Number(question.score || 0), 0)
+  };
+}));
+const ruleBlueprint = computed(() => questionTypes.map((type) => {
+  const rules = generateForm.rules.filter((rule) => rule.questionType === type.value && Number(rule.count || 0) > 0);
+  return {
+    label: type.label,
+    value: type.value,
+    count: rules.reduce((sum, rule) => sum + Number(rule.count || 0), 0),
+    score: rules.reduce((sum, rule) => sum + Number(rule.count || 0) * Number(rule.score || 0), 0)
+  };
+}));
+const selectedQuestionGroups = computed(() => questionTypes
+  .map((type) => {
+    const items = selectedQuestions.value
+      .map((question, index) => ({ question, index }))
+      .filter((item) => item.question.questionType === type.value);
+    return {
+      label: type.label,
+      value: type.value,
+      count: items.length,
+      score: items.reduce((sum, item) => sum + Number(item.question.score || 0), 0),
+      items
+    };
+  })
+  .filter((group) => group.items.length > 0));
+const previewQuestionGroups = computed(() => questionTypes
+  .map((type) => {
+    const items = (preview.value?.questions || [])
+      .filter((question) => question.questionType === type.value)
+      .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+    return {
+      label: type.label,
+      value: type.value,
+      count: items.length,
+      score: items.reduce((sum, question) => sum + Number(question.score || 0), 0),
+      items
+    };
+  })
+  .filter((group) => group.items.length > 0));
 
 const summaryCards = computed(() => [
   { label: '试卷总数', value: summary.value.total || 0, remark: '已创建', className: '' },
@@ -422,7 +504,7 @@ async function loadBootstrapData() {
   const firstSubjectId = subjects.value[0]?.id || 0;
   paperForm.subjectId = firstSubjectId;
   generateForm.subjectId = firstSubjectId;
-  await loadAvailableQuestions();
+  await Promise.all([loadAvailableQuestions(), loadGenerateAvailableQuestions()]);
 }
 
 async function loadSubjects() {
@@ -464,6 +546,15 @@ async function loadAvailableQuestions() {
   availableQuestions.value = response.data.list;
 }
 
+async function loadGenerateAvailableQuestions() {
+  if (!generateForm.subjectId) {
+    generateAvailableQuestions.value = [];
+    return;
+  }
+  const response = await listQuestions({ subjectId: generateForm.subjectId, status: 1, size: 10000 });
+  generateAvailableQuestions.value = response.data.list;
+}
+
 function resetQuery() {
   query.keyword = '';
   query.subjectId = null;
@@ -489,8 +580,9 @@ async function handlePaperSubjectChange() {
   await loadAvailableQuestions();
 }
 
-function handleGenerateSubjectChange() {
-  generateForm.rules = [defaultRule()];
+async function handleGenerateSubjectChange() {
+  generateForm.rules = defaultRuleSet();
+  await loadGenerateAvailableQuestions();
 }
 
 function addSelectedQuestion(question: QuestionInfo) {
@@ -509,26 +601,73 @@ function addSelectedQuestion(question: QuestionInfo) {
     knowledgePointId: question.knowledgePointId,
     knowledgePointName: question.knowledgePointName
   });
+  normalizeSelectedQuestionOrder();
 }
 
 function removeSelectedQuestion(index: number) {
   selectedQuestions.value.splice(index, 1);
+  normalizeSelectedQuestionOrder();
+}
+
+function moveSelectedQuestion(index: number, direction: -1 | 1) {
+  const nextIndex = sameTypeNeighborIndex(index, direction);
+  if (nextIndex === -1) {
+    return;
+  }
+  const current = selectedQuestions.value[index];
+  selectedQuestions.value[index] = selectedQuestions.value[nextIndex];
+  selectedQuestions.value[nextIndex] = current;
   selectedQuestions.value.forEach((item, itemIndex) => {
     item.sortOrder = itemIndex + 1;
   });
+}
+
+function canMoveSelectedQuestion(index: number, direction: -1 | 1) {
+  return sameTypeNeighborIndex(index, direction) !== -1;
+}
+
+function sameTypeNeighborIndex(index: number, direction: -1 | 1) {
+  const current = selectedQuestions.value[index];
+  if (!current) {
+    return -1;
+  }
+  for (let nextIndex = index + direction; nextIndex >= 0 && nextIndex < selectedQuestions.value.length; nextIndex += direction) {
+    if (selectedQuestions.value[nextIndex].questionType === current.questionType) {
+      return nextIndex;
+    }
+  }
+  return -1;
+}
+
+function normalizeSelectedQuestionOrder() {
+  selectedQuestions.value.sort((a, b) => {
+    const typeDiff = questionTypeOrder(a.questionType) - questionTypeOrder(b.questionType);
+    return typeDiff || Number(a.sortOrder || 0) - Number(b.sortOrder || 0);
+  });
+  selectedQuestions.value.forEach((item, itemIndex) => {
+    item.sortOrder = itemIndex + 1;
+  });
+}
+
+function questionTypeOrder(type?: string) {
+  const index = questionTypes.findIndex((item) => item.value === type);
+  return index === -1 ? questionTypes.length : index;
 }
 
 async function savePaper() {
   const payload = buildPaperPayload();
   if (!payload) return;
   try {
+    let savedPaper: PaperInfo;
     if (editingPaperId.value) {
-      await updatePaper(editingPaperId.value, payload);
+      savedPaper = (await updatePaper(editingPaperId.value, payload)).data;
       ElMessage.success('试卷已更新');
     } else {
-      await createPaper(payload);
+      savedPaper = (await createPaper(payload)).data;
       ElMessage.success('试卷已创建');
     }
+    preview.value = savedPaper;
+    previewVisible.value = true;
     resetPaperForm();
     await loadPapers();
   } catch (error) {
@@ -574,6 +713,7 @@ async function editPaper(id: number) {
     paperForm.status = paper.status;
     await loadAvailableQuestions();
     selectedQuestions.value = (paper.questions || []).map((item, index) => ({ ...item, sortOrder: item.sortOrder || index + 1 }));
+    normalizeSelectedQuestionOrder();
     ElMessage.success('已载入试卷');
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '试卷详情加载失败');
@@ -727,17 +867,22 @@ function resetGenerateForm() {
   generateForm.paperName = '';
   generateForm.description = '';
   generateForm.status = 0;
-  generateForm.rules = [defaultRule()];
+  generateForm.rules = defaultRuleSet();
+  loadGenerateAvailableQuestions();
 }
 
-function defaultRule(): GenerateRulePayload {
+function defaultRule(questionType: QuestionType = 'SINGLE_CHOICE'): GenerateRulePayload {
   return {
     knowledgePointId: null,
-    questionType: 'SINGLE_CHOICE',
+    questionType,
     difficulty: null,
-    count: 1,
+    count: 0,
     score: 5
   };
+}
+
+function defaultRuleSet(): GenerateRulePayload[] {
+  return questionTypes.map((type) => defaultRule(type.value));
 }
 
 function addRule() {
@@ -747,7 +892,7 @@ function addRule() {
 function removeRule(index: number) {
   generateForm.rules.splice(index, 1);
   if (generateForm.rules.length === 0) {
-    generateForm.rules.push(defaultRule());
+    generateForm.rules = defaultRuleSet();
   }
 }
 
@@ -756,17 +901,29 @@ async function submitGeneratePaper() {
     ElMessage.warning('请选择科目并填写试卷名称');
     return;
   }
-  if (generateForm.rules.some((rule) => !rule.questionType || !rule.count || !rule.score)) {
+  const rules = activeGenerateRules.value.map((rule) => ({
+    ...rule,
+    count: Number(rule.count || 0),
+    score: Number(rule.score || 0)
+  }));
+  if (rules.length === 0) {
+    ElMessage.warning('请至少设置一种题型的抽题数量');
+    return;
+  }
+  if (rules.some((rule) => !rule.questionType || !rule.count || !rule.score)) {
     ElMessage.warning('请完整填写组卷规则');
     return;
   }
   try {
-    await generatePaper({
+    const response = await generatePaper({
       ...generateForm,
       paperName: generateForm.paperName.trim(),
-      description: generateForm.description.trim()
+      description: generateForm.description.trim(),
+      rules
     });
     ElMessage.success('规则组卷成功');
+    preview.value = response.data;
+    previewVisible.value = true;
     resetGenerateForm();
     await loadPapers();
   } catch (error) {
@@ -776,6 +933,14 @@ async function submitGeneratePaper() {
 
 function pointName(id: number) {
   return knowledgePoints.value.find((point) => point.id === id)?.pointName || `知识点 #${id}`;
+}
+
+function ruleAvailableCount(rule: GenerateRulePayload) {
+  return generateAvailableQuestions.value.filter((question) => {
+    return question.questionType === rule.questionType
+      && (!rule.difficulty || question.difficulty === rule.difficulty)
+      && (!rule.knowledgePointId || question.knowledgePointId === rule.knowledgePointId);
+  }).length;
 }
 
 function typeText(type?: string) {
@@ -838,6 +1003,38 @@ function statusText(status: number) {
 .paper-card-header span {
   color: #64748b;
   font-size: 12px;
+}
+
+.paper-blueprint {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.blueprint-chip {
+  display: grid;
+  gap: 4px;
+  min-height: 54px;
+  padding: 9px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.blueprint-chip strong {
+  color: #334155;
+  font-size: 13px;
+}
+
+.blueprint-chip span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.blueprint-chip.active {
+  border-color: #bfdbfe;
+  background: #eff6ff;
 }
 
 .paper-builder-form {
@@ -946,7 +1143,7 @@ function statusText(status: number) {
 
 .rule-card {
   display: grid;
-  grid-template-columns: 34px minmax(150px, 1fr) 130px 120px 110px 120px 70px;
+  grid-template-columns: 34px minmax(150px, 1fr) 130px 120px 104px 116px 104px 70px;
   gap: 10px;
   align-items: center;
   padding: 12px;
@@ -967,6 +1164,21 @@ function statusText(status: number) {
   font-weight: 700;
 }
 
+.rule-state {
+  display: grid;
+  gap: 3px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.rule-state strong {
+  color: #111827;
+}
+
+.rule-state.shortage span {
+  color: #dc2626;
+}
+
 .basket-card {
   display: flex;
   flex-direction: column;
@@ -981,6 +1193,22 @@ function statusText(status: number) {
   min-height: 0;
   overflow: auto;
   padding-right: 2px;
+}
+
+.basket-group {
+  display: grid;
+  gap: 8px;
+}
+
+.basket-group-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 13px;
 }
 
 .basket-item,
@@ -1017,6 +1245,12 @@ function statusText(status: number) {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.basket-order-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .basket-footer {
@@ -1064,6 +1298,21 @@ function statusText(status: number) {
 .paper-preview {
   display: grid;
   gap: 12px;
+}
+
+.paper-preview-group {
+  display: grid;
+  gap: 10px;
+}
+
+.paper-preview-group-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #eef2ff;
+  color: #3730a3;
 }
 
 .paper-preview-question {

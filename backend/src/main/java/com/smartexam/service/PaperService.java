@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -220,15 +220,17 @@ public class PaperService {
             if (difficulty != null && !ALL_DIFFICULTIES.contains(difficulty)) {
                 throw new IllegalArgumentException("不支持的难度：" + rule.getDifficulty());
             }
-            List<Map<String, Object>> candidates = questionBankService.listQuestions(null, request.getSubjectId(), rule.getKnowledgePointId(), type, difficulty, 1, null).stream()
-                    .filter(row -> selectedIds.add(longValue(row.get("id"))))
-                    .sorted(Comparator.comparing(row -> longValue(row.get("id"))))
-                    .limit(rule.getCount())
-                    .toList();
+            List<Map<String, Object>> candidates = new ArrayList<>(questionBankService
+                    .listQuestions(null, request.getSubjectId(), rule.getKnowledgePointId(), type, difficulty, 1, null)
+                    .stream()
+                    .filter(row -> !selectedIds.contains(longValue(row.get("id"))))
+                    .toList());
+            Collections.shuffle(candidates);
             if (candidates.size() < rule.getCount()) {
                 throw new IllegalArgumentException("组卷题量不足：题型" + type + "需要" + rule.getCount() + "题，实际可用" + candidates.size() + "题");
             }
-            for (Map<String, Object> candidate : candidates) {
+            for (Map<String, Object> candidate : candidates.stream().limit(rule.getCount()).toList()) {
+                selectedIds.add(longValue(candidate.get("id")));
                 PaperQuestionRequest question = new PaperQuestionRequest();
                 question.setQuestionId(longValue(candidate.get("id")));
                 question.setScore(rule.getScore());

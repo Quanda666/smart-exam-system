@@ -3,8 +3,10 @@ package com.smartexam.dto.exam;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Size;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public class ExamUpdateRequest {
@@ -25,6 +27,13 @@ public class ExamUpdateRequest {
     @NotNull(message = "Duration is required")
     @Min(value = 1, message = "Duration must be greater than 0")
     private Integer durationMinutes;
+
+    @NotNull(message = "Max attempts is required")
+    @Min(value = 1, message = "Max attempts must be greater than 0")
+    private Integer maxAttempts = 1;
+
+    @DecimalMin(value = "0.0", message = "Pass score must be greater than or equal to 0")
+    private BigDecimal passScore;
 
     public String getExamName() {
         return examName;
@@ -64,5 +73,21 @@ public class ExamUpdateRequest {
 
     public void setDurationMinutes(Integer durationMinutes) {
         this.durationMinutes = durationMinutes;
+    }
+
+    public Integer getMaxAttempts() {
+        return maxAttempts;
+    }
+
+    public void setMaxAttempts(Integer maxAttempts) {
+        this.maxAttempts = maxAttempts;
+    }
+
+    public BigDecimal getPassScore() {
+        return passScore;
+    }
+
+    public void setPassScore(BigDecimal passScore) {
+        this.passScore = passScore;
     }
 }

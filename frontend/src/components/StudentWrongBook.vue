@@ -70,9 +70,24 @@
       <el-empty v-if="!loading && wrongQuestions.length === 0" description="暂无错题" />
     </div>
 
-    <el-dialog v-model="aiExplainVisible" :title="aiExplainTitle" width="720px" class="ai-explain-dialog">
+    <el-dialog v-model="aiExplainVisible" :title="aiExplainTitle" width="min(880px, 92vw)" top="6vh" class="ai-explain-dialog">
       <el-skeleton v-if="aiExplainingQuestionId" :rows="5" animated />
-      <div v-else class="ai-explain-content">{{ aiExplanation }}</div>
+      <div v-else class="ai-explain-shell">
+        <div v-if="activeWrongQuestion" class="ai-question-card">
+          <div class="ai-question-meta">
+            <el-tag size="small">{{ typeText(activeWrongQuestion.questionType) }}</el-tag>
+            <span>累计错 {{ activeWrongQuestion.wrongCount }} 次</span>
+          </div>
+          <strong>{{ formatInlineText(activeWrongQuestion.stem) }}</strong>
+          <span v-if="activeWrongQuestion.correctAnswer">参考答案：{{ formatInlineText(activeWrongQuestion.correctAnswer) }}</span>
+        </div>
+        <div class="ai-section-list">
+          <section v-for="section in aiExplainSections" :key="section.title" class="ai-explain-section">
+            <h4>{{ section.title }}</h4>
+            <p v-for="(line, index) in section.lines" :key="index">{{ line }}</p>
+          </section>
+        </div>
+      </div>
     </el-dialog>
   </section>
 </template>
@@ -91,6 +106,12 @@ const aiExplainVisible = ref(false);
 const aiExplanation = ref('');
 const aiExplainTitle = ref('AI错题讲解');
 const aiExplainingQuestionId = ref<number | null>(null);
+const activeWrongQuestion = ref<WrongQuestion | null>(null);
+
+interface AiExplainSection {
+  title: string;
+  lines: string[];
+}
 
 const summaryCards = computed(() => {
   const totalWrongTimes = wrongQuestions.value.reduce((sum, item) => sum + Number(item.wrongCount || 0), 0);
@@ -125,7 +146,8 @@ async function loadWrongQuestions(manual = false) {
 async function aiExplainWrong(item: WrongQuestion) {
   aiExplainVisible.value = true;
   aiExplanation.value = '';
-  aiExplainTitle.value = `AI讲解：${item.stem.slice(0, 24)}`;
+  aiExplainTitle.value = 'AI错题讲解';
+  activeWrongQuestion.value = item;
   aiExplainingQuestionId.value = item.questionId;
   try {
     const response = await explainWrongQuestion({
@@ -152,6 +174,8 @@ async function aiExplainWrong(item: WrongQuestion) {
   }
 }
 
+const aiExplainSections = computed<AiExplainSection[]>(() => parseAiExplanation(aiExplanation.value));
+
 function isCorrectValue(value: boolean | number | undefined) {
   return value === true || value === 1;
 }
@@ -165,6 +189,80 @@ function typeText(type?: string) {
     SUBJECTIVE: '主观题'
   };
   return type ? map[type] || type : '未知题型';
+}
+
+function parseAiExplanation(text: string): AiExplainSection[] {
+  const lines = normalizeAiText(text).split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const sections: AiExplainSection[] = [];
+  let current: AiExplainSection | null = null;
+
+  lines.forEach((line) => {
+    const heading = extractHeading(line);
+    if (heading) {
+      if (current) {
+        sections.push(current);
+      }
+      current = { title: heading.title, lines: [] };
+      if (heading.rest) {
+        current.lines.push(formatInlineText(heading.rest));
+      }
+      return;
+    }
+    if (!current) {
+      current = { title: '讲解内容', lines: [] };
+    }
+    current.lines.push(formatInlineText(line));
+  });
+
+  if (current) {
+    sections.push(current);
+  }
+  return sections.length ? sections : [{ title: '讲解内容', lines: ['AI 暂未返回可用讲解。'] }];
+}
+
+function extractHeading(line: string): { title: string; rest: string } | null {
+  const cleaned = line.replace(/^\d+[.、]\s*/, '').trim();
+  const bracket = cleaned.match(/^【(.+?)】\s*[:：]?\s*(.*)$/);
+  if (bracket) {
+    return { title: bracket[1], rest: bracket[2] || '' };
+  }
+  const bold = cleaned.match(/^\*\*(.+?)\*\*\s*[:：]?\s*(.*)$/);
+  if (bold) {
+    return { title: bold[1], rest: bold[2] || '' };
+  }
+  const known = ['错因定位', '正确思路', '关键知识点', '下次作答提醒'];
+  const title = known.find((item) => cleaned.startsWith(item));
+  if (!title) {
+    return null;
+  }
+  return { title, rest: cleaned.slice(title.length).replace(/^[:：]\s*/, '') };
+}
+
+function normalizeAiText(text: string) {
+  return (text || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\\\[(.*?)\\\]/gs, '$1')
+    .replace(/\\\((.*?)\\\)/g, '$1');
+}
+
+function formatInlineText(text: string) {
+  return (text || '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\$([^$]+)\$/g, '$1')
+    .replace(/\\vec\{([^}]+)\}/g, '向量$1')
+    .replace(/\\mathbf\{([^}]+)\}/g, '$1')
+    .replace(/\\cdot/g, '·')
+    .replace(/\\times/g, '×')
+    .replace(/\\perp/g, '⊥')
+    .replace(/\\Leftrightarrow/g, '⇔')
+    .replace(/\\Rightarrow/g, '⇒')
+    .replace(/\\left|\\right/g, '')
+    .replace(/\\[a-zA-Z]+/g, '')
+    .replace(/[{}]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 </script>
 
@@ -212,13 +310,73 @@ function typeText(type?: string) {
   color: #166534;
 }
 
-.ai-explain-content {
-  white-space: pre-wrap;
-  line-height: 1.8;
+.wrong-date {
+  font-size: 16px;
+}
+
+:deep(.ai-explain-dialog .el-dialog__body) {
+  max-height: min(72vh, 720px);
+  overflow: auto;
+  padding-top: 8px;
+}
+
+.ai-explain-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.ai-question-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
   color: #1f2937;
 }
 
-.wrong-date {
-  font-size: 16px;
+.ai-question-card strong {
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.ai-question-card > span {
+  color: #475569;
+  font-size: 13px;
+}
+
+.ai-question-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.ai-section-list {
+  display: grid;
+  gap: 12px;
+}
+
+.ai-explain-section {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.ai-explain-section h4 {
+  margin: 0;
+  color: #111827;
+  font-size: 15px;
+}
+
+.ai-explain-section p {
+  margin: 0;
+  color: #374151;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
 }
 </style>
