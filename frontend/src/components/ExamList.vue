@@ -16,6 +16,9 @@
             <div class="exam-name-cell">
               <strong>{{ scope.row.examName }}</strong>
               <span>{{ scope.row.paperName || scope.row.description || '—' }}</span>
+              <small v-if="(scope.row.maxAttempts || 1) > 1">
+                第 {{ scope.row.attemptNo || 1 }} / {{ scope.row.maxAttempts }} 次
+              </small>
             </div>
           </template>
         </el-table-column>
@@ -165,5 +168,11 @@ function tagType(status: number) {
 .exam-name-cell span {
   color: #64748b;
   font-size: 12px;
+}
+
+.exam-name-cell small {
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 600;
 }
 </style>

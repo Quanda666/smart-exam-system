@@ -26,7 +26,16 @@ public class OverviewService {
         data.put("totalStudents", queryInt(jt, "SELECT COUNT(*) FROM sys_user u JOIN sys_user_role ur ON ur.user_id = u.id JOIN sys_role r ON r.id = ur.role_id WHERE r.role_code = 'STUDENT' AND u.deleted = 0"));
         data.put("totalTeachers", queryInt(jt, "SELECT COUNT(*) FROM sys_user u JOIN sys_user_role ur ON ur.user_id = u.id JOIN sys_role r ON r.id = ur.role_id WHERE r.role_code = 'TEACHER' AND u.deleted = 0"));
         data.put("todayExams", queryInt(jt, "SELECT COUNT(*) FROM exam WHERE deleted = 0 AND DATE(start_time) = CURDATE()"));
+        data.put("runningExams", queryInt(jt, """
+                SELECT COUNT(*)
+                FROM exam
+                WHERE deleted = 0
+                  AND start_time <= NOW()
+                  AND (end_time IS NULL OR end_time >= NOW())
+                """));
+        data.put("pendingReviews", queryInt(jt, "SELECT COUNT(*) FROM exam_attempt WHERE status = 4"));
         data.put("totalPapers", queryInt(jt, "SELECT COUNT(*) FROM paper WHERE deleted = 0"));
+        data.put("totalQuestions", queryInt(jt, "SELECT COUNT(*) FROM question WHERE deleted = 0"));
 
         // 学科分布（teacher_profile 无学科关联字段，改以各科目下的题目数量反映学科分布）
         data.put("teacherSubjects", jt.queryForList("""
@@ -53,11 +62,28 @@ public class OverviewService {
         data.put("examTrend", jt.queryForList("""
                 SELECT DATE(ea.submit_time) AS date,
                        COUNT(*) AS total,
-                       SUM(CASE WHEN ea.score >= 60 THEN 1 ELSE 0 END) AS passed
+                       SUM(CASE WHEN ea.score >= COALESCE(e.pass_score, 60) THEN 1 ELSE 0 END) AS passed
                 FROM exam_attempt ea
+                JOIN exam e ON e.id = ea.exam_id
                 WHERE ea.submit_time IS NOT NULL AND ea.submit_time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
                 GROUP BY DATE(ea.submit_time)
                 ORDER BY date
+                """));
+
+        data.put("recentExams", jt.queryForList("""
+                SELECT e.id, e.exam_name AS name, e.start_time AS time, e.end_time AS endTime,
+                       CASE
+                         WHEN e.end_time IS NOT NULL AND e.end_time < NOW() THEN 2
+                         WHEN e.start_time IS NOT NULL AND e.start_time <= NOW()
+                              AND (e.end_time IS NULL OR e.end_time >= NOW()) THEN 1
+                         ELSE 0
+                       END AS phase,
+                       (SELECT COUNT(*) FROM exam_attempt ea WHERE ea.exam_id = e.id) AS attemptCount,
+                       (SELECT COUNT(*) FROM exam_attempt ea WHERE ea.exam_id = e.id AND ea.status IN (2,4,5)) AS submittedCount
+                FROM exam e
+                WHERE e.deleted = 0
+                ORDER BY e.start_time DESC
+                LIMIT 6
                 """));
 
         return data;
@@ -69,12 +95,38 @@ public class OverviewService {
 
         // 我的考试任务数
         data.put("myExams", queryInt(jt, "SELECT COUNT(*) FROM exam WHERE deleted = 0 AND created_by = ?", user.getId()));
+        data.put("runningExams", queryInt(jt, """
+                SELECT COUNT(*)
+                FROM exam
+                WHERE deleted = 0 AND created_by = ?
+                  AND start_time <= NOW()
+                  AND (end_time IS NULL OR end_time >= NOW())
+                """, user.getId()));
+        data.put("upcomingExams", queryInt(jt, """
+                SELECT COUNT(*)
+                FROM exam
+                WHERE deleted = 0 AND created_by = ?
+                  AND (start_time IS NULL OR start_time > NOW())
+                """, user.getId()));
+        data.put("finishedExams", queryInt(jt, """
+                SELECT COUNT(*)
+                FROM exam
+                WHERE deleted = 0 AND created_by = ?
+                  AND end_time IS NOT NULL AND end_time < NOW()
+                """, user.getId()));
         // 待批阅试卷（status=1 表示已提交未批阅）
         data.put("pendingReviews", queryInt(jt,
                 "SELECT COUNT(*) FROM exam_attempt WHERE status = 4 AND exam_id IN (SELECT id FROM exam WHERE created_by = ? AND deleted = 0)",
                 user.getId()));
         // 我创建的试卷数
         data.put("myPapers", queryInt(jt, "SELECT COUNT(*) FROM paper WHERE deleted = 0 AND created_by = ?", user.getId()));
+        data.put("publishedPapers", queryInt(jt, "SELECT COUNT(*) FROM paper WHERE deleted = 0 AND created_by = ? AND status = 1", user.getId()));
+        data.put("avgScore", queryInt(jt, """
+                SELECT COALESCE(ROUND(AVG(ea.score), 0), 0)
+                FROM exam_attempt ea
+                JOIN exam e ON e.id = ea.exam_id
+                WHERE e.created_by = ? AND e.deleted = 0 AND ea.score IS NOT NULL AND ea.status IN (2,4,5)
+                """, user.getId()));
 
         // 成绩分布
         data.put("scoreDistribution", jt.queryForList("""
@@ -94,9 +146,18 @@ public class OverviewService {
 
         // 近期考试
         data.put("recentExams", jt.queryForList("""
-                SELECT exam_name AS name, start_time AS time, status
-                FROM exam WHERE deleted = 0 AND created_by = ?
-                ORDER BY start_time DESC LIMIT 5
+                SELECT e.id, e.exam_name AS name, e.start_time AS time, e.end_time AS endTime,
+                       CASE
+                         WHEN e.end_time IS NOT NULL AND e.end_time < NOW() THEN 2
+                         WHEN e.start_time IS NOT NULL AND e.start_time <= NOW()
+                              AND (e.end_time IS NULL OR e.end_time >= NOW()) THEN 1
+                         ELSE 0
+                       END AS phase,
+                       (SELECT COUNT(*) FROM exam_attempt ea WHERE ea.exam_id = e.id) AS attemptCount,
+                       (SELECT COUNT(*) FROM exam_attempt ea WHERE ea.exam_id = e.id AND ea.status IN (2,4,5)) AS submittedCount
+                FROM exam e
+                WHERE e.deleted = 0 AND e.created_by = ?
+                ORDER BY e.start_time DESC LIMIT 6
                 """, user.getId()));
 
         return data;
@@ -108,7 +169,16 @@ public class OverviewService {
 
         // 即将开始/进行中的考试
         data.put("upcomingExams", queryInt(jt,
-                "SELECT COUNT(*) FROM exam_attempt ea JOIN exam e ON e.id = ea.exam_id WHERE ea.user_id = ? AND e.deleted = 0 AND ea.status = 0",
+                """
+                SELECT COUNT(*)
+                FROM exam_attempt ea
+                JOIN exam e ON e.id = ea.exam_id
+                WHERE ea.user_id = ? AND e.deleted = 0 AND ea.status = 0
+                  AND (e.end_time IS NULL OR e.end_time >= NOW())
+                """,
+                user.getId()));
+        data.put("activeExams", queryInt(jt,
+                "SELECT COUNT(*) FROM exam_attempt WHERE user_id = ? AND status = 1",
                 user.getId()));
         // 已完成考试
         data.put("finishedExams", queryInt(jt,
@@ -116,6 +186,12 @@ public class OverviewService {
         // 错题数
         data.put("wrongQuestions", queryInt(jt,
                 "SELECT COUNT(*) FROM wrong_question_book WHERE user_id = ?", user.getId()));
+        data.put("avgScore", queryInt(jt,
+                "SELECT COALESCE(ROUND(AVG(score), 0), 0) FROM exam_attempt WHERE user_id = ? AND score IS NOT NULL AND status IN (2,4,5)",
+                user.getId()));
+        data.put("bestScore", queryInt(jt,
+                "SELECT COALESCE(ROUND(MAX(score), 0), 0) FROM exam_attempt WHERE user_id = ? AND score IS NOT NULL AND status IN (2,4,5)",
+                user.getId()));
 
         // 成绩趋势
         data.put("scoreTrend", jt.queryForList("""
@@ -124,6 +200,22 @@ public class OverviewService {
                 JOIN exam e ON e.id = ea.exam_id
                 WHERE ea.user_id = ? AND ea.submit_time IS NOT NULL
                 ORDER BY ea.submit_time DESC LIMIT 10
+                """, user.getId()));
+
+        data.put("recentExams", jt.queryForList("""
+                SELECT ea.id AS attemptId, e.exam_name AS name, e.start_time AS time, e.end_time AS endTime,
+                       ea.attempt_no AS attemptNo, e.max_attempts AS maxAttempts, ea.status,
+                       CASE
+                         WHEN e.end_time IS NOT NULL AND e.end_time < NOW() THEN 2
+                         WHEN e.start_time IS NOT NULL AND e.start_time <= NOW()
+                              AND (e.end_time IS NULL OR e.end_time >= NOW()) THEN 1
+                         ELSE 0
+                       END AS phase
+                FROM exam_attempt ea
+                JOIN exam e ON e.id = ea.exam_id
+                WHERE ea.user_id = ? AND e.deleted = 0 AND ea.status < 2
+                ORDER BY e.start_time ASC, ea.attempt_no ASC
+                LIMIT 5
                 """, user.getId()));
 
         // 知识点掌握度

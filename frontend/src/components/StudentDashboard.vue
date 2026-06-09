@@ -1,124 +1,144 @@
 <template>
-  <section class="dashboard">
-    <!-- 问候语 -->
-    <h2 class="mp-greeting">{{ greeting }}，同学</h2>
+  <section class="dashboard student-dashboard">
+    <div class="dashboard-head">
+      <div>
+        <h2 class="mp-greeting">{{ greeting }}，同学</h2>
+        <p>考试待办、成绩变化和薄弱知识点会在这里同步更新。</p>
+      </div>
+      <el-button type="primary" :icon="AlarmClock" @click="emit('navigate', '/student/exams')">进入考试</el-button>
+    </div>
 
-    <!-- 快捷操作入口 -->
     <div class="mp-quick-actions">
       <div class="mp-quick-action" @click="emit('navigate', '/student/exams')"><el-icon><AlarmClock /></el-icon>进入考试</div>
       <div class="mp-quick-action" @click="emit('navigate', '/student/wrong-questions')"><el-icon><Notebook /></el-icon>错题本</div>
       <div class="mp-quick-action" @click="emit('navigate', '/student/results')"><el-icon><TrendCharts /></el-icon>成绩查询</div>
     </div>
 
-    <!-- 统计卡片网格 -->
     <div class="mp-stat-grid">
-      <!-- 待参加考试 -->
-      <div class="mp-stat-card">
+      <div v-for="card in statCards" :key="card.label" class="mp-stat-card">
         <div class="mp-stat-header">
-          <el-icon><Calendar /></el-icon>
-          考试提醒
+          <el-icon><component :is="card.icon" /></el-icon>
+          {{ card.group }}
         </div>
         <div class="mp-stat-row">
-          <div class="mp-stat-icon mp-icon-blue">
-            <el-icon><AlarmClock /></el-icon>
+          <div :class="['mp-stat-icon', card.iconClass]">
+            <el-icon><component :is="card.icon" /></el-icon>
           </div>
           <div class="mp-stat-content">
-            <div class="mp-stat-label">待参加考试</div>
-            <div class="mp-stat-value" style="color: #2563eb;">{{ data.upcomingExams }}</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 已完成考试 -->
-      <div class="mp-stat-card">
-        <div class="mp-stat-header">
-          <el-icon><CircleCheck /></el-icon>
-          学习进度
-        </div>
-        <div class="mp-stat-row">
-          <div class="mp-stat-icon mp-icon-green">
-            <el-icon><Finished /></el-icon>
-          </div>
-          <div class="mp-stat-content">
-            <div class="mp-stat-label">已完成考试</div>
-            <div class="mp-stat-value" style="color: #16a34a;">{{ data.finishedExams }}</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 错题数 -->
-      <div class="mp-stat-card">
-        <div class="mp-stat-header">
-          <el-icon><Warning /></el-icon>
-          错题回顾
-        </div>
-        <div class="mp-stat-row">
-          <div class="mp-stat-icon mp-icon-orange">
-            <el-icon><Notebook /></el-icon>
-          </div>
-          <div class="mp-stat-content">
-            <div class="mp-stat-label">错题数</div>
-            <div class="mp-stat-value" style="color: #ea580c;">{{ data.wrongQuestions }}</div>
+            <div class="mp-stat-label">{{ card.label }}</div>
+            <div class="mp-stat-value" :style="{ color: card.color }">{{ card.value }}</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 图表区域 -->
-    <el-row :gutter="16">
-      <el-col :span="14">
-        <div class="mp-card">
-          <div class="mp-card-title">
-            <el-icon><TrendCharts /></el-icon>
-            成绩趋势
-          </div>
-          <div v-if="data.scoreTrend?.length" ref="scoreTrendChart" class="chart-box"></div>
-          <el-empty v-else description="暂无考试记录" :image-size="80" />
+    <div class="dashboard-grid">
+      <div class="mp-card">
+        <div class="mp-card-title">
+          <el-icon><Calendar /></el-icon>
+          最近考试
         </div>
-      </el-col>
-      <el-col :span="10">
-        <div class="mp-card">
-          <div class="mp-card-title">
-            <el-icon><Aim /></el-icon>
-            知识点掌握度
-          </div>
-          <div v-if="data.knowledgePoints?.length" ref="kpChart" class="chart-box"></div>
-          <el-empty v-else description="暂无学习数据" :image-size="80" />
+        <div class="exam-list">
+          <button v-for="exam in data.recentExams" :key="exam.attemptId || exam.name" type="button" class="exam-row" @click="emit('navigate', '/student/exams')">
+            <span class="exam-dot" :class="phaseClass(exam.phase)"></span>
+            <span class="exam-main">
+              <strong>{{ exam.name }}</strong>
+              <small>{{ formatDateTime(exam.time) }} 至 {{ formatDateTime(exam.endTime) }}</small>
+              <small v-if="(exam.maxAttempts || 1) > 1">第 {{ exam.attemptNo || 1 }} / {{ exam.maxAttempts }} 次</small>
+            </span>
+            <span class="exam-side">
+              <el-tag :type="phaseTagType(exam.phase)" size="small">{{ phaseText(exam.phase) }}</el-tag>
+              <small>{{ statusText(exam.status) }}</small>
+            </span>
+          </button>
+          <el-empty v-if="!data.recentExams?.length" description="暂无待办考试" :image-size="80" />
         </div>
-      </el-col>
-    </el-row>
+      </div>
+
+      <div class="mp-card">
+        <div class="mp-card-title">
+          <el-icon><TrendCharts /></el-icon>
+          成绩趋势
+        </div>
+        <div v-if="data.scoreTrend?.length" ref="scoreTrendChart" class="chart-box"></div>
+        <el-empty v-else description="暂无考试记录" :image-size="80" />
+      </div>
+    </div>
+
+    <div class="mp-card knowledge-card">
+      <div class="mp-card-title">
+        <el-icon><Aim /></el-icon>
+        知识点掌握度
+      </div>
+      <div v-if="data.knowledgePoints?.length" ref="kpChart" class="chart-box wide"></div>
+      <el-empty v-else description="暂无学习数据" :image-size="80" />
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import { Calendar, AlarmClock, CircleCheck, Finished, Warning, Notebook, TrendCharts, Aim } from '@element-plus/icons-vue';
+import { Aim, AlarmClock, Calendar, CircleCheck, Finished, Notebook, TrendCharts, Warning } from '@element-plus/icons-vue';
 import { getJson } from '../api/request';
 import { useChartAutoResize } from '../composables/useChartAutoResize';
+import { formatDateTime } from '../utils/dateFormat';
 import * as echarts from 'echarts';
 
 const emit = defineEmits<{ navigate: [path: string] }>();
 const { register } = useChartAutoResize();
 
+interface RecentExam {
+  attemptId?: number;
+  name: string;
+  time: string;
+  endTime?: string;
+  phase: number;
+  status: number;
+  attemptNo?: number;
+  maxAttempts?: number;
+}
+
 interface StudentOverview {
-  upcomingExams: number; finishedExams: number; wrongQuestions: number;
+  upcomingExams: number;
+  activeExams: number;
+  finishedExams: number;
+  wrongQuestions: number;
+  avgScore: number;
+  bestScore: number;
   scoreTrend: Array<{ date: string; score: number; examName: string }>;
   knowledgePoints: Array<{ name: string; mastery: number }>;
+  recentExams: RecentExam[];
 }
 
 const data = ref<StudentOverview>({
-  upcomingExams: 0, finishedExams: 0, wrongQuestions: 0, scoreTrend: [], knowledgePoints: []
+  upcomingExams: 0,
+  activeExams: 0,
+  finishedExams: 0,
+  wrongQuestions: 0,
+  avgScore: 0,
+  bestScore: 0,
+  scoreTrend: [],
+  knowledgePoints: [],
+  recentExams: []
 });
 
 const greeting = computed(() => {
   const hour = new Date().getHours();
-  if (hour < 6) return '🌙 夜深了';
-  if (hour < 11) return '☀️ 早上好';
-  if (hour < 13) return '👋 中午好';
-  if (hour < 18) return '🌤️ 下午好';
-  return '🌙 晚上好';
+  if (hour < 6) return '夜深了';
+  if (hour < 11) return '早上好';
+  if (hour < 13) return '中午好';
+  if (hour < 18) return '下午好';
+  return '晚上好';
 });
+
+const statCards = computed(() => [
+  { group: '考试提醒', label: '待参加考试', value: data.value.upcomingExams, icon: Calendar, iconClass: 'mp-icon-blue', color: '#2563eb' },
+  { group: '考试提醒', label: '进行中考试', value: data.value.activeExams, icon: AlarmClock, iconClass: 'mp-icon-orange', color: '#ea580c' },
+  { group: '学习进度', label: '已完成考试', value: data.value.finishedExams, icon: Finished, iconClass: 'mp-icon-green', color: '#16a34a' },
+  { group: '成绩表现', label: '平均/最高分', value: `${data.value.avgScore}/${data.value.bestScore}`, icon: TrendCharts, iconClass: 'mp-icon-purple', color: '#4f46e5' },
+  { group: '错题回顾', label: '错题数', value: data.value.wrongQuestions, icon: Warning, iconClass: 'mp-icon-orange', color: '#dc2626' }
+]);
 
 const scoreTrendChart = ref<HTMLElement>();
 const kpChart = ref<HTMLElement>();
@@ -126,9 +146,9 @@ const kpChart = ref<HTMLElement>();
 onMounted(async () => {
   try {
     data.value = (await getJson<StudentOverview>('/api/overview/student')).data;
-    await (new Promise(r => setTimeout(r, 100)));
+    await new Promise((resolve) => setTimeout(resolve, 100));
     renderCharts();
-  } catch (e) {
+  } catch {
     ElMessage.error('概况数据加载失败');
   }
 });
@@ -138,38 +158,167 @@ function renderCharts() {
     const chart = echarts.init(scoreTrendChart.value);
     register(chart, scoreTrendChart.value);
     chart.setOption({
-      tooltip: { trigger: 'axis', backgroundColor: 'rgba(255,255,255,0.95)', borderColor: '#e8e8e8', textStyle: { color: '#333' } },
-      xAxis: { type: 'category', data: data.value.scoreTrend.map(e => e.date || e.examName), axisLabel: { rotate: 30, color: '#666' }, axisLine: { lineStyle: { color: '#e8e8e8' } } },
-      yAxis: { type: 'value', name: '分数', axisLabel: { color: '#666' }, splitLine: { lineStyle: { color: '#f0f0f0' } } },
-      series: [{ type: 'line', data: data.value.scoreTrend.map(e => e.score), smooth: true, lineStyle: { width: 3, color: '#4f46e5' }, itemStyle: { color: '#4f46e5' }, areaStyle: { color: 'rgba(79, 70, 229, 0.1)' } }],
-      grid: { top: 30, right: 20, bottom: 40, left: 50 }
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: data.value.scoreTrend.map((item) => item.date || item.examName), axisLabel: { rotate: 25 } },
+      yAxis: { type: 'value', name: '分数' },
+      series: [{ type: 'line', data: data.value.scoreTrend.map((item) => item.score), smooth: true, itemStyle: { color: '#4f46e5' }, areaStyle: { color: 'rgba(79, 70, 229, 0.12)' } }],
+      grid: { top: 30, right: 20, bottom: 48, left: 48 }
     });
   }
+
   if (kpChart.value && data.value.knowledgePoints.length) {
     const chart = echarts.init(kpChart.value);
     register(chart, kpChart.value);
-    // 知识点雷达图
-    const indicators = data.value.knowledgePoints.map(k => ({ name: k.name, max: 100 }));
-    const values = data.value.knowledgePoints.map(k => k.mastery);
     chart.setOption({
-      tooltip: { backgroundColor: 'rgba(255,255,255,0.95)', borderColor: '#e8e8e8', textStyle: { color: '#333' } },
+      tooltip: {},
       radar: {
-        indicator: indicators,
-        radius: '65%',
-        axisName: { color: '#666', fontSize: 11 },
-        splitLine: { lineStyle: { color: '#f0f0f0' } },
-        splitArea: { areaStyle: { color: ['rgba(79,70,229,0.02)', 'rgba(79,70,229,0.05)'] } }
+        indicator: data.value.knowledgePoints.map((item) => ({ name: item.name, max: 100 })),
+        radius: '66%',
+        axisName: { color: '#475569', fontSize: 12 }
       },
       series: [{
         type: 'radar',
-        data: [{ value: values, name: '掌握度', areaStyle: { color: 'rgba(79, 70, 229, 0.2)' }, lineStyle: { color: '#4f46e5' }, itemStyle: { color: '#4f46e5' } }]
+        data: [{
+          value: data.value.knowledgePoints.map((item) => item.mastery),
+          name: '掌握度',
+          areaStyle: { color: 'rgba(79, 70, 229, 0.2)' },
+          lineStyle: { color: '#4f46e5' },
+          itemStyle: { color: '#4f46e5' }
+        }]
       }]
     });
   }
 }
+
+function phaseText(phase?: number) {
+  if (phase === 1) return '进行中';
+  if (phase === 2) return '已结束';
+  return '待开始';
+}
+
+function phaseTagType(phase?: number) {
+  if (phase === 1) return 'success';
+  if (phase === 2) return 'info';
+  return 'warning';
+}
+
+function phaseClass(phase?: number) {
+  if (phase === 1) return 'running';
+  if (phase === 2) return 'ended';
+  return 'waiting';
+}
+
+function statusText(status?: number) {
+  if (status === 1) return '答题中';
+  if ((status || 0) >= 2) return '已交卷';
+  return '可进入';
+}
 </script>
 
 <style scoped>
-.dashboard { }
-.chart-box { width: 100%; height: 280px; }
+.dashboard-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.dashboard-head p {
+  margin: 6px 0 0;
+  color: #64748b;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.9fr) minmax(0, 1.1fr);
+  gap: 16px;
+}
+
+.knowledge-card {
+  margin-top: 16px;
+}
+
+.chart-box {
+  width: 100%;
+  height: 300px;
+}
+
+.chart-box.wide {
+  height: 320px;
+}
+
+.exam-list {
+  display: grid;
+  gap: 10px;
+}
+
+.exam-row {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.exam-row:hover {
+  border-color: #bfdbfe;
+  background: #f8fbff;
+}
+
+.exam-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+
+.exam-dot.running {
+  background: #16a34a;
+}
+
+.exam-dot.ended {
+  background: #94a3b8;
+}
+
+.exam-main,
+.exam-side {
+  display: grid;
+  gap: 4px;
+}
+
+.exam-main {
+  min-width: 0;
+}
+
+.exam-main strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exam-main small,
+.exam-side small {
+  color: #64748b;
+}
+
+.exam-side {
+  justify-items: end;
+}
+
+@media (max-width: 900px) {
+  .dashboard-head,
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-head {
+    display: grid;
+  }
+}
 </style>

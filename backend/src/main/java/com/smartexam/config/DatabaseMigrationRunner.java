@@ -124,6 +124,10 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
                 "ALTER TABLE exam ADD COLUMN max_attempts INT NOT NULL DEFAULT 1 COMMENT '允许考试次数' AFTER duration_minutes");
         addColumnIfMissing(jdbc, "exam", "pass_score",
                 "ALTER TABLE exam ADD COLUMN pass_score DECIMAL(10,2) DEFAULT NULL COMMENT '及格线' AFTER max_attempts");
+        addColumnIfMissing(jdbc, "exam_attempt", "attempt_no",
+                "ALTER TABLE exam_attempt ADD COLUMN attempt_no INT NOT NULL DEFAULT 1 COMMENT '第几次作答' AFTER user_id");
+        addIndexIfMissing(jdbc, "exam_attempt", "idx_attempt_exam_user_no",
+                "ALTER TABLE exam_attempt ADD INDEX idx_attempt_exam_user_no (exam_id, user_id, attempt_no)");
     }
 
     /** AI 题目进入题库后保留来源，方便审计和后续质量统计。 */

@@ -11,6 +11,7 @@ export interface ExamInfo {
   endTime: string;
   durationMinutes: number;
   maxAttempts?: number;
+  attemptNo?: number;
   passScore?: number | null;
   status: number;
   paperName?: string;
@@ -29,6 +30,7 @@ export interface StudentExamInfo {
   endTime: string;
   durationMinutes: number;
   maxAttempts?: number;
+  attemptNo?: number;
   passScore?: number | null;
   status: number;
   paperName: string;

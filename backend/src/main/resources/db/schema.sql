@@ -369,6 +369,7 @@ CREATE TABLE IF NOT EXISTS exam_attempt (
   id          BIGINT        NOT NULL AUTO_INCREMENT,
   exam_id     BIGINT        NOT NULL,
   user_id     BIGINT        NOT NULL COMMENT '考生 sys_user.id',
+  attempt_no  INT           NOT NULL DEFAULT 1 COMMENT '第几次作答',
   status      TINYINT       NOT NULL DEFAULT 0 COMMENT '0未开始 1进行中 2已交卷 4待批阅 5已完成',
   score       DECIMAL(10,2) DEFAULT NULL,
   start_time  DATETIME      DEFAULT NULL,
@@ -377,7 +378,8 @@ CREATE TABLE IF NOT EXISTS exam_attempt (
   updated_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_attempt_exam (exam_id),
-  KEY idx_attempt_user (user_id)
+  KEY idx_attempt_user (user_id),
+  KEY idx_attempt_exam_user_no (exam_id, user_id, attempt_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='考试参与/答卷';
 
 CREATE TABLE IF NOT EXISTS answer_record (

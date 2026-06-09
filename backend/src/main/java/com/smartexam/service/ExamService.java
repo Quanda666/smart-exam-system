@@ -112,14 +112,14 @@ public class ExamService {
                 SELECT a.id AS attemptId, e.id AS examId, e.exam_name AS examName, e.description,
                        e.start_time AS startTime, e.end_time AS endTime, e.duration_minutes AS durationMinutes,
                        e.max_attempts AS maxAttempts, e.pass_score AS passScore,
-                       a.status, p.paper_name AS paperName, s.subject_name AS subjectName, a.score,
+                       a.attempt_no AS attemptNo, a.status, p.paper_name AS paperName, s.subject_name AS subjectName, a.score,
                        a.submit_time AS submitTime
                 FROM exam_attempt a
                 JOIN exam e ON e.id = a.exam_id
                 JOIN paper p ON p.id = e.paper_id
                 JOIN edu_subject s ON s.id = p.subject_id
                 WHERE a.user_id = ? AND e.deleted = 0
-                ORDER BY e.start_time DESC, e.id DESC
+                ORDER BY e.start_time DESC, e.id DESC, a.attempt_no DESC
                 LIMIT ? OFFSET ?
                 """, user.getId(), safeSize, offset);
         return PageResult.of(list, total == null ? 0 : total, safePage, safeSize);
@@ -354,6 +354,7 @@ public class ExamService {
         int finalStatus = hasSubjective ? 4 : 5;
         jt.update("UPDATE exam_attempt SET score = ?, status = ? WHERE id = ?", totalScore, finalStatus, attemptId);
         jt.update("DELETE FROM exam_answer_draft WHERE attempt_id = ?", attemptId);
+        createNextAttemptIfAllowed(jt, attempt);
         return Map.of("success", true, "message", "Submitted", "score", totalScore, "status", finalStatus);
     }
 
@@ -530,13 +531,45 @@ public class ExamService {
 
     private void insertAttemptIfMissing(JdbcTemplate jt, Long examId, Long studentId) {
         jt.update("""
-                INSERT INTO exam_attempt (exam_id, user_id, status)
-                SELECT ?, ?, 0
+                INSERT INTO exam_attempt (exam_id, user_id, attempt_no, status)
+                SELECT ?, ?, 1, 0
                 FROM DUAL
                 WHERE NOT EXISTS (
-                    SELECT 1 FROM exam_attempt WHERE exam_id = ? AND user_id = ?
+                    SELECT 1 FROM exam_attempt WHERE exam_id = ? AND user_id = ? AND attempt_no = 1
                 )
                 """, examId, studentId, examId, studentId);
+    }
+
+    private void createNextAttemptIfAllowed(JdbcTemplate jt, Map<String, Object> currentAttempt) {
+        Long examId = ((Number) currentAttempt.get("exam_id")).longValue();
+        Long userId = ((Number) currentAttempt.get("user_id")).longValue();
+        int attemptNo = currentAttempt.get("attempt_no") == null ? 1 : ((Number) currentAttempt.get("attempt_no")).intValue();
+        Map<String, Object> limit = jt.queryForMap("""
+                SELECT max_attempts, end_time
+                FROM exam
+                WHERE id = ? AND deleted = 0
+                """, examId);
+        int maxAttempts = limit.get("max_attempts") == null ? 1 : ((Number) limit.get("max_attempts")).intValue();
+        if (attemptNo >= maxAttempts) {
+            return;
+        }
+        Integer stillOpen = jt.queryForObject("""
+                SELECT CASE WHEN end_time IS NULL OR end_time > NOW() THEN 1 ELSE 0 END
+                FROM exam
+                WHERE id = ? AND deleted = 0
+                """, Integer.class, examId);
+        if (stillOpen == null || stillOpen == 0) {
+            return;
+        }
+        int nextNo = attemptNo + 1;
+        jt.update("""
+                INSERT INTO exam_attempt (exam_id, user_id, attempt_no, status)
+                SELECT ?, ?, ?, 0
+                FROM DUAL
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM exam_attempt WHERE exam_id = ? AND user_id = ? AND attempt_no = ?
+                )
+                """, examId, userId, nextNo, examId, userId, nextNo);
     }
 
     private String appendExamScope(AuthUser user, List<Object> params) {

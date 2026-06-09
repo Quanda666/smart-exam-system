@@ -320,6 +320,7 @@ const codeSending = ref(false);
 const codeLoginLoading = ref(false);
 let codeTimer: ReturnType<typeof setInterval> | null = null;
 const ACTIVE_EXAM_ATTEMPT_KEY = 'smart_exam_active_attempt_id';
+const ACTIVE_EXAM_ATTEMPT_FALLBACK_KEY = 'smart_exam_active_attempt_id_fallback';
 
 const takingExam = ref<{ attemptId: number } | null>(null);
 const loginLoading = ref(false);
@@ -556,14 +557,19 @@ function leaveExam() {
 function storeActiveAttemptId(attemptId: number) {
   try {
     sessionStorage.setItem(ACTIVE_EXAM_ATTEMPT_KEY, String(attemptId));
+    localStorage.setItem(ACTIVE_EXAM_ATTEMPT_FALLBACK_KEY, String(attemptId));
   } catch {
-    // sessionStorage 不可用时，刷新恢复能力降级，但不影响考试作答。
+    try {
+      localStorage.setItem(ACTIVE_EXAM_ATTEMPT_FALLBACK_KEY, String(attemptId));
+    } catch {
+      // 浏览器存储不可用时，刷新恢复能力降级，但不影响考试作答。
+    }
   }
 }
 
 function readActiveAttemptId() {
   try {
-    const raw = sessionStorage.getItem(ACTIVE_EXAM_ATTEMPT_KEY);
+    const raw = sessionStorage.getItem(ACTIVE_EXAM_ATTEMPT_KEY) || localStorage.getItem(ACTIVE_EXAM_ATTEMPT_FALLBACK_KEY);
     const parsed = raw ? Number(raw) : 0;
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   } catch {
@@ -574,8 +580,13 @@ function readActiveAttemptId() {
 function clearActiveAttemptId() {
   try {
     sessionStorage.removeItem(ACTIVE_EXAM_ATTEMPT_KEY);
+    localStorage.removeItem(ACTIVE_EXAM_ATTEMPT_FALLBACK_KEY);
   } catch {
-    // 忽略浏览器存储异常。
+    try {
+      localStorage.removeItem(ACTIVE_EXAM_ATTEMPT_FALLBACK_KEY);
+    } catch {
+      // 忽略浏览器存储异常。
+    }
   }
 }
 
