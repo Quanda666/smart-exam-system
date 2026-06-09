@@ -58,7 +58,7 @@ public class MenuService {
                 new MenuItem("概况", "/teacher", "Notebook", List.of("TEACHER")),
                 new MenuItem("考试任务", "/exam-tasks", "Calendar", List.of("TEACHER")),
                 new MenuItem("阅卷管理", "/reviews", "EditPen", List.of("TEACHER")),
-                new MenuItem("教师成绩分析", "/teacher/analysis", "TrendCharts", List.of("TEACHER")),
+                new MenuItem("成绩分析", "/teacher/analysis", "TrendCharts", List.of("TEACHER")),
                 new MenuItem("学情分析", "/teacher/students", "DataLine", List.of("TEACHER")),
 
                 // 学生菜单 - 按使用频率排序
