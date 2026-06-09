@@ -164,7 +164,7 @@ onMounted(async () => {
     await (new Promise(r => setTimeout(r, 100)));
     renderCharts();
   } catch (e) {
-    ElMessage.error('仪表盘数据加载失败');
+    ElMessage.error('概况数据加载失败');
   }
 });
 

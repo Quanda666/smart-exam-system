@@ -162,7 +162,7 @@
                 <span class="crumb-sep">/</span>
                 <span class="crumb-current">{{ currentMenuTitle }}</span>
               </div>
-              <h2>{{ isManagedModulePath ? currentMenuTitle : '工作台' }}</h2>
+              <h2>{{ currentMenuTitle }}</h2>
             </div>
           </div>
           <div class="user-box">
@@ -194,7 +194,7 @@
         <StudentInsight v-else-if="isTeacherStudentsPath && user" />
         <StudentPanel v-else-if="isStudentModulePath && user" :path="currentPath" />
 
-        <!-- V2 角色仪表盘 -->
+        <!-- V2 角色概况 -->
         <AdminDashboard v-else-if="currentPath === '/admin' && user" @navigate="navigateTo" />
         <TeacherDashboard v-else-if="currentPath === '/teacher' && user" @navigate="navigateTo" />
         <StudentDashboard v-else-if="currentPath === '/student' && user" @navigate="navigateTo" />

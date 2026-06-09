@@ -1049,84 +1049,140 @@ function tabFromPath(path: string) {
 .basic-panel {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
+  color: #1f2937;
 }
 
 .basic-summary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
-  margin-bottom: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 10px;
 }
 
 .basic-summary-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 20px;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
-  transition: transform 0.2s, box-shadow 0.2s;
+  position: relative;
+  min-height: 86px;
+  padding: 14px 16px 12px 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto 1fr auto;
+  column-gap: 10px;
+  overflow: hidden;
 }
 
-.basic-summary-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+.basic-summary-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: #2563eb;
+}
+
+.basic-summary-card:nth-child(2)::before {
+  background: #059669;
+}
+
+.basic-summary-card:nth-child(3)::before {
+  background: #7c3aed;
+}
+
+.basic-summary-card:nth-child(4)::before {
+  background: #d97706;
+}
+
+.basic-summary-card:nth-child(5)::before {
+  background: #0891b2;
+}
+
+.basic-summary-card:nth-child(6)::before {
+  background: #dc2626;
 }
 
 .basic-summary-card span {
-  font-size: 14px;
-  opacity: 0.9;
+  grid-column: 1 / 2;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b5563;
 }
 
 .basic-summary-card strong {
-  font-size: 32px;
+  grid-column: 2 / 3;
+  grid-row: 1 / 3;
+  align-self: center;
+  color: #111827;
+  font-size: 30px;
   font-weight: 700;
   line-height: 1;
 }
 
 .basic-summary-card small {
+  grid-column: 1 / -1;
   font-size: 12px;
-  opacity: 0.8;
-  margin-top: 4px;
+  color: #6b7280;
+  line-height: 1.4;
 }
 
 .basic-tabs {
   background: white;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0;
+  overflow: hidden;
 }
 
 .basic-tabs :deep(.el-tabs__header) {
-  margin-bottom: 24px;
+  margin: 0;
+  padding: 0 20px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+.basic-tabs :deep(.el-tabs__nav-wrap::after) {
+  height: 0;
 }
 
 .basic-tabs :deep(.el-tabs__item) {
-  font-size: 15px;
-  font-weight: 500;
-  padding: 0 24px;
-  height: 44px;
-  line-height: 44px;
+  height: 50px;
+  padding: 0 18px;
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.basic-tabs :deep(.el-tabs__item.is-active) {
+  color: #2563eb;
 }
 
 .basic-tabs :deep(.el-tabs__active-bar) {
-  height: 3px;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  height: 2px;
+  background: #2563eb;
+}
+
+.basic-tabs :deep(.el-tabs__content) {
+  padding: 18px 20px 20px;
 }
 
 .toolbar-line {
   display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 10px;
+  margin-bottom: 14px;
   flex-wrap: wrap;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
 }
 
 .toolbar-line .el-input {
   flex: 1;
-  min-width: 200px;
+  min-width: 240px;
 }
 
 .toolbar-line .el-select {
@@ -1134,14 +1190,14 @@ function tabFromPath(path: string) {
 }
 
 .inline-editor {
-  background: #f8f9fa;
-  border: 1px solid #e8e8e8;
+  background: #fff;
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 20px;
+  padding: 16px;
+  margin-bottom: 14px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px 16px;
   align-items: end;
 }
 
@@ -1150,18 +1206,46 @@ function tabFromPath(path: string) {
 }
 
 .inline-editor :deep(.el-form-item__label) {
-  font-size: 13px;
+  height: 18px;
   font-weight: 500;
-  color: #606266;
-  margin-bottom: 6px;
+  color: #4b5563;
+  line-height: 18px;
+  margin-bottom: 5px;
+  padding: 0;
+}
+
+.inline-editor :deep(.el-input__wrapper),
+.toolbar-line :deep(.el-input__wrapper),
+.inline-editor :deep(.el-select__wrapper),
+.toolbar-line :deep(.el-select__wrapper) {
+  min-height: 36px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px #d1d5db inset;
+}
+
+.inline-editor :deep(.el-input__wrapper.is-focus),
+.toolbar-line :deep(.el-input__wrapper.is-focus),
+.inline-editor :deep(.el-select__wrapper.is-focused),
+.toolbar-line :deep(.el-select__wrapper.is-focused) {
+  box-shadow: 0 0 0 1px #2563eb inset;
+}
+
+.inline-editor :deep(.el-input-number) {
+  width: 100%;
+}
+
+.inline-editor :deep(.el-button),
+.toolbar-line :deep(.el-button) {
+  min-height: 36px;
+  border-radius: 6px;
 }
 
 .notice-editor {
-  grid-template-columns: 1fr 1fr 120px 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .notice-editor :deep(.el-form-item:first-child) {
-  grid-column: 1 / -1;
+  grid-column: span 2;
 }
 
 .notice-editor :deep(.el-form-item:nth-child(2)) {
@@ -1169,15 +1253,54 @@ function tabFromPath(path: string) {
 }
 
 .el-table {
-  border-radius: 8px;
+  border-radius: 6px;
   overflow: hidden;
+  --el-table-border-color: #e5e7eb;
+  --el-table-header-bg-color: #f8fafc;
+  --el-table-header-text-color: #374151;
+  --el-table-row-hover-bg-color: #f9fafb;
 }
 
-.el-table :deep(.el-table__header) {
+.el-table :deep(th.el-table__cell) {
   font-weight: 600;
+  background: #f8fafc;
+}
+
+.el-table :deep(.el-table__cell) {
+  padding: 9px 0;
 }
 
 .el-table :deep(.el-table__row:hover) {
-  background: #f5f7fa;
+  background: #f9fafb;
+}
+
+.el-table :deep(.el-button.is-link) {
+  padding: 0 2px;
+}
+
+@media (max-width: 900px) {
+  .basic-tabs :deep(.el-tabs__header) {
+    padding: 0 12px;
+  }
+
+  .basic-tabs :deep(.el-tabs__content) {
+    padding: 14px 12px 16px;
+  }
+
+  .notice-editor :deep(.el-form-item:first-child) {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .basic-summary-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .toolbar-line .el-input,
+  .toolbar-line .el-select {
+    width: 100%;
+    min-width: 100%;
+  }
 }
 </style>
