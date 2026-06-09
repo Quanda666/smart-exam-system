@@ -48,6 +48,14 @@ export interface SystemRole {
   status: number;
   userCount: number;
   pages: string[];
+  availablePages?: RolePageOption[];
+}
+
+export interface RolePageOption {
+  title: string;
+  path: string;
+  icon?: string;
+  roles: string[];
 }
 
 export interface OperationLog {
@@ -181,6 +189,10 @@ export function updateUser(id: number, payload: UpdateUserPayload) {
 
 export function listRoles() {
   return getJson<SystemRole[]>('/api/system/roles');
+}
+
+export function updateRolePages(roleCode: string, pages: string[]) {
+  return putJson<{ roleCode: string; pages: string[] }>(`/api/system/roles/${roleCode}/pages`, { pages });
 }
 
 export function listOperationLogs(page = 1, size = 10) {

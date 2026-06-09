@@ -341,13 +341,19 @@ button {
 .menu-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   margin-top: 12px;
   padding: 0 12px;
   overflow: auto;
 }
 
+.menu-group {
+  display: grid;
+  gap: 2px;
+}
+
 .menu-item {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -362,6 +368,51 @@ button {
   font-weight: 500;
   transition: all 0.2s ease;
   white-space: nowrap;
+}
+
+.menu-parent {
+  position: relative;
+}
+
+.menu-parent .menu-caret {
+  margin-left: auto;
+  transition: transform 0.18s ease;
+  color: var(--mp-text-muted);
+}
+
+.menu-parent .menu-caret.open {
+  transform: rotate(180deg);
+}
+
+.menu-group.active > .menu-parent {
+  color: var(--mp-primary);
+}
+
+.menu-children {
+  display: grid;
+  gap: 2px;
+  padding: 2px 0 4px 34px;
+}
+
+.menu-child {
+  min-height: 34px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--mp-text-muted);
+}
+
+.menu-child::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  flex-shrink: 0;
+}
+
+.menu-child.active::before,
+.menu-child:hover::before {
+  background: var(--mp-primary);
 }
 
 .menu-item:hover {
@@ -382,6 +433,10 @@ button {
 
 .sidebar-collapsed .menu-item span {
   display: none;
+}
+
+.sidebar-collapsed .menu-list {
+  padding: 0 8px;
 }
 
 .content-panel {

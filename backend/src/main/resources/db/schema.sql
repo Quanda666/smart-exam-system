@@ -50,6 +50,18 @@ CREATE TABLE IF NOT EXISTS sys_user_role (
   KEY idx_user_role_role (role_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户-角色关联';
 
+CREATE TABLE IF NOT EXISTS role_page_permission (
+  id         BIGINT       NOT NULL AUTO_INCREMENT,
+  role_code  VARCHAR(32)  NOT NULL COMMENT '角色编码',
+  page_path  VARCHAR(128) NOT NULL COMMENT '页面路径',
+  sort_order INT          NOT NULL DEFAULT 0 COMMENT '菜单排序',
+  created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_role_page_permission (role_code, page_path),
+  KEY idx_role_page_permission_role (role_code, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色页面权限';
+
 -- ---------- 学生 / 教师档案 ----------
 
 CREATE TABLE IF NOT EXISTS student_profile (

@@ -136,19 +136,41 @@
         </div>
 
         <nav class="menu-list">
-          <button
-            v-for="item in menus"
-            :key="item.path"
-            type="button"
-            :class="['menu-item', { active: currentPath === item.path }]"
-            @click="navigateTo(item.path)"
-            :title="sidebarCollapsed ? item.title : ''"
+          <div
+            v-for="group in groupedMenus"
+            :key="menuKey(group)"
+            :class="['menu-group', { active: isMenuGroupActive(group) }]"
           >
-            <el-icon v-if="item.icon && iconMap[item.icon]" :size="18">
-              <component :is="iconMap[item.icon]" />
-            </el-icon>
-            <span>{{ item.title }}</span>
-          </button>
+            <button
+              type="button"
+              :class="['menu-item menu-parent', { active: currentPath === group.path && !group.children?.length }]"
+              @click="group.children?.length ? toggleMenuGroup(group) : navigateTo(group.path)"
+              :title="sidebarCollapsed ? group.title : ''"
+            >
+              <el-icon v-if="group.icon && iconMap[group.icon]" :size="18">
+                <component :is="iconMap[group.icon]" />
+              </el-icon>
+              <span>{{ group.title }}</span>
+              <el-icon
+                v-if="group.children?.length && !sidebarCollapsed"
+                class="menu-caret"
+                :class="{ open: expandedMenuKeys.has(menuKey(group)) }"
+              >
+                <ArrowDown />
+              </el-icon>
+            </button>
+            <div v-if="group.children?.length && !sidebarCollapsed && expandedMenuKeys.has(menuKey(group))" class="menu-children">
+              <button
+                v-for="child in group.children"
+                :key="child.path"
+                type="button"
+                :class="['menu-item menu-child', { active: currentPath === child.path }]"
+                @click="navigateTo(child.path)"
+              >
+                <span>{{ child.title }}</span>
+              </button>
+            </div>
+          </div>
         </nav>
       </aside>
 
@@ -219,7 +241,7 @@ import {
   Lock, Message, User, Loading,
   DataAnalysis, OfficeBuilding, Management, Connection, Bell, Collection,
   Document, PieChart, Notebook, Files, Calendar, EditPen, TrendCharts,
-  DataLine, House, Clock, Tickets, Reading
+  DataLine, House, Clock, Tickets, Reading, ArrowDown
 } from '@element-plus/icons-vue';
 
 // 侧边栏菜单图标映射（后端返回图标名 → Element Plus 组件）
@@ -243,7 +265,8 @@ const iconMap: Record<string, unknown> = {
   House,
   Clock,
   Tickets,
-  Reading
+  Reading,
+  ArrowDown
 };
 const BasicDataPanel = defineAsyncComponent(() => import('./components/BasicDataPanel.vue'));
 const QuestionBankPanel = defineAsyncComponent(() => import('./components/QuestionBankPanel.vue'));
@@ -329,6 +352,7 @@ const registerLoading = ref(false);
 const initializing = ref(true);
 const user = ref<AuthUser | null>(null);
 const menus = ref<MenuItem[]>([]);
+const expandedMenuKeys = ref<Set<string>>(new Set());
 const currentPath = ref('/login');
 const show404 = ref(false);
 const requestedPath404 = ref('');
@@ -340,11 +364,16 @@ const sidebarCollapsed = ref(localStorage.getItem('pref_sidebar_collapsed') === 
 watch(sidebarCollapsed, (collapsed) => {
   localStorage.setItem('pref_sidebar_collapsed', collapsed ? '1' : '0');
 });
+watch([menus, currentPath], () => {
+  syncExpandedMenus();
+}, { deep: true });
 function handlePreferenceChanged(prefs: { sidebarCollapsed: boolean }) {
   sidebarCollapsed.value = prefs.sidebarCollapsed;
 }
 
-const currentMenuTitle = computed(() => menus.value.find((item) => item.path === currentPath.value)?.title || '角色首页');
+const groupedMenus = computed(() => normalizeMenus(menus.value));
+const flatMenus = computed(() => flattenMenus(groupedMenus.value));
+const currentMenuTitle = computed(() => flatMenus.value.find((item) => item.path === currentPath.value)?.title || '角色首页');
 
 const isBasicPath = computed(() => currentPath.value.startsWith('/basic/'));
 
@@ -592,7 +621,7 @@ function clearActiveAttemptId() {
 
 function resolveLandingPath(defaultPath: string) {
   const urlPath = window.location.pathname;
-  return menus.value.some((item) => item.path === urlPath) ? urlPath : defaultPath;
+  return flatMenus.value.some((item) => item.path === urlPath) ? urlPath : defaultPath;
 }
 
 type NavigateMode = 'push' | 'replace' | 'silent';
@@ -607,7 +636,7 @@ function navigateTo(path: string, mode: NavigateMode = 'push') {
     return;
   }
 
-  const allowed = menus.value.some((item) => item.path === path);
+  const allowed = flatMenus.value.some((item) => item.path === path);
   if (!allowed) {
     // 显示 404 页面而不是静默回首页
     show404.value = true;
@@ -624,6 +653,50 @@ function navigateTo(path: string, mode: NavigateMode = 'push') {
   } else if (mode === 'replace') {
     window.history.replaceState({}, '', currentPath.value);
   }
+}
+
+function flattenMenus(items: MenuItem[]): MenuItem[] {
+  return items.flatMap((item) => item.children?.length ? [item, ...item.children] : [item]);
+}
+
+function normalizeMenus(items: MenuItem[]): MenuItem[] {
+  if (items.some((item) => item.children?.length)) {
+    return items;
+  }
+  return items.map((item) => ({ ...item, children: [] }));
+}
+
+function menuKey(item: MenuItem) {
+  return item.path || item.title;
+}
+
+function isMenuGroupActive(item: MenuItem) {
+  return item.path === currentPath.value || Boolean(item.children?.some((child) => child.path === currentPath.value));
+}
+
+function toggleMenuGroup(item: MenuItem) {
+  if (sidebarCollapsed.value && item.children?.length) {
+    navigateTo(item.children[0].path);
+    return;
+  }
+  const next = new Set(expandedMenuKeys.value);
+  const key = menuKey(item);
+  if (next.has(key)) {
+    next.delete(key);
+  } else {
+    next.add(key);
+  }
+  expandedMenuKeys.value = next;
+}
+
+function syncExpandedMenus() {
+  const next = new Set(expandedMenuKeys.value);
+  groupedMenus.value.forEach((item) => {
+    if (isMenuGroupActive(item)) {
+      next.add(menuKey(item));
+    }
+  });
+  expandedMenuKeys.value = next;
 }
 
 onMounted(async () => {

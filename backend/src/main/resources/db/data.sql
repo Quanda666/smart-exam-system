@@ -18,6 +18,30 @@ INSERT IGNORE INTO sys_user (id, username, password_hash, real_name, status, del
 
 INSERT IGNORE INTO sys_user_role (user_id, role_id) VALUES (1, 1);
 
+-- ---------- 页面权限 ----------
+INSERT IGNORE INTO role_page_permission (role_code, page_path, sort_order) VALUES
+  ('ADMIN', '/admin', 0),
+  ('ADMIN', '/question-bank', 1),
+  ('ADMIN', '/papers', 2),
+  ('ADMIN', '/exam/analysis', 3),
+  ('ADMIN', '/basic/data', 4),
+  ('ADMIN', '/system/users', 5),
+  ('ADMIN', '/system/roles', 6),
+  ('ADMIN', '/monitor/logs', 7),
+  ('TEACHER', '/teacher', 0),
+  ('TEACHER', '/exam-tasks', 1),
+  ('TEACHER', '/reviews', 2),
+  ('TEACHER', '/teacher/analysis', 3),
+  ('TEACHER', '/teacher/students', 4),
+  ('TEACHER', '/question-bank', 5),
+  ('TEACHER', '/papers', 6),
+  ('TEACHER', '/basic/data', 7),
+  ('STUDENT', '/student', 0),
+  ('STUDENT', '/student/exams', 1),
+  ('STUDENT', '/student/results', 2),
+  ('STUDENT', '/student/wrong-questions', 3),
+  ('STUDENT', '/basic/data', 4);
+
 -- ---------- 基础资料：班级 ----------
 -- 注意：这里仍使用旧列集合，避免旧库在 DatabaseMigrationRunner 补列前执行 data.sql 时因缺少 class_code/class_type 失败。
 -- 新库会使用 schema.sql 中 class_type 默认值；旧库会由 DatabaseMigrationRunner/migration-v4.sql 回填。

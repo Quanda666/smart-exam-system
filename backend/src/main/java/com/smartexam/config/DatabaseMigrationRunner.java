@@ -47,10 +47,12 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
         ensureEmailVerificationTable(jdbc);
         ensureV4Columns(jdbc);
         ensureExamPublishColumns(jdbc);
+        ensureRolePermissionTable(jdbc);
         ensureQuestionSourceColumns(jdbc);
         ensureRagTables(jdbc);
         ensureV4Tables(jdbc);
         backfillV4Data(jdbc);
+        backfillRolePermissions(jdbc);
     }
 
     /** sys_user.email_verified 缺失则补列（V1.0 旧库升级场景）。 */
@@ -128,6 +130,23 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
                 "ALTER TABLE exam_attempt ADD COLUMN attempt_no INT NOT NULL DEFAULT 1 COMMENT '第几次作答' AFTER user_id");
         addIndexIfMissing(jdbc, "exam_attempt", "idx_attempt_exam_user_no",
                 "ALTER TABLE exam_attempt ADD INDEX idx_attempt_exam_user_no (exam_id, user_id, attempt_no)");
+    }
+
+    /** Page-level role permissions used by the role authorization UI. */
+    private void ensureRolePermissionTable(JdbcTemplate jdbc) {
+        executeQuietly(jdbc, "create role_page_permission table", """
+                CREATE TABLE IF NOT EXISTS role_page_permission (
+                  id         BIGINT      NOT NULL AUTO_INCREMENT,
+                  role_code  VARCHAR(32) NOT NULL,
+                  page_path  VARCHAR(128) NOT NULL,
+                  sort_order INT         NOT NULL DEFAULT 0,
+                  created_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  updated_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                  PRIMARY KEY (id),
+                  UNIQUE KEY uk_role_page_permission (role_code, page_path),
+                  KEY idx_role_page_permission_role (role_code, sort_order)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Role page permissions'
+                """);
     }
 
     /** AI 题目进入题库后保留来源，方便审计和后续质量统计。 */
@@ -403,6 +422,36 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
                 INSERT IGNORE INTO exam_target (exam_id, target_type, target_id, target_code)
                 SELECT exam_id, 'CLASS', class_id, ''
                 FROM exam_class
+                """);
+    }
+
+    private void backfillRolePermissions(JdbcTemplate jdbc) {
+        executeQuietly(jdbc, "backfill role page permissions", """
+                INSERT IGNORE INTO role_page_permission (role_code, page_path, sort_order)
+                SELECT role_code, page_path, sort_order
+                FROM (
+                  SELECT 'ADMIN' role_code, '/admin' page_path, 0 sort_order
+                  UNION ALL SELECT 'ADMIN', '/question-bank', 1
+                  UNION ALL SELECT 'ADMIN', '/papers', 2
+                  UNION ALL SELECT 'ADMIN', '/exam/analysis', 3
+                  UNION ALL SELECT 'ADMIN', '/basic/data', 4
+                  UNION ALL SELECT 'ADMIN', '/system/users', 5
+                  UNION ALL SELECT 'ADMIN', '/system/roles', 6
+                  UNION ALL SELECT 'ADMIN', '/monitor/logs', 7
+                  UNION ALL SELECT 'TEACHER', '/teacher', 0
+                  UNION ALL SELECT 'TEACHER', '/exam-tasks', 1
+                  UNION ALL SELECT 'TEACHER', '/reviews', 2
+                  UNION ALL SELECT 'TEACHER', '/teacher/analysis', 3
+                  UNION ALL SELECT 'TEACHER', '/teacher/students', 4
+                  UNION ALL SELECT 'TEACHER', '/question-bank', 5
+                  UNION ALL SELECT 'TEACHER', '/papers', 6
+                  UNION ALL SELECT 'TEACHER', '/basic/data', 7
+                  UNION ALL SELECT 'STUDENT', '/student', 0
+                  UNION ALL SELECT 'STUDENT', '/student/exams', 1
+                  UNION ALL SELECT 'STUDENT', '/student/results', 2
+                  UNION ALL SELECT 'STUDENT', '/student/wrong-questions', 3
+                  UNION ALL SELECT 'STUDENT', '/basic/data', 4
+                ) seed
                 """);
     }
 

@@ -2,36 +2,47 @@ package com.smartexam.service;
 
 import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.dto.auth.MenuItem;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class MenuService {
+
+    private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
+
+    public MenuService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+        this.jdbcTemplateProvider = jdbcTemplateProvider;
+    }
 
     public List<MenuItem> menusFor(AuthUser user) {
         Map<String, MenuItem> menuByPath = new LinkedHashMap<>();
         for (MenuItem menu : allMenus()) {
             menuByPath.put(menu.getPath(), menu);
         }
-        List<MenuItem> menus = new ArrayList<>();
+        List<MenuItem> flatMenus = new ArrayList<>();
         for (String role : List.of("ADMIN", "TEACHER", "STUDENT")) {
             if (user != null && user.hasRole(role)) {
                 for (String path : rolePageMap().getOrDefault(role, List.of())) {
                     MenuItem menu = menuByPath.get(path);
-                    if (menu != null && canAccess(user, menu) && menus.stream().noneMatch(item -> item.getPath().equals(path))) {
-                        menus.add(menu);
+                    if (menu != null && canAccess(user, menu) && flatMenus.stream().noneMatch(item -> item.getPath().equals(path))) {
+                        flatMenus.add(menu);
                     }
                 }
             }
         }
-        return menus;
+        return groupMenus(user, flatMenus);
     }
 
-    public Map<String, List<String>> rolePageMap() {
+    public Map<String, List<String>> defaultRolePageMap() {
         Map<String, List<String>> data = new LinkedHashMap<>();
         // 管理员：概况 -> 核心业务 -> 基础数据 -> 系统管理
         data.put("ADMIN", List.of("/admin", "/question-bank", "/papers", "/exam/analysis", "/basic/data", "/system/users", "/system/roles", "/monitor/logs"));
@@ -40,6 +51,81 @@ public class MenuService {
         // 学生：概况 -> 核心功能 -> 基础数据
         data.put("STUDENT", List.of("/student", "/student/exams", "/student/results", "/student/wrong-questions", "/basic/data"));
         return data;
+    }
+
+    public Map<String, List<String>> rolePageMap() {
+        Map<String, List<String>> defaults = defaultRolePageMap();
+        JdbcTemplate jdbc = jdbcTemplateProvider.getIfAvailable();
+        if (jdbc == null || !rolePermissionTableExists(jdbc)) {
+            return defaults;
+        }
+        try {
+            Map<String, List<String>> custom = new LinkedHashMap<>();
+            jdbc.query("""
+                    SELECT role_code, page_path
+                    FROM role_page_permission
+                    ORDER BY role_code, sort_order, id
+                    """, rs -> {
+                String role = rs.getString("role_code");
+                String path = rs.getString("page_path");
+                custom.computeIfAbsent(role, key -> new ArrayList<>()).add(path);
+            });
+            Map<String, List<String>> merged = new LinkedHashMap<>();
+            defaults.forEach((role, paths) -> merged.put(role, custom.getOrDefault(role, paths)));
+            return merged;
+        } catch (Exception ex) {
+            return defaults;
+        }
+    }
+
+    public List<MenuItem> allMenuItems() {
+        return allMenus();
+    }
+
+    @Transactional
+    public List<String> updateRolePages(String roleCode, List<String> pages) {
+        String role = roleCode == null ? "" : roleCode.trim().toUpperCase();
+        Map<String, List<String>> defaults = defaultRolePageMap();
+        if (!defaults.containsKey(role)) {
+            throw new IllegalArgumentException("Unknown role: " + roleCode);
+        }
+
+        Set<String> allowed = new LinkedHashSet<>();
+        for (MenuItem menu : allMenus()) {
+            if (menu.getRoles() != null && menu.getRoles().contains(role)) {
+                allowed.add(menu.getPath());
+            }
+        }
+
+        Set<String> next = new LinkedHashSet<>();
+        if (pages != null) {
+            for (String page : pages) {
+                if (page != null && allowed.contains(page)) {
+                    next.add(page);
+                }
+            }
+        }
+
+        for (String required : requiredPages(role)) {
+            if (!next.contains(required)) {
+                throw new IllegalArgumentException("Required page missing: " + required);
+            }
+        }
+
+        JdbcTemplate jdbc = jdbcTemplateProvider.getIfAvailable();
+        if (jdbc == null) {
+            throw new IllegalStateException("Data source is not available");
+        }
+        ensureRolePermissionTable(jdbc);
+        jdbc.update("DELETE FROM role_page_permission WHERE role_code = ?", role);
+        int sort = 0;
+        for (String page : next) {
+            jdbc.update("""
+                    INSERT INTO role_page_permission (role_code, page_path, sort_order)
+                    VALUES (?, ?, ?)
+                    """, role, page, sort++);
+        }
+        return new ArrayList<>(next);
     }
 
     private List<MenuItem> allMenus() {
@@ -74,5 +160,96 @@ public class MenuService {
             return false;
         }
         return menu.getRoles().stream().anyMatch(user::hasRole);
+    }
+
+    private List<MenuItem> groupMenus(AuthUser user, List<MenuItem> flatMenus) {
+        if (user != null && user.hasRole("ADMIN")) {
+            return groups(flatMenus,
+                    group("工作台", "House", "/admin"),
+                    group("考试与题库", "Collection", "/question-bank", "/papers", "/exam/analysis"),
+                    group("基础数据", "Management", "/basic/data"),
+                    group("用户与权限", "User", "/system/users", "/system/roles"),
+                    group("系统监控", "Document", "/monitor/logs"));
+        }
+        if (user != null && user.hasRole("TEACHER")) {
+            return groups(flatMenus,
+                    group("工作台", "House", "/teacher"),
+                    group("考试管理", "Calendar", "/exam-tasks", "/reviews", "/teacher/analysis"),
+                    group("试卷题库", "Files", "/papers", "/question-bank"),
+                    group("教学数据", "DataLine", "/teacher/students", "/basic/data"));
+        }
+        if (user != null && user.hasRole("STUDENT")) {
+            return groups(flatMenus,
+                    group("学习首页", "House", "/student"),
+                    group("我的考试", "Clock", "/student/exams", "/student/results", "/student/wrong-questions"),
+                    group("基础数据", "Management", "/basic/data"));
+        }
+        return flatMenus;
+    }
+
+    private MenuGroup group(String title, String icon, String... paths) {
+        return new MenuGroup(title, icon, List.of(paths));
+    }
+
+    private List<MenuItem> groups(List<MenuItem> flatMenus, MenuGroup... groups) {
+        List<MenuItem> result = new ArrayList<>();
+        for (MenuGroup group : groups) {
+            MenuItem parent = new MenuItem(group.title, group.paths.get(0), group.icon, List.of("ADMIN", "TEACHER", "STUDENT"));
+            List<MenuItem> children = new ArrayList<>();
+            for (String path : group.paths) {
+                flatMenus.stream()
+                        .filter(item -> item.getPath().equals(path))
+                        .findFirst()
+                        .ifPresent(children::add);
+            }
+            if (children.isEmpty()) {
+                continue;
+            }
+            parent.setChildren(children);
+            result.add(parent);
+        }
+        return result;
+    }
+
+    private record MenuGroup(String title, String icon, List<String> paths) {
+    }
+
+    private List<String> requiredPages(String role) {
+        return switch (role) {
+            case "ADMIN" -> List.of("/admin", "/system/users", "/system/roles");
+            case "TEACHER" -> List.of("/teacher");
+            case "STUDENT" -> List.of("/student");
+            default -> List.of();
+        };
+    }
+
+    private boolean rolePermissionTableExists(JdbcTemplate jdbc) {
+        try {
+            Integer count = jdbc.queryForObject("""
+                    SELECT COUNT(*)
+                    FROM information_schema.TABLES
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'role_page_permission'
+                    """, Integer.class);
+            return count != null && count > 0;
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    private void ensureRolePermissionTable(JdbcTemplate jdbc) {
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS role_page_permission (
+                  id         BIGINT      NOT NULL AUTO_INCREMENT,
+                  role_code  VARCHAR(32) NOT NULL,
+                  page_path  VARCHAR(128) NOT NULL,
+                  sort_order INT         NOT NULL DEFAULT 0,
+                  created_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  updated_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                  PRIMARY KEY (id),
+                  UNIQUE KEY uk_role_page_permission (role_code, page_path),
+                  KEY idx_role_page_permission_role (role_code, sort_order)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Role page permissions'
+                """);
     }
 }

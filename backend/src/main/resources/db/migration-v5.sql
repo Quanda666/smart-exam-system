@@ -16,6 +16,41 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+CREATE TABLE IF NOT EXISTS role_page_permission (
+  id         BIGINT       NOT NULL AUTO_INCREMENT,
+  role_code  VARCHAR(32)  NOT NULL COMMENT '角色编码',
+  page_path  VARCHAR(128) NOT NULL COMMENT '页面路径',
+  sort_order INT          NOT NULL DEFAULT 0 COMMENT '菜单排序',
+  created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_role_page_permission (role_code, page_path),
+  KEY idx_role_page_permission_role (role_code, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色页面权限';
+
+INSERT IGNORE INTO role_page_permission (role_code, page_path, sort_order) VALUES
+  ('ADMIN', '/admin', 0),
+  ('ADMIN', '/question-bank', 1),
+  ('ADMIN', '/papers', 2),
+  ('ADMIN', '/exam/analysis', 3),
+  ('ADMIN', '/basic/data', 4),
+  ('ADMIN', '/system/users', 5),
+  ('ADMIN', '/system/roles', 6),
+  ('ADMIN', '/monitor/logs', 7),
+  ('TEACHER', '/teacher', 0),
+  ('TEACHER', '/exam-tasks', 1),
+  ('TEACHER', '/reviews', 2),
+  ('TEACHER', '/teacher/analysis', 3),
+  ('TEACHER', '/teacher/students', 4),
+  ('TEACHER', '/question-bank', 5),
+  ('TEACHER', '/papers', 6),
+  ('TEACHER', '/basic/data', 7),
+  ('STUDENT', '/student', 0),
+  ('STUDENT', '/student/exams', 1),
+  ('STUDENT', '/student/results', 2),
+  ('STUDENT', '/student/wrong-questions', 3),
+  ('STUDENT', '/basic/data', 4);
+
 SET @sql = (
   SELECT IF(
     COUNT(*) = 0,

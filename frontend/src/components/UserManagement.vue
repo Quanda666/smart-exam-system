@@ -34,26 +34,50 @@
       </div>
     </div>
 
-    <!-- 工具栏 -->
-    <div class="mp-toolbar">
-      <el-input v-model="query.keyword" placeholder="按用户名或姓名搜索" clearable style="width: 220px" @keyup.enter="search" />
-      <el-select v-model="query.role" placeholder="角色" clearable style="width: 140px">
-        <el-option label="管理员" value="ADMIN" />
-        <el-option label="教师" value="TEACHER" />
-        <el-option label="学生" value="STUDENT" />
-      </el-select>
-      <el-select v-model="query.status" placeholder="状态" clearable style="width: 120px">
-        <el-option label="启用" :value="1" />
-        <el-option label="停用" :value="0" />
-      </el-select>
-      <el-button type="primary" :icon="Search" @click="search">查询</el-button>
-      <span class="mp-toolbar-spacer"></span>
-      <el-button :icon="Download" :loading="exporting" @click="exportUsers">导出</el-button>
-      <el-button type="success" :icon="Plus" @click="openCreate">新建用户</el-button>
-    </div>
+    <div class="user-admin-layout">
+      <aside class="user-scope-panel">
+        <div class="scope-title">组织视图</div>
+        <el-input v-model="scopeKeyword" placeholder="搜索班级" clearable :prefix-icon="Search" />
+        <el-tree
+          class="scope-tree"
+          :data="scopeTree"
+          node-key="key"
+          :default-expanded-keys="['all', 'roles', 'classes']"
+          :filter-node-method="filterScopeNode"
+          :props="{ label: 'label', children: 'children' }"
+          highlight-current
+          @node-click="selectScope"
+          ref="scopeTreeRef"
+        />
+      </aside>
 
-    <!-- 表格卡片 -->
-    <div class="mp-table-card">
+      <main class="user-list-panel">
+        <div class="scope-summary">
+          <div>
+            <strong>{{ selectedScopeLabel }}</strong>
+            <span>{{ selectedScopeHint }}</span>
+          </div>
+          <el-button text @click="resetScope">查看全部</el-button>
+        </div>
+
+        <div class="mp-toolbar">
+          <el-input v-model="query.keyword" placeholder="按用户名或姓名搜索" clearable style="width: 220px" @keyup.enter="search" />
+          <el-select v-model="query.role" placeholder="角色" clearable style="width: 140px" @change="search">
+            <el-option label="管理员" value="ADMIN" />
+            <el-option label="教师" value="TEACHER" />
+            <el-option label="学生" value="STUDENT" />
+          </el-select>
+          <el-select v-model="query.status" placeholder="状态" clearable style="width: 120px" @change="search">
+            <el-option label="启用" :value="1" />
+            <el-option label="停用" :value="0" />
+          </el-select>
+          <el-button type="primary" :icon="Search" @click="search">查询</el-button>
+          <span class="mp-toolbar-spacer"></span>
+          <el-button :icon="Download" :loading="exporting" @click="exportUsers">导出</el-button>
+          <el-button type="success" :icon="Plus" @click="openCreate">新建用户</el-button>
+        </div>
+
+        <div class="mp-table-card">
       <!-- 批量操作浮条 -->
       <div v-if="selectedRows.length > 0" class="mp-batch-bar">
         已选择 <span class="mp-batch-count">{{ selectedRows.length }}</span> 项
@@ -126,6 +150,8 @@
         @current-change="load"
         @size-change="onSizeChange"
       />
+        </div>
+      </main>
     </div>
 
     <el-dialog v-model="userDialogVisible" :title="editingUser ? '编辑用户' : '新建用户'" width="520px">
@@ -213,7 +239,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import {
   User, UserFilled, CircleCheck, CircleClose, Search, Download, Plus,
@@ -254,6 +280,9 @@ const userDialogVisible = ref(false);
 const editingUser = ref<SystemUser | null>(null);
 const userSubmitting = ref(false);
 const classes = ref<ClassInfo[]>([]);
+const scopeKeyword = ref('');
+const selectedScope = ref<{ type: 'all' | 'role' | 'class'; id?: number; role?: string; label: string }>({ type: 'all', label: '全部用户' });
+const scopeTreeRef = ref<{ filter: (keyword: string) => void; setCurrentKey: (key: string) => void }>();
 const formRef = ref<FormInstance>();
 const userForm = reactive<CreateUserPayload>({
   username: '',
@@ -275,6 +304,36 @@ const userForm = reactive<CreateUserPayload>({
 });
 
 const electiveClasses = computed(() => classes.value.filter((cls) => cls.id !== userForm.classId));
+const selectedScopeLabel = computed(() => selectedScope.value.label);
+const selectedScopeHint = computed(() => {
+  if (selectedScope.value.type === 'class') return '当前按班级查看学生，列表只显示该班学生';
+  if (selectedScope.value.type === 'role') return `当前按${selectedScope.value.label}筛选`;
+  return '当前显示全部用户，可从左侧选择班级或角色';
+});
+const scopeTree = computed(() => [
+  { key: 'all', label: `全部用户（${summary.value.total || 0}）`, type: 'all' },
+  {
+    key: 'roles',
+    label: '按角色',
+    disabled: true,
+    children: [
+      { key: 'role:ADMIN', label: '管理员', type: 'role', role: 'ADMIN' },
+      { key: 'role:TEACHER', label: '教师', type: 'role', role: 'TEACHER' },
+      { key: 'role:STUDENT', label: '学生', type: 'role', role: 'STUDENT' }
+    ]
+  },
+  {
+    key: 'classes',
+    label: '按班级',
+    disabled: true,
+    children: classes.value.map((cls) => ({
+      key: `class:${cls.id}`,
+      label: `${cls.className}${cls.grade ? ` / ${cls.grade}` : ''}`,
+      type: 'class',
+      id: cls.id
+    }))
+  }
+]);
 
 const userRules = computed<FormRules>(() => ({
   username: editingUser.value ? [] : [
@@ -297,17 +356,46 @@ const userRules = computed<FormRules>(() => ({
   email: [{ type: 'email', message: '请输入有效的邮箱', trigger: 'blur' }]
 }));
 
-onMounted(load);
+watch(scopeKeyword, (keyword) => {
+  scopeTreeRef.value?.filter(keyword);
+});
+
+onMounted(async () => {
+  await loadClasses();
+  await load();
+  await nextTick();
+  scopeTreeRef.value?.setCurrentKey('all');
+});
+
+async function loadClasses() {
+  try {
+    classes.value = (await listClasses({ status: 1 })).data;
+  } catch {
+    classes.value = [];
+  }
+}
 
 async function load() {
   loading.value = true;
   try {
+    const role = selectedScope.value.type === 'role'
+      ? selectedScope.value.role
+      : (selectedScope.value.type === 'class' ? 'STUDENT' : (query.role || undefined));
     const [userResponse, summaryResponse] = await Promise.all([
-      listUsers({ keyword: query.keyword, role: query.role || undefined, status: query.status, page: page.value, size: size.value }),
+      listUsers({
+        keyword: query.keyword,
+        role,
+        status: query.status,
+        page: selectedScope.value.type === 'class' ? 1 : page.value,
+        size: selectedScope.value.type === 'class' ? 10000 : size.value
+      }),
       fetchUserSummary()
     ]);
-    users.value = userResponse.data.list;
-    total.value = userResponse.data.total;
+    const list = selectedScope.value.type === 'class'
+      ? userResponse.data.list.filter((user) => isUserInClass(user, selectedScope.value.id))
+      : userResponse.data.list;
+    users.value = list;
+    total.value = selectedScope.value.type === 'class' ? list.length : userResponse.data.total;
     summary.value = summaryResponse.data;
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '用户列表加载失败');
@@ -317,8 +405,47 @@ async function load() {
 }
 
 function search() {
+  if (query.role && selectedScope.value.type === 'role' && query.role !== selectedScope.value.role) {
+    selectedScope.value = { type: 'all', label: '全部用户' };
+  }
   page.value = 1;
   load();
+}
+
+function selectScope(node: any) {
+  if (node.disabled) return;
+  if (node.type === 'role') {
+    selectedScope.value = { type: 'role', role: node.role, label: node.label };
+    query.role = node.role;
+  } else if (node.type === 'class') {
+    selectedScope.value = { type: 'class', id: node.id, label: node.label };
+    query.role = 'STUDENT';
+  } else {
+    selectedScope.value = { type: 'all', label: '全部用户' };
+    query.role = '';
+  }
+  page.value = 1;
+  load();
+}
+
+function resetScope() {
+  selectedScope.value = { type: 'all', label: '全部用户' };
+  query.role = '';
+  page.value = 1;
+  scopeTreeRef.value?.setCurrentKey('all');
+  load();
+}
+
+function filterScopeNode(keyword: string, data: any) {
+  if (!keyword) return true;
+  return String(data.label || '').toLowerCase().includes(keyword.toLowerCase());
+}
+
+function isUserInClass(user: SystemUser, classId?: number) {
+  if (!classId) return false;
+  if (user.classId === classId) return true;
+  return String(user.classMemberships || '').split(',')
+    .some((item) => item.trim().startsWith(`${classId}:`));
 }
 
 function onSizeChange() {
@@ -532,9 +659,7 @@ async function openCreate() {
   resetUserForm();
   formRef.value?.clearValidate();
   if (classes.value.length === 0) {
-    try {
-      classes.value = (await listClasses({ status: 1 })).data;
-    } catch { /* ignore */ }
+    await loadClasses();
   }
   userDialogVisible.value = true;
 }
@@ -558,9 +683,7 @@ async function openEdit(row: SystemUser) {
   userForm.email = row.email || '';
   formRef.value?.clearValidate();
   if (classes.value.length === 0) {
-    try {
-      classes.value = (await listClasses({ status: 1 })).data;
-    } catch { /* ignore */ }
+    await loadClasses();
   }
   userDialogVisible.value = true;
 }
@@ -621,3 +744,63 @@ async function confirmUser() {
   }
 }
 </script>
+
+<style scoped>
+.user-admin-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.user-scope-panel,
+.user-list-panel {
+  min-width: 0;
+}
+
+.user-scope-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.scope-title {
+  color: #111827;
+  font-weight: 700;
+}
+
+.scope-tree {
+  min-height: 360px;
+}
+
+.scope-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.scope-summary div {
+  display: grid;
+  gap: 4px;
+}
+
+.scope-summary span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+@media (max-width: 960px) {
+  .user-admin-layout {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
