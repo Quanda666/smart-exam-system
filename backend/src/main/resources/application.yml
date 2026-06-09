@@ -9,6 +9,10 @@ server:
 spring:
   application:
     name: smart-exam-backend
+  servlet:
+    multipart:
+      max-file-size: ${UPLOAD_MAX_FILE_SIZE:12MB}
+      max-request-size: ${UPLOAD_MAX_REQUEST_SIZE:14MB}
   lifecycle:
     timeout-per-shutdown-phase: 30s
   sql:
@@ -50,16 +54,6 @@ app:
     model: ${OPENAI_MODEL:gpt-4o-mini}
     mock-enabled: ${AI_MOCK_ENABLED:true}
     timeout-seconds: ${AI_TIMEOUT_SECONDS:30}
-  mail:
-    host: ${MAIL_HOST:smtp.qq.com}
-    port: ${MAIL_PORT:465}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
-    protocol: smtps
-    properties:
-      mail.smtp.auth: true
-      mail.smtp.ssl.enable: true
-      mail.smtp.starttls.enable: false
 
 # Logging configuration
 logging:

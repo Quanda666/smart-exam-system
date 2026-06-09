@@ -1,6 +1,5 @@
 package com.smartexam.controller;
 
-import com.smartexam.auth.AuthContext;
 import com.smartexam.common.ApiResponse;
 import com.smartexam.common.PageResult;
 import com.smartexam.dto.auth.AuthUser;
@@ -73,12 +72,5 @@ public class QuestionBankController {
     public ApiResponse<Map<String, Object>> deleteQuestion(@PathVariable Long id) {
         AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
         return ApiResponse.ok("题目删除成功", questionBankService.deleteQuestion(id, user));
-    }
-
-    @GetMapping("/student-deny-check")
-    public ApiResponse<Map<String, Object>> studentDenyCheck() {
-        AuthContext.requireSession();
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok(Map.of("accessible", true));
     }
 }

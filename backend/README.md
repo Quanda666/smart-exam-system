@@ -1,113 +1,90 @@
 # 后端服务
 
-本目录为智慧在线考试与学习反馈系统后端服务，当前已进入阶段 9：防作弊与日志。
+本目录是智慧在线考试与学习反馈系统的 Spring Boot 后端，负责认证授权、业务 API、数据库初始化、AI 接入、文档文本抽取、日志与监控。
 
 ## 环境要求
 
 - JDK 17+
 - Maven 3.8+
-- MySQL 8，必需。后端已切换为生产模式，所有业务数据均来自数据库；未配置数据库时接口会返回数据库连接不可用。
+- MySQL 8
 
-## 启动命令
+## 启动
 
 ```bash
 mvn spring-boot:run
 ```
 
-Windows 本地也可在项目根目录使用：
+或在项目根目录使用：
 
 ```cmd
 scripts\run-backend.cmd
 ```
 
-## 默认接口
+默认地址：`http://localhost:8080`。
 
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| GET | /api/health | 健康检查，包含应用、时间和数据库连通状态 |
-| GET | /api/ai/status | AI 配置状态，返回模拟模式、模型名、Base URL 和密钥配置状态，不返回明文密钥 |
-| GET | /api/auth/register-options | 获取注册所需角色与班级选项 |
-| POST | /api/auth/register | 注册教师或学生账号并返回 Token、用户信息和角色菜单 |
-| POST | /api/auth/login | 登录并返回 Token、用户信息和角色菜单 |
-| GET | /api/auth/me | 获取当前用户信息，需要 Token |
-| GET | /api/auth/menus | 获取当前用户菜单，需要 Token |
-| POST | /api/auth/logout | 退出登录，需要 Token |
-| GET | /api/admin/overview | 管理员工作台，需要 ADMIN 角色 |
-| GET | /api/teacher/overview | 教师工作台，需要 TEACHER 角色 |
-| GET | /api/student/overview | 学生首页，需要 STUDENT 角色 |
-| GET | /api/basic/summary | 基础资料统计，需要登录 |
-| GET | /api/basic/classes | 班级列表，ADMIN、TEACHER 可访问 |
-| POST | /api/basic/classes | 新增班级，仅 ADMIN |
-| PUT | /api/basic/classes/{id} | 修改班级，仅 ADMIN |
-| DELETE | /api/basic/classes/{id} | 删除班级，仅 ADMIN |
-| GET | /api/basic/subjects | 科目列表，三类角色可访问 |
-| POST | /api/basic/subjects | 新增科目，ADMIN、TEACHER 可访问 |
-| PUT | /api/basic/subjects/{id} | 修改科目，ADMIN、TEACHER 可访问 |
-| DELETE | /api/basic/subjects/{id} | 删除科目，ADMIN、TEACHER 可访问 |
-| GET | /api/basic/knowledge-points | 知识点列表，三类角色可访问 |
-| POST | /api/basic/knowledge-points | 新增知识点，ADMIN、TEACHER 可访问 |
-| PUT | /api/basic/knowledge-points/{id} | 修改知识点，ADMIN、TEACHER 可访问 |
-| DELETE | /api/basic/knowledge-points/{id} | 删除知识点，ADMIN、TEACHER 可访问 |
-| GET | /api/basic/notices | 公告列表，三类角色可访问 |
-| POST | /api/basic/notices | 新增公告，ADMIN、TEACHER 可访问 |
-| PUT | /api/basic/notices/{id} | 修改公告，ADMIN、TEACHER 可访问 |
-| DELETE | /api/basic/notices/{id} | 删除公告，ADMIN、TEACHER 可访问 |
-| GET | /api/questions/summary | 题库统计，ADMIN、TEACHER 可访问 |
-| GET | /api/questions | 题目列表，支持关键词、科目、知识点、题型、难度、状态筛选 |
-| POST | /api/questions | 新增题目，ADMIN、TEACHER 可访问 |
-| PUT | /api/questions/{id} | 修改题目，ADMIN、TEACHER 可访问 |
-| PUT | /api/questions/{id}/status | 发布或撤回题目，ADMIN、TEACHER 可访问 |
-| DELETE | /api/questions/{id} | 删除题目，ADMIN、TEACHER 可访问 |
-| GET | /api/papers/summary | 试卷统计，ADMIN、TEACHER 可访问 |
-| GET | /api/papers | 试卷列表，支持关键词、科目、状态筛选 |
-| POST | /api/papers | 手动组卷创建试卷 |
-| POST | /api/papers/generate | 规则组卷创建试卷 |
-| GET | /api/papers/{id} | 获取试卷详情，含题目列表 |
-| PUT | /api/papers/{id} | 更新试卷题目、分值和基础信息 |
-| DELETE | /api/papers/{id} | 删除试卷，ADMIN、TEACHER 可访问 |
-| GET | /api/exams/teacher | 教师查询考试任务，ADMIN、TEACHER 可访问 |
-| GET | /api/exams/student | 学生查询个人考试列表，STUDENT 可访问 |
-| POST | /api/exams | 创建考试任务 |
-| POST | /api/exams/attempt/{id}/start | 学生开始考试 |
-| POST | /api/exams/attempt/{id}/submit | 学生提交答案 |
-| GET | /api/reviews/pending | 获取待批阅列表 |
-| GET | /api/reviews/attempt/{id} | 获取待批阅答卷详情 |
-| POST | /api/reviews/attempt/{id} | 提交主观题批阅 |
-| GET | /api/student/grades | 获取个人成绩列表 |
-| GET | /api/student/exam-result/{id} | 获取单次考试结果 |
-| GET | /api/student/wrong-questions | 获取错题本 |
-| GET | /api/student/mastery | 获取知识点掌握度 |
-| POST | /api/monitor/cheat-event | 记录异常事件 |
-| GET | /api/monitor/cheat-events/{id} | 查看异常事件 |
-| GET | /api/monitor/logs | 查询操作日志 |
-| POST | /api/ai/generate-question | AI 辅助出题 |
-| POST | /api/ai/explain | AI 内容解释 |
-| POST | /api/ai/suggest-review | AI 评分建议 |
+## 数据库初始化
 
-## 初始管理员与账号注册
+后端启动时自动执行：
 
-数据库初始化脚本仅保留初始管理员账号：
+- `src/main/resources/db/schema.sql`
+- `src/main/resources/db/data.sql`
 
-| 角色 | 账号 | 初始密码 |
-|---|---|---|
-| 管理员 | admin | admin123 |
+首次运行只需要提前创建数据库：
 
-教师和学生账号通过 `/api/auth/register` 或前端注册页面创建。生产部署后建议管理员立即修改初始密码，并按学校/机构流程审核用户信息。
+```sql
+CREATE DATABASE IF NOT EXISTS smart_exam_system
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+```
+
+## 主要接口
+
+| 分组 | 路径 |
+|---|---|
+| 健康检查 | `GET /api/health` |
+| 认证 | `/api/auth/login`, `/api/auth/register`, `/api/auth/me`, `/api/auth/menus`, `/api/auth/logout`, `/api/auth/profile`, `/api/auth/password`, `/api/auth/login-logs` |
+| 邮箱验证码 | `/api/auth/send-login-code`, `/api/auth/login-by-code`, `/api/auth/send-bind-code`, `/api/auth/bind-email` |
+| 三端概况 | `GET /api/overview/admin`, `GET /api/overview/teacher`, `GET /api/overview/student` |
+| 基础数据 | `/api/basic/classes`, `/api/basic/courses`, `/api/basic/class-courses`, `/api/basic/teaching-assignments`, `/api/basic/student-memberships`, `/api/basic/subjects`, `/api/basic/knowledge-points`, `/api/basic/notices`, `/api/basic/summary` |
+| 题库 | `/api/questions`, `/api/questions/summary`, `/api/questions/{id}/status` |
+| AI | `/api/ai/status`, `/api/ai/questions/generate`, `/api/ai/questions/import-document`, `/api/ai/questions/generate-from-material`, `/api/ai/questions/save`, `/api/ai/wrong-question/explain`, `/api/ai/suggest-review` |
+| 试卷 | `/api/papers`, `/api/papers/generate`, `/api/papers/{id}/status` |
+| 考试 | `/api/exams`, `/api/exams/teacher`, `/api/exams/student`, `/api/exams/attempt/{id}/start`, `/api/exams/attempt/{id}/save`, `/api/exams/attempt/{id}/submit` |
+| 阅卷 | `/api/reviews/pending`, `/api/reviews/attempt/{id}` |
+| 学生反馈 | `/api/student/grades`, `/api/student/exam-result/{id}`, `/api/student/wrong-questions`, `/api/student/mastery` |
+| 分析画像 | `/api/analysis/overview`, `/api/analysis/teacher`, `/api/insight/classes/{classId}/students`, `/api/insight/students/{userId}` |
+| 监控日志 | `/api/monitor/cheat-event`, `/api/monitor/cheat-events/{id}`, `/api/monitor/logs` |
+| 系统管理 | `/api/system/users`, `/api/system/roles` |
+| 通知 | `/api/notifications/my`, `/api/notifications/unread-count`, `/api/notifications/{id}/read`, `/api/notifications/read-all` |
+
+旧接口 `/api/admin/overview`、`/api/teacher/overview`、`/api/student/overview`、`/api/ai/generate-question`、`/api/ai/explain` 已废弃并从代码中移除。
 
 ## 环境变量
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| SERVER_PORT | 8080 | 后端端口 |
-| MYSQL_URL | jdbc:mysql://localhost:3306/smart_exam_system | 数据库连接地址 |
-| MYSQL_USERNAME | root | 数据库用户名 |
-| MYSQL_PASSWORD | root | 数据库密码 |
-| CORS_ALLOWED_ORIGIN_PATTERNS | http://localhost:*,http://127.0.0.1:* | 允许访问后端的前端域名模式，云部署时配置为前端公网域名 |
-| OPENAI_BASE_URL | https://api.openai.com/v1 | OpenAI 兼容接口地址 |
-| OPENAI_API_KEY | 空 | AI 密钥，不配置时 AI 处于未配置或模拟状态 |
-| OPENAI_MODEL | gpt-4o-mini | 默认模型 |
-| AI_MOCK_ENABLED | true | 是否启用 AI 模拟响应 |
+| `SERVER_PORT` / `PORT` | `8080` | 服务端口 |
+| `MYSQL_URL` | 本地 `smart_exam_system` | MySQL 连接串 |
+| `MYSQL_USERNAME` | `root` | 数据库用户 |
+| `MYSQL_PASSWORD` | `root` | 数据库密码 |
+| `DB_INIT_MODE` | `always` | Spring SQL 初始化模式 |
+| `CORS_ALLOWED_ORIGIN_PATTERNS` | `http://localhost:*,http://127.0.0.1:*` | CORS 来源 |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI 兼容接口地址 |
+| `OPENAI_API_KEY` | 空 | AI 密钥 |
+| `OPENAI_MODEL` | `gpt-4o-mini` | 模型名称 |
+| `AI_MOCK_ENABLED` | `true` | AI 模拟模式 |
+| `AI_TIMEOUT_SECONDS` | `30` | AI 请求超时 |
+| `UPLOAD_MAX_FILE_SIZE` | `12MB` | 单文件上传限制 |
+| `UPLOAD_MAX_REQUEST_SIZE` | `14MB` | 上传请求限制 |
+| `RESEND_API_KEY` | 空 | Resend API Key |
+| `RESEND_FROM_EMAIL` | 空 | 验证码发件邮箱 |
 
-## 阶段说明
+邮件发送使用 `EmailServiceV3` 调用 Resend HTTP API，不再使用 SMTP 配置。
 
-阶段 10 添加了 AI 辅助能力，包括 AI 辅助出题、AI 内容解释和 AI 评分建议，标志着所有核心功能已开发完成。
+## 初始账号
+
+| 角色 | 账号 | 初始密码 |
+|---|---|---|
+| 管理员 | `admin` | `admin123` |
+
+教师和学生账号通过注册入口创建。

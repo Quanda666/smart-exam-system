@@ -1073,7 +1073,7 @@ button {
   }
 }
 
-/* ===== 仪表盘快捷操作入口 ===== */
+/* ===== 概况快捷操作入口 ===== */
 .mp-quick-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1106,7 +1106,7 @@ button {
   color: var(--mp-primary);
 }
 
-/* 仪表盘问候语与快捷区的间距收敛 */
+/* 概况问候语与快捷区的间距收敛 */
 .dashboard .mp-greeting {
   margin-bottom: 16px;
 }

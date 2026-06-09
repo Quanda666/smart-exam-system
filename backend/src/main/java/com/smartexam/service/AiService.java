@@ -6,7 +6,7 @@ import com.smartexam.config.AiProperties;
 import com.smartexam.dto.ai.AiGeneratedQuestion;
 import com.smartexam.dto.ai.AiGeneratedQuestionOption;
 import com.smartexam.dto.ai.GenerateQuestionBatchRequest;
-import com.smartexam.dto.ai.GenerateQuestionRequest;
+import com.smartexam.dto.ai.MaterialQuestionGenerationRequest;
 import com.smartexam.dto.ai.SuggestReviewRequest;
 import com.smartexam.dto.ai.WrongQuestionExplainRequest;
 import org.springframework.http.HttpEntity;
@@ -26,6 +26,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.LinkedHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,6 +37,10 @@ public class AiService {
     private static final List<String> OBJECTIVE_TYPES = List.of("SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE");
     private static final List<String> ALL_TYPES = List.of("SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_BLANK", "SUBJECTIVE");
     private static final List<String> ALL_DIFFICULTIES = List.of("EASY", "MEDIUM", "HARD");
+    private static final Pattern QUESTION_START = Pattern.compile("^(?:第\\s*\\d+\\s*题\\s*[：:]?|\\d{1,3}\\s*[.、)）]\\s*).+");
+    private static final Pattern OPTION_LINE = Pattern.compile("^[（(]?([A-Ha-h])[）).、]\\s*(.+)$");
+    private static final Pattern ANSWER_LINE = Pattern.compile("^(?:正确答案|参考答案|答案)\\s*[：:]\\s*(.*)$");
+    private static final Pattern ANALYSIS_LINE = Pattern.compile("^(?:答案解析|题目解析|解析)\\s*[：:]\\s*(.*)$");
 
     private final AiProperties aiProperties;
     private final RestTemplate restTemplate;
@@ -47,14 +54,6 @@ public class AiService {
         factory.setConnectTimeout(timeoutMs);
         factory.setReadTimeout(timeoutMs);
         this.restTemplate = new RestTemplate(factory);
-    }
-
-    public String generateQuestion(GenerateQuestionRequest request) {
-        String prompt = "为" + request.getSubject() + "生成一个" + request.getDifficulty() + "的" + request.getQuestionType() + "题目";
-        if (request.getKnowledgePoint() != null) {
-            prompt += "，关于知识点：" + request.getKnowledgePoint();
-        }
-        return callAi(prompt);
     }
 
     public List<AiGeneratedQuestion> generateQuestionDrafts(GenerateQuestionBatchRequest request) {
@@ -81,9 +80,42 @@ public class AiService {
         return normalized;
     }
 
-    public String explain(String text) {
-        String prompt = "请解释以下内容：\n" + text;
-        return callAi(prompt);
+    public List<AiGeneratedQuestion> importQuestionsFromDocument(String documentText, GenerateQuestionBatchRequest defaults) {
+        validateDocumentDefaults(defaults);
+        if (!isMockMode()) {
+            try {
+                List<AiGeneratedQuestion> parsed = parseGeneratedQuestions(requestRemote(buildQuestionImportPrompt(documentText, defaults), aiProperties.getApiKey()));
+                List<AiGeneratedQuestion> normalized = normalizeImportedQuestions(parsed, defaults);
+                if (!normalized.isEmpty()) {
+                    return normalized;
+                }
+            } catch (Exception ignore) {
+                // 真实模型解析失败时继续走本地规则，避免导入入口直接不可用。
+            }
+        }
+
+        List<AiGeneratedQuestion> local = parseQuestionDocumentLocally(documentText, defaults);
+        if (local.isEmpty()) {
+            throw new IllegalArgumentException("未识别到题目，请检查文档格式，建议使用“1.题干 + A.选项 + 答案 + 解析”的结构");
+        }
+        return local;
+    }
+
+    public List<AiGeneratedQuestion> generateQuestionDraftsFromMaterial(String materialText, MaterialQuestionGenerationRequest request) {
+        validateMaterialRequest(request);
+        Map<String, Integer> typeCounts = normalizedTypeCounts(request.getTypeCounts());
+        if (!isMockMode()) {
+            try {
+                List<AiGeneratedQuestion> parsed = parseGeneratedQuestions(requestRemote(buildMaterialQuestionPrompt(materialText, request, typeCounts), aiProperties.getApiKey()));
+                List<AiGeneratedQuestion> normalized = normalizeMaterialQuestions(parsed, request, typeCounts);
+                if (hasRequestedCounts(normalized, typeCounts)) {
+                    return normalized;
+                }
+            } catch (Exception ignore) {
+                // 模型输出不稳定时回退到本地草稿，老师仍然能继续微调。
+            }
+        }
+        return buildLocalMaterialQuestionDrafts(materialText, request, typeCounts);
     }
 
     public String explainWrongQuestion(WrongQuestionExplainRequest request) {
@@ -165,6 +197,34 @@ public class AiService {
         }
     }
 
+    private void validateDocumentDefaults(GenerateQuestionBatchRequest request) {
+        String difficulty = normalizeCode(request.getDifficulty());
+        if (!ALL_DIFFICULTIES.contains(difficulty)) {
+            throw new IllegalArgumentException("不支持的难度：" + request.getDifficulty());
+        }
+        if (request.getSubjectId() == null || blankToNull(request.getSubjectName()) == null) {
+            throw new IllegalArgumentException("请先选择科目");
+        }
+    }
+
+    private void validateMaterialRequest(MaterialQuestionGenerationRequest request) {
+        String difficulty = normalizeCode(request.getDifficulty());
+        if (!ALL_DIFFICULTIES.contains(difficulty)) {
+            throw new IllegalArgumentException("不支持的难度：" + request.getDifficulty());
+        }
+        if (request.getSubjectId() == null || blankToNull(request.getSubjectName()) == null) {
+            throw new IllegalArgumentException("请先选择科目");
+        }
+        Map<String, Integer> typeCounts = normalizedTypeCounts(request.getTypeCounts());
+        int total = typeCounts.values().stream().mapToInt(Integer::intValue).sum();
+        if (total <= 0) {
+            throw new IllegalArgumentException("请至少选择一种题型数量");
+        }
+        if (total > 30) {
+            throw new IllegalArgumentException("单次最多生成30道题");
+        }
+    }
+
     private String buildQuestionDraftPrompt(GenerateQuestionBatchRequest request) {
         String topic = topicName(request);
         return """
@@ -199,6 +259,62 @@ public class AiService {
                 normalizedCount(request.getCount()),
                 request.getDefaultScore() == null ? BigDecimal.valueOf(5) : request.getDefaultScore(),
                 blankToNull(request.getRequirements()) == null ? "" : "- 补充要求：" + request.getRequirements().trim()
+        );
+    }
+
+    private String buildQuestionImportPrompt(String documentText, GenerateQuestionBatchRequest defaults) {
+        return """
+                请从老师上传的题目文档中识别题目，并转换成在线考试题库草稿。只返回 JSON 数组，不要输出 Markdown。
+                每道题包含：subjectId, knowledgePointId, questionType, difficulty, stem, correctAnswer, analysis, defaultScore, status, options。
+
+                识别规则：
+                - 保留原题语义，不要额外改写或创造新题。
+                - 自动判断题型：SINGLE_CHOICE、MULTIPLE_CHOICE、TRUE_FALSE、FILL_BLANK、SUBJECTIVE。
+                - 客观题必须抽取选项并标记 correct；若文档没有答案，可先给出最可能答案，但 analysis 中提示老师确认。
+                - 非客观题 options 为空数组，correctAnswer 放参考答案。
+                - status 固定为 0。
+                - 所有题目使用 subjectId=%d、knowledgePointId=%s、difficulty=%s、defaultScore=%s。
+
+                题目文档：
+                %s
+                """.formatted(
+                defaults.getSubjectId(),
+                defaults.getKnowledgePointId() == null ? "null" : defaults.getKnowledgePointId(),
+                normalizeCode(defaults.getDifficulty()),
+                defaults.getDefaultScore() == null ? BigDecimal.valueOf(5) : defaults.getDefaultScore(),
+                promptText(documentText)
+        );
+    }
+
+    private String buildMaterialQuestionPrompt(String materialText, MaterialQuestionGenerationRequest request, Map<String, Integer> typeCounts) {
+        return """
+                请根据课程材料生成在线考试题库草稿，只返回 JSON 数组，不要输出 Markdown。
+                每道题包含：subjectId, knowledgePointId, questionType, difficulty, stem, correctAnswer, analysis, defaultScore, status, options。
+
+                课程上下文：
+                - 科目：%s（ID=%d）
+                - 关联知识点：%s（ID=%s）
+                - 难度：%s
+                - 默认分值：%s
+                - 题型数量：%s
+                - status 固定为 0。
+                - 题目必须来自材料内容，不要编造材料外事实。
+                - 解析必须指出材料中的依据或关键概念。
+                - SINGLE_CHOICE 4个选项且1个正确；MULTIPLE_CHOICE 4个选项且至少2个正确；TRUE_FALSE 使用 A=正确、B=错误；FILL_BLANK/SUBJECTIVE 不要选项。
+                %s
+
+                课程材料：
+                %s
+                """.formatted(
+                safeText(request.getSubjectName()),
+                request.getSubjectId(),
+                firstNonBlank(request.getKnowledgePointName(), "自动关联材料核心内容"),
+                request.getKnowledgePointId() == null ? "null" : request.getKnowledgePointId(),
+                normalizeCode(request.getDifficulty()),
+                request.getDefaultScore() == null ? BigDecimal.valueOf(5) : request.getDefaultScore(),
+                typeCounts,
+                blankToNull(request.getRequirements()) == null ? "" : "- 补充要求：" + request.getRequirements().trim(),
+                promptText(materialText)
         );
     }
 
@@ -302,29 +418,34 @@ public class AiService {
     }
 
     private AiGeneratedQuestion normalizeGeneratedQuestion(AiGeneratedQuestion question, GenerateQuestionBatchRequest request, int index) {
-        String type = normalizeCode(request.getQuestionType());
+        return normalizeQuestionForType(question, request, normalizeCode(request.getQuestionType()), index);
+    }
+
+    private AiGeneratedQuestion normalizeQuestionForType(AiGeneratedQuestion question, GenerateQuestionBatchRequest request, String type, int index) {
+        String normalizedType = ALL_TYPES.contains(normalizeCode(type)) ? normalizeCode(type) : inferQuestionType(question);
         String difficulty = normalizeCode(request.getDifficulty());
-        AiGeneratedQuestion normalized = question == null ? createLocalQuestionDraft(request, index) : question;
+        GenerateQuestionBatchRequest typedRequest = requestForType(request, normalizedType, 1);
+        AiGeneratedQuestion normalized = question == null ? createLocalQuestionDraft(typedRequest, index) : question;
         normalized.setSubjectId(request.getSubjectId());
         normalized.setKnowledgePointId(request.getKnowledgePointId());
-        normalized.setQuestionType(type);
+        normalized.setQuestionType(normalizedType);
         normalized.setDifficulty(difficulty);
         normalized.setDefaultScore(request.getDefaultScore());
         normalized.setStatus(0);
 
         if (blankToNull(normalized.getStem()) == null) {
-            normalized.setStem(createLocalQuestionDraft(request, index).getStem());
+            normalized.setStem(createLocalQuestionDraft(typedRequest, index).getStem());
         } else {
             normalized.setStem(truncate(normalized.getStem().trim(), 4000));
         }
         normalized.setAnalysis(truncate(firstNonBlank(normalized.getAnalysis(), "请结合题干条件分析关键概念，按步骤判断后再得出答案。"), 4000));
 
-        if (OBJECTIVE_TYPES.contains(type)) {
-            normalized.setOptions(normalizeObjectiveOptions(normalized, request, index));
+        if (OBJECTIVE_TYPES.contains(normalizedType)) {
+            normalized.setOptions(normalizeObjectiveOptions(normalized, typedRequest, index));
             normalized.setCorrectAnswer(correctLabels(normalized.getOptions()).stream().collect(Collectors.joining(",")));
         } else {
             normalized.setOptions(List.of());
-            normalized.setCorrectAnswer(truncate(firstNonBlank(normalized.getCorrectAnswer(), createLocalQuestionDraft(request, index).getCorrectAnswer()), 4000));
+            normalized.setCorrectAnswer(truncate(firstNonBlank(normalized.getCorrectAnswer(), createLocalQuestionDraft(typedRequest, index).getCorrectAnswer()), 4000));
         }
         return normalized;
     }
@@ -390,6 +511,283 @@ public class AiService {
                 .filter(option -> Boolean.TRUE.equals(option.getCorrect()))
                 .map(AiGeneratedQuestionOption::getOptionLabel)
                 .collect(Collectors.toCollection(HashSet::new));
+    }
+
+    private List<AiGeneratedQuestion> normalizeImportedQuestions(List<AiGeneratedQuestion> parsed, GenerateQuestionBatchRequest defaults) {
+        List<AiGeneratedQuestion> normalized = new ArrayList<>();
+        for (AiGeneratedQuestion question : parsed) {
+            if (normalized.size() >= 100) {
+                break;
+            }
+            String type = ALL_TYPES.contains(normalizeCode(question.getQuestionType())) ? normalizeCode(question.getQuestionType()) : inferQuestionType(question);
+            normalized.add(normalizeQuestionForType(question, defaults, type, normalized.size() + 1));
+        }
+        return normalized;
+    }
+
+    private List<AiGeneratedQuestion> normalizeMaterialQuestions(List<AiGeneratedQuestion> parsed,
+                                                                 MaterialQuestionGenerationRequest request,
+                                                                 Map<String, Integer> typeCounts) {
+        String topic = materialTopic("", request);
+        Map<String, List<AiGeneratedQuestion>> bucket = new LinkedHashMap<>();
+        for (String type : ALL_TYPES) {
+            bucket.put(type, new ArrayList<>());
+        }
+        for (AiGeneratedQuestion question : parsed) {
+            String type = ALL_TYPES.contains(normalizeCode(question.getQuestionType())) ? normalizeCode(question.getQuestionType()) : inferQuestionType(question);
+            bucket.computeIfAbsent(type, ignored -> new ArrayList<>()).add(question);
+        }
+
+        List<AiGeneratedQuestion> result = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : typeCounts.entrySet()) {
+            String type = entry.getKey();
+            int count = entry.getValue();
+            GenerateQuestionBatchRequest typed = requestFromMaterial(request, type, count, topic);
+            List<AiGeneratedQuestion> candidates = bucket.getOrDefault(type, List.of());
+            for (int i = 0; i < count; i++) {
+                AiGeneratedQuestion candidate = i < candidates.size() ? candidates.get(i) : createLocalQuestionDraft(typed, i + 1);
+                result.add(normalizeQuestionForType(candidate, typed, type, i + 1));
+            }
+        }
+        return result;
+    }
+
+    private boolean hasRequestedCounts(List<AiGeneratedQuestion> questions, Map<String, Integer> typeCounts) {
+        Map<String, Long> actual = questions.stream().collect(Collectors.groupingBy(q -> normalizeCode(q.getQuestionType()), Collectors.counting()));
+        return typeCounts.entrySet().stream().allMatch(entry -> actual.getOrDefault(entry.getKey(), 0L) >= entry.getValue());
+    }
+
+    private List<AiGeneratedQuestion> buildLocalMaterialQuestionDrafts(String materialText,
+                                                                       MaterialQuestionGenerationRequest request,
+                                                                       Map<String, Integer> typeCounts) {
+        String topic = materialTopic(materialText, request);
+        String snippet = materialSnippet(materialText);
+        List<AiGeneratedQuestion> result = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : typeCounts.entrySet()) {
+            GenerateQuestionBatchRequest typed = requestFromMaterial(request, entry.getKey(), entry.getValue(), topic);
+            for (int i = 1; i <= entry.getValue(); i++) {
+                AiGeneratedQuestion question = createLocalQuestionDraft(typed, i);
+                question.setAnalysis("依据课程材料要点“" + snippet + "”，本题考察学生能否抓住概念、条件和应用场景。教师可在保存前继续补充更精确的材料出处。");
+                result.add(question);
+            }
+        }
+        return result;
+    }
+
+    private List<AiGeneratedQuestion> parseQuestionDocumentLocally(String documentText, GenerateQuestionBatchRequest defaults) {
+        List<List<String>> blocks = splitQuestionBlocks(documentText);
+        List<AiGeneratedQuestion> result = new ArrayList<>();
+        for (List<String> block : blocks) {
+            AiGeneratedQuestion parsed = parseQuestionBlock(block, defaults, result.size() + 1);
+            if (parsed != null) {
+                result.add(parsed);
+            }
+        }
+        return result;
+    }
+
+    private List<List<String>> splitQuestionBlocks(String documentText) {
+        List<List<String>> blocks = new ArrayList<>();
+        List<String> current = new ArrayList<>();
+        for (String rawLine : safeText(documentText).split("\\R")) {
+            String line = rawLine.trim();
+            if (line.isBlank()) {
+                continue;
+            }
+            if (QUESTION_START.matcher(line).matches() && !current.isEmpty()) {
+                blocks.add(current);
+                current = new ArrayList<>();
+            }
+            current.add(line);
+        }
+        if (!current.isEmpty()) {
+            blocks.add(current);
+        }
+        return blocks;
+    }
+
+    private AiGeneratedQuestion parseQuestionBlock(List<String> block, GenerateQuestionBatchRequest defaults, int index) {
+        StringBuilder stem = new StringBuilder();
+        StringBuilder analysis = new StringBuilder();
+        List<AiGeneratedQuestionOption> parsedOptions = new ArrayList<>();
+        String answer = "";
+        boolean readingAnalysis = false;
+
+        for (String raw : block) {
+            String line = raw.trim();
+            Matcher answerMatcher = ANSWER_LINE.matcher(line);
+            if (answerMatcher.matches()) {
+                answer = answerMatcher.group(1).trim();
+                readingAnalysis = false;
+                continue;
+            }
+            Matcher analysisMatcher = ANALYSIS_LINE.matcher(line);
+            if (analysisMatcher.matches()) {
+                analysis.append(analysisMatcher.group(1).trim());
+                readingAnalysis = true;
+                continue;
+            }
+            Matcher optionMatcher = OPTION_LINE.matcher(line);
+            if (optionMatcher.matches()) {
+                parsedOptions.add(option(optionMatcher.group(1).toUpperCase(Locale.ROOT), optionMatcher.group(2).trim(), false));
+                readingAnalysis = false;
+                continue;
+            }
+            if (readingAnalysis) {
+                analysis.append(analysis.isEmpty() ? "" : "\n").append(line);
+            } else {
+                stem.append(stem.isEmpty() ? "" : "\n").append(stripQuestionNumber(line));
+            }
+        }
+
+        String cleanStem = cleanStem(stem.toString());
+        if (cleanStem.isBlank()) {
+            return null;
+        }
+
+        AiGeneratedQuestion question = new AiGeneratedQuestion();
+        question.setSubjectId(defaults.getSubjectId());
+        question.setKnowledgePointId(defaults.getKnowledgePointId());
+        question.setDifficulty(normalizeCode(defaults.getDifficulty()));
+        question.setDefaultScore(defaults.getDefaultScore());
+        question.setStatus(0);
+        question.setStem(cleanStem);
+        question.setAnalysis(analysis.isEmpty() ? "由文档自动识别，请教师确认答案和解析后保存。" : analysis.toString().trim());
+
+        String type = inferQuestionType(cleanStem, parsedOptions, answer);
+        question.setQuestionType(type);
+        if (OBJECTIVE_TYPES.contains(type)) {
+            List<AiGeneratedQuestionOption> options = parsedOptions.isEmpty() && "TRUE_FALSE".equals(type)
+                    ? options(option("A", "正确", false), option("B", "错误", false))
+                    : parsedOptions;
+            markCorrectOptions(options, answer, type);
+            question.setOptions(options);
+            question.setCorrectAnswer(correctLabels(options).stream().collect(Collectors.joining(",")));
+        } else {
+            question.setOptions(List.of());
+            question.setCorrectAnswer(firstNonBlank(answer, "请教师补充参考答案"));
+        }
+        return normalizeQuestionForType(question, defaults, type, index);
+    }
+
+    private void markCorrectOptions(List<AiGeneratedQuestionOption> options, String answer, String type) {
+        Set<String> labels = extractAnswerLabels(answer);
+        if ("TRUE_FALSE".equals(type) && labels.isEmpty()) {
+            String upper = safeText(answer).toUpperCase(Locale.ROOT);
+            labels.add(upper.contains("错") || upper.contains("FALSE") ? "B" : "A");
+        }
+        if (labels.isEmpty() && !options.isEmpty()) {
+            labels.add(options.get(0).getOptionLabel());
+        }
+        for (AiGeneratedQuestionOption option : options) {
+            option.setCorrect(labels.contains(option.getOptionLabel()));
+        }
+    }
+
+    private Set<String> extractAnswerLabels(String answer) {
+        Set<String> labels = new HashSet<>();
+        String upper = safeText(answer).toUpperCase(Locale.ROOT);
+        for (char label = 'A'; label <= 'H'; label++) {
+            if (upper.indexOf(label) >= 0) {
+                labels.add(String.valueOf(label));
+            }
+        }
+        return labels;
+    }
+
+    private String inferQuestionType(AiGeneratedQuestion question) {
+        if (question == null) {
+            return "SINGLE_CHOICE";
+        }
+        return inferQuestionType(question.getStem(), question.getOptions(), question.getCorrectAnswer());
+    }
+
+    private String inferQuestionType(String stem, List<AiGeneratedQuestionOption> options, String answer) {
+        if (options != null && !options.isEmpty()) {
+            if (options.size() == 2 && options.stream().map(option -> safeText(option.getOptionContent())).collect(Collectors.joining("|")).matches(".*(正确|错误|对|错|true|false).*")) {
+                return "TRUE_FALSE";
+            }
+            return extractAnswerLabels(answer).size() > 1 ? "MULTIPLE_CHOICE" : "SINGLE_CHOICE";
+        }
+        String text = safeText(stem);
+        if (text.contains("____") || text.contains("______") || text.matches(".*[（(]\\s*[）)].*")) {
+            return "FILL_BLANK";
+        }
+        return "SUBJECTIVE";
+    }
+
+    private Map<String, Integer> normalizedTypeCounts(Map<String, Integer> raw) {
+        Map<String, Integer> result = new LinkedHashMap<>();
+        for (String type : ALL_TYPES) {
+            int value = raw == null ? 0 : raw.getOrDefault(type, raw.getOrDefault(type.toLowerCase(Locale.ROOT), 0));
+            if (value > 0) {
+                result.put(type, Math.min(value, 30));
+            }
+        }
+        return result;
+    }
+
+    private GenerateQuestionBatchRequest requestForType(GenerateQuestionBatchRequest base, String type, int count) {
+        GenerateQuestionBatchRequest request = new GenerateQuestionBatchRequest();
+        request.setSubjectId(base.getSubjectId());
+        request.setSubjectName(base.getSubjectName());
+        request.setKnowledgePointId(base.getKnowledgePointId());
+        request.setKnowledgePointName(base.getKnowledgePointName());
+        request.setQuestionType(type);
+        request.setDifficulty(base.getDifficulty());
+        request.setCount(count);
+        request.setDefaultScore(base.getDefaultScore());
+        request.setRequirements(base.getRequirements());
+        return request;
+    }
+
+    private GenerateQuestionBatchRequest requestFromMaterial(MaterialQuestionGenerationRequest source, String type, int count, String topic) {
+        GenerateQuestionBatchRequest request = new GenerateQuestionBatchRequest();
+        request.setSubjectId(source.getSubjectId());
+        request.setSubjectName(source.getSubjectName());
+        request.setKnowledgePointId(source.getKnowledgePointId());
+        request.setKnowledgePointName(firstNonBlank(source.getKnowledgePointName(), topic));
+        request.setQuestionType(type);
+        request.setDifficulty(source.getDifficulty());
+        request.setCount(count);
+        request.setDefaultScore(source.getDefaultScore());
+        request.setRequirements(source.getRequirements());
+        return request;
+    }
+
+    private String materialTopic(String materialText, MaterialQuestionGenerationRequest request) {
+        String knowledgePoint = blankToNull(request.getKnowledgePointName());
+        if (knowledgePoint != null) {
+            return knowledgePoint;
+        }
+        for (String line : safeText(materialText).split("\\R")) {
+            String cleaned = line.replaceAll("[#*\\-\\d.、：:]+", "").trim();
+            if (cleaned.length() >= 4 && cleaned.length() <= 40) {
+                return cleaned;
+            }
+        }
+        return safeText(request.getSubjectName());
+    }
+
+    private String materialSnippet(String materialText) {
+        String compact = safeText(materialText).replaceAll("\\s+", " ").trim();
+        if (compact.isBlank()) {
+            return "课程材料核心内容";
+        }
+        return compact.length() > 60 ? compact.substring(0, 60) + "..." : compact;
+    }
+
+    private String promptText(String text) {
+        String value = safeText(text).trim();
+        return value.length() > 18_000 ? value.substring(0, 18_000) : value;
+    }
+
+    private String stripQuestionNumber(String line) {
+        return line.replaceFirst("^(?:第\\s*\\d+\\s*题\\s*[：:]?|\\d{1,3}\\s*[.、)）]\\s*)", "").trim();
+    }
+
+    private String cleanStem(String stem) {
+        return stem.replaceFirst("^[【\\[]?(?:单选题|多选题|判断题|填空题|主观题|简答题)[】\\]]?\\s*", "").trim();
     }
 
     private String buildWrongQuestionPrompt(WrongQuestionExplainRequest request) {

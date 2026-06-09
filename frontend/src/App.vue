@@ -199,69 +199,7 @@
         <TeacherDashboard v-else-if="currentPath === '/teacher' && user" @navigate="navigateTo" />
         <StudentDashboard v-else-if="currentPath === '/student' && user" @navigate="navigateTo" />
 
-        <!-- 404 页面 -->
-        <NotFoundPage v-else-if="show404 && user" :requested-path="requestedPath404" :default-path="user.defaultPath" @navigate="navigateTo" />
-
-        <template v-else>
-        <section class="overview-grid">
-          <el-card class="overview-main" shadow="hover">
-            <template #header>
-              <div class="card-header">
-                <span>{{ overview?.title || '工作台' }}</span>
-                <el-tag :type="roleTagType">{{ user.roleLabel }}</el-tag>
-              </div>
-            </template>
-            <p class="overview-desc">{{ overview?.description || '正在加载角色首页数据。' }}</p>
-            <div class="metric-grid">
-              <div v-for="card in overview?.cards || []" :key="card.label" class="metric-card">
-                <span>{{ card.label }}</span>
-                <strong>{{ card.value }}</strong>
-                <small>{{ card.remark }}</small>
-              </div>
-            </div>
-          </el-card>
-
-          <el-card shadow="hover">
-            <template #header>
-              <div class="card-header">
-                <span>登录状态</span>
-                <el-tag type="success">已认证</el-tag>
-              </div>
-            </template>
-            <el-descriptions :column="1" border>
-              <el-descriptions-item label="账号">{{ user.username }}</el-descriptions-item>
-              <el-descriptions-item label="姓名">{{ user.realName }}</el-descriptions-item>
-              <el-descriptions-item label="角色">{{ user.roleLabel }}</el-descriptions-item>
-              <el-descriptions-item label="默认入口">{{ user.defaultPath }}</el-descriptions-item>
-            </el-descriptions>
-          </el-card>
-        </section>
-
-        <section class="panel-grid">
-          <el-card shadow="hover">
-            <template #header>
-              <div class="card-header">
-                <span>当前角色菜单</span>
-                <el-tag>{{ menus.length }} 项</el-tag>
-              </div>
-            </template>
-            <div class="access-list">
-              <span v-for="item in menus" :key="item.path">{{ item.title }}</span>
-            </div>
-          </el-card>
-          <el-card shadow="hover">
-            <template #header>
-              <div class="card-header">
-                <span>系统状态</span>
-              </div>
-            </template>
-             <el-descriptions :column="1" border>
-              <el-descriptions-item label="后端服务">{{ healthState }}</el-descriptions-item>
-              <el-descriptions-item label="AI 服务">{{ ai?.mode || '未知' }}</el-descriptions-item>
-            </el-descriptions>
-          </el-card>
-        </section>
-        </template>
+        <NotFoundPage v-else-if="user" :requested-path="requestedPath404 || currentPath" :default-path="user.defaultPath" @navigate="navigateTo" />
         </div>
       </div>
     </section>
@@ -322,7 +260,6 @@ const UserProfile = defineAsyncComponent(() => import('./components/UserProfile.
 import {
   fetchCurrentUser,
   fetchRegisterOptions,
-  fetchRoleOverview,
   login,
   loginByCode,
   logout,
@@ -331,11 +268,9 @@ import {
   type AuthUser,
   type MenuItem,
   type RegisterRequest,
-  type RoleCode,
-  type RoleOverview
+  type RoleCode
 } from './api/auth';
 import { clearToken, getToken, setToken } from './api/request';
-import { fetchAiStatus, fetchHealth, type AiStatusData, type HealthData } from './api/system';
 
 function handleProfileUpdated(updates: { realName?: string; email?: string; phone?: string; emailVerified?: boolean; profile?: Record<string, unknown> }) {
   if (!user.value) return;
@@ -384,13 +319,10 @@ const registerLoading = ref(false);
 const initializing = ref(true);
 const user = ref<AuthUser | null>(null);
 const menus = ref<MenuItem[]>([]);
-const overview = ref<RoleOverview | null>(null);
 const currentPath = ref('/login');
 const show404 = ref(false);
 const requestedPath404 = ref('');
 const routeBlockedMessage = ref('');
-const health = ref<HealthData | null>(null);
-const ai = ref<AiStatusData | null>(null);
 const availableClasses = ref<Array<{ id: number; className: string }>>([]);
 
 // 侧边栏（折叠状态持久化为个人偏好，刷新/重登保持）
@@ -401,11 +333,6 @@ watch(sidebarCollapsed, (collapsed) => {
 function handlePreferenceChanged(prefs: { sidebarCollapsed: boolean }) {
   sidebarCollapsed.value = prefs.sidebarCollapsed;
 }
-
-const healthState = computed(() => {
-  if (!health.value) return '待检测';
-  return health.value.status === 'UP' ? '正常' : '异常';
-});
 
 const currentMenuTitle = computed(() => menus.value.find((item) => item.path === currentPath.value)?.title || '角色首页');
 
@@ -423,20 +350,6 @@ const isExamTaskPath = computed(() => currentPath.value === '/exam-tasks');
 const isTeacherAnalysisPath = computed(() => currentPath.value === '/teacher/analysis');
 const isStudentModulePath = computed(() => ['/student/exams', '/student/results', '/student/wrong-questions'].includes(currentPath.value));
 const isTeacherStudentsPath = computed(() => currentPath.value === '/teacher/students');
-
-const isManagedModulePath = computed(() => isBasicPath.value || isQuestionBankPath.value || isPaperPath.value || isReviewPath.value || isUserPath.value || isRolePath.value || isLogPath.value || isAnalysisPath.value || isExamTaskPath.value || isTeacherAnalysisPath.value || isStudentModulePath.value || isTeacherStudentsPath.value);
-
-const roleTagType = computed(() => {
-  if (user.value?.primaryRole === 'ADMIN') return 'danger';
-  if (user.value?.primaryRole === 'TEACHER') return 'warning';
-  return 'success';
-});
-
-async function loadPublicData() {
-  const [healthResponse, aiResponse] = await Promise.all([fetchHealth(), fetchAiStatus()]);
-  health.value = healthResponse.data;
-  ai.value = aiResponse.data;
-}
 
 async function loadRegisterOptions() {
   const response = await fetchRegisterOptions();
@@ -491,7 +404,6 @@ async function handleCodeLogin() {
     user.value = response.data.user;
     menus.value = response.data.menus;
     navigateTo(resolveLandingPath(response.data.defaultPath), 'replace');
-    await loadOverview(response.data.user.primaryRole);
     ElMessage.success(`${response.data.user.roleLabel} ${response.data.user.realName} 登录成功`);
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '验证码登录失败');
@@ -509,7 +421,6 @@ async function restoreSession() {
     user.value = response.data.user;
     menus.value = response.data.menus;
     navigateTo(resolveLandingPath(response.data.defaultPath), 'replace');
-    await loadOverview(user.value.primaryRole);
   } catch (error) {
     clearToken();
     user.value = null;
@@ -533,7 +444,6 @@ async function handleLogin() {
     user.value = response.data.user;
     menus.value = response.data.menus;
     navigateTo(resolveLandingPath(response.data.defaultPath), 'replace');
-    await loadOverview(response.data.user.primaryRole);
     ElMessage.success(`${response.data.user.roleLabel} ${response.data.user.realName} 登录成功`);
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '登录失败');
@@ -587,7 +497,6 @@ async function handleRegister() {
     user.value = response.data.user;
     menus.value = response.data.menus;
     navigateTo(resolveLandingPath(response.data.defaultPath), 'replace');
-    await loadOverview(response.data.user.primaryRole);
     ElMessage.success(`${response.data.user.roleLabel} ${response.data.user.realName} 注册并登录成功`);
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '注册失败');
@@ -605,19 +514,13 @@ async function handleLogout() {
   clearToken();
   user.value = null;
   menus.value = [];
-  overview.value = null;
   currentPath.value = '/login';
   window.history.replaceState({}, '', '/');
   ElMessage.success('已退出登录');
 }
 
-function startExam(exam: { attemptId: number }) {
-  takingExam.value = { attemptId: exam.attemptId };
-}
-
 function finishExam() {
   takingExam.value = null;
-  // TODO: Refresh exam list
 }
 
 function resolveLandingPath(defaultPath: string) {
@@ -656,16 +559,6 @@ function navigateTo(path: string, mode: NavigateMode = 'push') {
   }
 }
 
-async function loadOverview(role: RoleCode) {
-  try {
-    const response = await fetchRoleOverview(role);
-    overview.value = response.data;
-  } catch (error) {
-    overview.value = null;
-    ElMessage.error(error instanceof Error ? error.message : '角色首页加载失败');
-  }
-}
-
 onMounted(async () => {
   // 先恢复会话（若本地有 token），恢复期间显示加载态而非登录页，避免刷新后闪现登录页。
   try {
@@ -673,11 +566,6 @@ onMounted(async () => {
   } finally {
     initializing.value = false;
   }
-
-  // 后端健康 / AI 状态非首屏关键信息，后台静默加载，不阻塞首屏、失败也不打断。
-  loadPublicData().catch((error) => {
-    ElMessage.warning(error instanceof Error ? error.message : '公共状态加载失败');
-  });
 
   // 响应浏览器前进/后退：URL 已由浏览器更新，按当前 path 切换页面（silent 不再回写 history）
   window.addEventListener('popstate', () => {

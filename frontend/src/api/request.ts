@@ -34,6 +34,29 @@ export async function postJson<T, B = unknown>(url: string, body?: B): Promise<A
   });
 }
 
+export async function postForm<T>(url: string, body: FormData): Promise<ApiResponse<T>> {
+  const token = getToken();
+  const headers = new Headers();
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const response = await fetch(resolveUrl(url), {
+    method: 'POST',
+    headers,
+    body
+  });
+
+  const payload = (await response.json().catch(() => null)) as ApiResponse<T> | null;
+  if (!response.ok) {
+    throw new Error(payload?.message || `请求失败：${response.status}`);
+  }
+  if (!payload) {
+    throw new Error('接口响应为空');
+  }
+  return payload;
+}
+
 export async function putJson<T, B = unknown>(url: string, body?: B): Promise<ApiResponse<T>> {
   return requestJson<T>(url, {
     method: 'PUT',

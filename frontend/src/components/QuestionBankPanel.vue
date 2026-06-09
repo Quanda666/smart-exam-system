@@ -61,8 +61,28 @@
             placeholder="补充要求：考察重点、场景、易错点"
           />
         </div>
-        <el-button type="success" :icon="MagicStick" :loading="aiGenerating" @click="aiGenerateQuestion">生成草稿</el-button>
+        <div class="ai-generator-actions">
+          <el-button type="success" :icon="MagicStick" :loading="aiGenerating" @click="aiGenerateQuestion">生成草稿</el-button>
+          <el-button type="primary" plain :icon="DocumentAdd" :loading="aiImporting" @click="pickQuestionDocument">识别题目文档</el-button>
+        </div>
       </div>
+
+      <div class="ai-material-strip">
+        <div class="ai-material-title">
+          <span>课程材料生成</span>
+          <small>上传 txt / Word / PDF，按题型数量生成题库草稿</small>
+        </div>
+        <div class="ai-material-counts">
+          <label v-for="item in questionTypes" :key="item.value" class="ai-count-item">
+            <span>{{ item.label }}</span>
+            <el-input-number v-model="materialCounts[item.value]" :min="0" :max="20" controls-position="right" />
+          </label>
+        </div>
+        <el-button type="primary" :icon="Upload" :loading="aiMaterialGenerating" @click="pickMaterialDocument">上传材料生成</el-button>
+      </div>
+
+      <input ref="questionDocInputRef" class="hidden-file-input" type="file" accept=".txt,.text,.md,.doc,.docx,.pdf" @change="handleQuestionDocumentSelected" />
+      <input ref="materialDocInputRef" class="hidden-file-input" type="file" accept=".txt,.text,.md,.doc,.docx,.pdf" @change="handleMaterialDocumentSelected" />
 
       <el-form class="question-form" :model="questionForm" label-position="top">
         <el-form-item label="所属科目">
@@ -205,7 +225,7 @@
       </div>
     </el-card>
 
-    <el-dialog v-model="aiDialogVisible" title="AI题目草稿" width="960px" class="ai-draft-dialog">
+    <el-dialog v-model="aiDialogVisible" :title="aiDialogTitle" width="960px" class="ai-draft-dialog">
       <div class="ai-draft-toolbar">
         <span>共生成 {{ aiDrafts.length }} 道题，保存时统一进入草稿状态</span>
         <el-button type="primary" :icon="DocumentChecked" :loading="aiSaving" :disabled="aiDrafts.length === 0" @click="saveAiDrafts">
@@ -254,7 +274,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Check, DocumentChecked, Download, MagicStick } from '@element-plus/icons-vue';
+import { Check, DocumentAdd, DocumentChecked, Download, MagicStick, Upload } from '@element-plus/icons-vue';
 import { exportToCsv } from '../utils/exportCsv';
 import { listKnowledgePoints, listSubjects, type KnowledgePointInfo, type SubjectInfo } from '../api/basic';
 import {
@@ -270,7 +290,13 @@ import {
   type QuestionPayload,
   type QuestionType
 } from '../api/question';
-import { generateQuestionDrafts, saveGeneratedQuestions, type AiGeneratedQuestion } from '../api/ai';
+import {
+  generateQuestionDrafts,
+  generateQuestionsFromMaterial,
+  importQuestionDocument,
+  saveGeneratedQuestions,
+  type AiGeneratedQuestion
+} from '../api/ai';
 import type { RoleCode } from '../api/auth';
 
 const props = defineProps<{
@@ -301,15 +327,27 @@ const summary = ref({ total: 0, published: 0, draft: 0, types: {}, difficulties:
 const editingQuestionId = ref<number | null>(null);
 
 const tableRef = ref<{ clearSelection: () => void }>();
+const questionDocInputRef = ref<HTMLInputElement | null>(null);
+const materialDocInputRef = ref<HTMLInputElement | null>(null);
 const selectedQuestions = ref<QuestionInfo[]>([]);
 const exporting = ref(false);
 const aiGenerating = ref(false);
+const aiImporting = ref(false);
+const aiMaterialGenerating = ref(false);
 const aiSaving = ref(false);
 const aiDialogVisible = ref(false);
+const aiDialogTitle = ref('AI题目草稿');
 const aiDrafts = ref<AiGeneratedQuestion[]>([]);
 const aiSettings = reactive({
   count: 3,
   requirements: ''
+});
+const materialCounts = reactive<Record<QuestionType, number>>({
+  SINGLE_CHOICE: 2,
+  MULTIPLE_CHOICE: 1,
+  TRUE_FALSE: 1,
+  FILL_BLANK: 1,
+  SUBJECTIVE: 0
 });
 
 const query = reactive<{
@@ -708,14 +746,103 @@ async function aiGenerateQuestion() {
       defaultScore: Number(questionForm.defaultScore || 5),
       requirements: aiSettings.requirements.trim()
     });
-    aiDrafts.value = response.data.map(normalizeAiDraft);
-    aiDialogVisible.value = true;
+    showAiDrafts(response.data, 'AI题目草稿');
     ElMessage.success(`已生成 ${aiDrafts.value.length} 道题目草稿`);
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : 'AI辅助出题失败');
   } finally {
     aiGenerating.value = false;
   }
+}
+
+function pickQuestionDocument() {
+  if (!currentDocumentContext()) return;
+  questionDocInputRef.value?.click();
+}
+
+function pickMaterialDocument() {
+  if (!currentDocumentContext()) return;
+  if (materialQuestionTotal() <= 0) {
+    ElMessage.warning('请至少设置一种题型数量');
+    return;
+  }
+  materialDocInputRef.value?.click();
+}
+
+async function handleQuestionDocumentSelected(event: Event) {
+  const file = selectedFile(event);
+  if (!file) return;
+  const context = currentDocumentContext();
+  if (!context) return;
+  aiImporting.value = true;
+  try {
+    const response = await importQuestionDocument(file, context);
+    showAiDrafts(response.data, `题目文档识别：${file.name}`);
+    ElMessage.success(`已识别 ${aiDrafts.value.length} 道题目草稿`);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '题目文档识别失败');
+  } finally {
+    aiImporting.value = false;
+  }
+}
+
+async function handleMaterialDocumentSelected(event: Event) {
+  const file = selectedFile(event);
+  if (!file) return;
+  const context = currentDocumentContext();
+  if (!context) return;
+  if (materialQuestionTotal() <= 0) {
+    ElMessage.warning('请至少设置一种题型数量');
+    return;
+  }
+  aiMaterialGenerating.value = true;
+  try {
+    const response = await generateQuestionsFromMaterial(file, {
+      ...context,
+      requirements: aiSettings.requirements.trim(),
+      typeCounts: { ...materialCounts }
+    });
+    showAiDrafts(response.data, `课程材料生成：${file.name}`);
+    ElMessage.success(`已根据课程材料生成 ${aiDrafts.value.length} 道题目草稿`);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '课程材料生成失败');
+  } finally {
+    aiMaterialGenerating.value = false;
+  }
+}
+
+function showAiDrafts(drafts: AiGeneratedQuestion[], title: string) {
+  aiDialogTitle.value = title;
+  aiDrafts.value = drafts.map(normalizeAiDraft);
+  aiDialogVisible.value = true;
+}
+
+function currentDocumentContext() {
+  const subject = subjects.value.find((item) => item.id === questionForm.subjectId);
+  if (!subject) {
+    ElMessage.warning('请先选择科目');
+    return null;
+  }
+  const knowledgePoint = knowledgePoints.value.find((item) => item.id === questionForm.knowledgePointId);
+  return {
+    subjectId: subject.id,
+    subjectName: subject.subjectName,
+    knowledgePointId: knowledgePoint?.id ?? null,
+    knowledgePointName: knowledgePoint?.pointName ?? null,
+    difficulty: questionForm.difficulty,
+    defaultScore: Number(questionForm.defaultScore || 5)
+  };
+}
+
+function selectedFile(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0] || null;
+  input.value = '';
+  return file;
+}
+
+function materialQuestionTotal() {
+  return Object.values(materialCounts).reduce((sum, value) => sum + Number(value || 0), 0);
 }
 
 async function saveAiDrafts() {
@@ -824,6 +951,62 @@ function correctAnswerText(question: QuestionPayload) {
   white-space: nowrap;
 }
 
+.ai-generator-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ai-material-strip {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  margin: -4px 0 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.ai-material-title {
+  display: grid;
+  gap: 3px;
+}
+
+.ai-material-title span {
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.ai-material-title small {
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.ai-material-counts {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(92px, 1fr));
+  gap: 8px;
+}
+
+.ai-count-item {
+  display: grid;
+  gap: 4px;
+  color: #4b5563;
+  font-size: 12px;
+}
+
+.ai-count-item :deep(.el-input-number) {
+  width: 100%;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
 .ai-draft-toolbar {
   display: flex;
   align-items: center;
@@ -916,6 +1099,16 @@ function correctAnswerText(question: QuestionPayload) {
 
   .ai-generator-main {
     grid-template-columns: 1fr;
+  }
+
+  .ai-generator-actions,
+  .ai-material-strip {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .ai-material-counts {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
   }
 
   .ai-draft-toolbar,

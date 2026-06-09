@@ -1,133 +1,65 @@
 # Smart Exam System 智慧在线考试与学习反馈系统
 
-本仓库用于第七组《计算机工程综合能力实训》项目“在线考试系统”的开发、测试、答辩展示与实训报告沉淀。
+本项目面向高校课程考核、课堂测验和阶段训练场景，提供管理员、教师、学生三端在线考试闭环：基础数据维护、题库建设、AI 辅助出题、试卷管理、考试发布、在线答题、自动判分、教师阅卷、成绩分析、防作弊记录、错题反馈与系统日志。
 
-## 项目定位
+## 当前状态
 
-本系统面向高校课程考核、课堂测验和阶段训练场景，围绕题库管理、试卷管理、考试发布、在线答题、自动评分、教师阅卷、成绩分析、防作弊记录、错题反馈与 AI 辅助学习构建完整在线考试闭环。
+项目已从早期“阶段式开发记录”整理为可运行的业务系统。三端默认入口均为“概况”，并置于菜单第一位；旧的角色占位概览、诊断接口、旧 AI 文本接口、重复初始化脚本和未使用 SMTP 配置已清理。
 
-## 团队信息
+## 核心能力
 
-| 分工 | 学号 | 姓名 |
-|---|---|---|
-| 组长 | 2312402060134 | 陈绍杰 |
-| 成员 | 2312402060135 | 张嘉豪 |
-| 成员 | 2312402060133 | 黄权达 |
-| 成员 | 2312402060128 | 黄浩然 |
+- 三端概况：管理员、教师、学生分别查看当前角色相关的业务概览与快捷入口。
+- 基础数据：班级、课程、课程班、授课分配、学生班级关系、科目、知识点、公告统一维护。
+- 题库管理：支持单选、多选、判断、填空、主观题，含筛选、草稿、发布、撤回、删除。
+- AI 出题台：支持直接生成题目、上传题目文档批量识别、上传课程资料按题型数量生成题目，生成后由教师确认并保存为题库草稿。
+- 试卷与考试：支持手动组卷、规则组卷、发布撤回、考试任务、在线答题、草稿保存与交卷。
+- 阅卷与成绩：客观题自动评分，主观题教师评分，支持 AI 评分建议、成绩记录与结果详情。
+- 学习反馈：错题本、知识点掌握度、学生画像与错题 AI 讲解。
+- 监控与日志：切屏、失焦、粘贴、超时等异常事件记录，系统操作日志查询。
+- 账号与邮件：账号密码登录、邮箱验证码登录、邮箱绑定、登录日志、用户与角色管理；邮件发送使用 Resend HTTP API。
 
-## 技术栈规划
+## 技术栈
 
 | 层次 | 技术 |
 |---|---|
-| 前端 | Vue 3、Vite、TypeScript、Element Plus、ECharts |
-| 后端 | Java 17、Spring Boot 3、轻量 Token 认证，后续可扩展 Spring Security 或 Sa Token |
+| 前端 | Vue 3, Vite, TypeScript, Element Plus, ECharts |
+| 后端 | Java 17, Spring Boot 3, JDBC, Bean Validation, AOP |
 | 数据库 | MySQL 8 |
-| AI 接入 | OpenAI 兼容接口适配层，可配置 Base URL、模型名、API Key 与模拟响应 |
-| 协作 | Git、GitHub、GitHub Actions、阶段记录、测试记录 |
-
-## 当前阶段
-
-当前已完成阶段 9：防作弊、日志与学生反馈。
-
-本阶段已完成：
-
-1. 后端登录接口、退出接口、当前用户接口、角色菜单接口。
-2. 后端轻量 Token 会话与角色访问控制。
-3. 管理员、教师、学生三类角色专属工作台接口。
-4. 班级、科目、知识点、公告的基础资料接口。
-5. 题库管理接口，支持单选、多选、判断、填空、主观题维护、筛选、发布撤回和删除。
-6. 试卷管理接口，支持手动组卷、规则组卷、试卷预览、发布撤回。
-7. 考试任务接口，支持教师创建考试、学生获取考试列表、开始考试和提交答案。
-8. 阅卷、成绩、错题本、知识点掌握度、防作弊和日志等相关接口。
-9. 前端实现了完整的教师端（基础资料、题库、试卷、考试任务、阅卷）和学生端（考试中心、在线答题、成绩查询、错题本）核心页面。
-10. 数据库已补充考试、答案、批阅、错题、防作弊和日志相关表。
-11. 后端测试和前端生产构建验证。
+| AI | OpenAI 兼容 Chat Completions 接口，可配置 Base URL、模型、API Key、超时与模拟模式 |
+| 部署 | Docker 多阶段构建，一体化 Jar 托管前端静态资源 |
 
 ## 目录结构
 
 ```text
 smart-exam-system
-├─ backend                    # 后端 Spring Boot 项目
-├─ frontend                   # 前端 Vue 项目
-├─ database                   # 数据库脚本与说明
-├─ docs                       # 接口、数据库、AI、测试等文档
-├─ scripts                    # Windows 本地辅助脚本
-├─ 第七组-在线考试系统项目主控文档.md
-├─ README.md
-├─ .gitignore
-└─ LICENSE
+├── backend/                 # Spring Boot 后端
+├── frontend/                # Vue 前端
+├── database/                # 数据库说明
+├── docs/                    # 设计、部署、测试、审查文档
+├── scripts/                 # Windows 本地辅助脚本
+├── Dockerfile               # 一体化云部署构建
+├── docker-compose.yml       # 本地容器运行参考
+└── README.md
 ```
 
-## 后端快速启动
+## 快速启动
+
+首次运行前先创建数据库，表结构和初始数据由后端启动时自动执行：
+
+```sql
+CREATE DATABASE IF NOT EXISTS smart_exam_system
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+```
+
+后端开发启动：
 
 ```bash
 cd backend
 mvn spring-boot:run
 ```
 
-Windows 本地可在项目根目录使用：
-
-```cmd
-scripts\run-backend.cmd
-```
-
-后端默认地址：
-
-```text
-http://localhost:8080
-```
-
-核心接口：
-
-```text
-GET  http://localhost:8080/api/health
-GET  http://localhost:8080/api/ai/status
-GET  http://localhost:8080/api/auth/register-options
-POST http://localhost:8080/api/auth/register
-POST http://localhost:8080/api/auth/login
-GET  http://localhost:8080/api/auth/me
-GET  http://localhost:8080/api/admin/overview
-GET  http://localhost:8080/api/teacher/overview
-GET  http://localhost:8080/api/student/overview
-GET  http://localhost:8080/api/basic/summary
-GET  http://localhost:8080/api/basic/classes
-GET  http://localhost:8080/api/basic/subjects
-GET  http://localhost:8080/api/basic/knowledge-points
-GET  http://localhost:8080/api/basic/notices
-GET  http://localhost:8080/api/questions/summary
-GET  http://localhost:8080/api/questions
-POST http://localhost:8080/api/questions
-PUT  http://localhost:8080/api/questions/{id}
-PUT  http://localhost:8080/api/questions/{id}/status
-DELETE http://localhost:8080/api/questions/{id}
-GET  http://localhost:8080/api/papers/summary
-GET  http://localhost:8080/api/papers
-POST http://localhost:8080/api/papers
-POST http://localhost:8080/api/papers/generate
-GET  http://localhost:8080/api/papers/{id}
-PUT  http://localhost:8080/api/papers/{id}
-DELETE http://localhost:8080/api/papers/{id}
-GET  http://localhost:8080/api/exams/teacher
-GET  http://localhost:8080/api/exams/student
-POST http://localhost:8080/api/exams
-POST http://localhost:8080/api/exams/attempt/{id}/start
-POST http://localhost:8080/api/exams/attempt/{id}/submit
-GET  http://localhost:8080/api/reviews/pending
-GET  http://localhost:8080/api/reviews/attempt/{id}
-POST http://localhost:8080/api/reviews/attempt/{id}
-GET  http://localhost:8080/api/student/grades
-GET  http://localhost:8080/api/student/exam-result/{id}
-GET  http://localhost:8080/api/student/wrong-questions
-GET  http://localhost:8080/api/student/mastery
-POST http://localhost:8080/api/monitor/cheat-event
-GET  http://localhost:8080/api/monitor/cheat-events/{id}
-GET  http://localhost:8080/api/monitor/logs
-POST http://localhost:8080/api/ai/generate-question
-POST http://localhost:8080/api/ai/explain
-POST http://localhost:8080/api/ai/suggest-review
-```
-
-## 前端快速启动
+前端开发启动：
 
 ```bash
 cd frontend
@@ -135,106 +67,111 @@ npm install
 npm run dev
 ```
 
-Windows 本地可在项目根目录使用：
+访问地址：
+
+```text
+后端 API: http://localhost:8080
+前端开发服务: http://127.0.0.1:3000
+```
+
+Windows 一体化本地启动推荐使用：
 
 ```cmd
-scripts\run-frontend.cmd
+scripts\run-all.cmd
 ```
 
-前端默认地址：
+该脚本会构建前端、复制到 Spring Boot 静态资源目录，并通过 `http://localhost:8080` 统一访问完整系统。
+
+## 初始账号
+
+| 角色 | 账号 | 初始密码 |
+|---|---|---|
+| 管理员 | `admin` | `admin123` |
+
+教师和学生账号通过登录页注册入口创建。生产部署后应立即修改初始管理员密码。
+
+## 数据库
+
+唯一权威脚本位于：
+
+- [backend/src/main/resources/db/schema.sql](backend/src/main/resources/db/schema.sql)
+- [backend/src/main/resources/db/data.sql](backend/src/main/resources/db/data.sql)
+
+Spring Boot 通过 `spring.sql.init.mode=always` 自动执行上述脚本。旧的 `docs/init.sql` 合并脚本已删除，避免和真实 schema 分叉。
+
+## 关键接口
 
 ```text
-http://127.0.0.1:3000
+GET  /api/health
+GET  /api/ai/status
+
+POST /api/auth/login
+POST /api/auth/register
+GET  /api/auth/me
+GET  /api/auth/menus
+PUT  /api/auth/profile
+PUT  /api/auth/password
+
+GET  /api/overview/admin
+GET  /api/overview/teacher
+GET  /api/overview/student
+
+GET  /api/basic/summary
+GET  /api/basic/classes
+GET  /api/basic/courses
+GET  /api/basic/class-courses
+GET  /api/basic/teaching-assignments
+GET  /api/basic/student-memberships
+GET  /api/basic/subjects
+GET  /api/basic/knowledge-points
+GET  /api/basic/notices
+
+GET  /api/questions
+POST /api/questions
+PUT  /api/questions/{id}
+PUT  /api/questions/{id}/status
+DELETE /api/questions/{id}
+
+POST /api/ai/questions/generate
+POST /api/ai/questions/import-document
+POST /api/ai/questions/generate-from-material
+POST /api/ai/questions/save
+POST /api/ai/wrong-question/explain
+POST /api/ai/suggest-review
 ```
 
-## 账号初始化与注册
+完整接口分组见 [docs/api-design.md](docs/api-design.md)。
 
-系统初始化脚本仅保留一个管理员账号用于首次登录和系统维护：
+## 环境变量
 
-| 角色 | 账号 | 初始密码 | 默认入口 |
-|---|---|---|---|
-| 管理员 | admin | admin123 | /admin |
-
-教师和学生账号通过登录页的注册入口创建，不再提供内置教师/学生账号或快速填充账号。生产部署后建议管理员尽快修改初始管理员密码。
-
-## 数据库初始化
-
-数据库脚本位于 [`database`](database) 目录：
-
-- [`backend/src/main/resources/db/schema.sql`](backend/src/main/resources/db/schema.sql)：创建了完整的数据库表结构，包括用户、角色、基础资料、题库、试卷、考试、答题、批阅、错题本、防作弊和日志等。
-- [`backend/src/main/resources/db/data.sql`](backend/src/main/resources/db/data.sql)：写入生产初始化所需的基础角色、初始管理员、班级、科目、知识点、公告和 AI 提示词模板。
-
-> Spring Boot 启动时通过 `spring.sql.init`（`mode=always`）自动执行上述脚本完成建表与初始化，无需手动导入。本地验收也可用合并版的 [`docs/init.sql`](docs/init.sql) 一键初始化（含建库语句）。
-
-建议数据库名：
+常用变量见 [.env.example](.env.example)。核心项包括：
 
 ```text
-smart_exam_system
+MYSQL_URL
+MYSQL_USERNAME
+MYSQL_PASSWORD
+CORS_ALLOWED_ORIGIN_PATTERNS
+OPENAI_BASE_URL
+OPENAI_API_KEY
+OPENAI_MODEL
+AI_MOCK_ENABLED
+UPLOAD_MAX_FILE_SIZE
+UPLOAD_MAX_REQUEST_SIZE
+RESEND_API_KEY
+RESEND_FROM_EMAIL
 ```
 
-## 本地验收部署（推荐）
+未配置 `OPENAI_API_KEY` 或开启 `AI_MOCK_ENABLED=true` 时，AI 功能使用本地模拟/规则兜底，不影响核心考试流程。
 
-面向验收老师的「一键交付」方案：拿到 **源码 + jar + init.sql**，5 分钟即可跑通整套系统，无需配置开发环境。完整步骤见 [本地验收部署指南](docs/deploy-local.md)。
+## 文档导航
 
-```bash
-# 1. 初始化数据库（仅首次，自动建库 + 建表 + 初始数据）
-mysql -u root -p < docs/init.sql
-
-# 2. 启动后端（默认 8080 端口）
-java -jar backend/target/smart-exam-backend-0.1.0-SNAPSHOT.jar
-
-# 3. 浏览器打开 frontend/dist/index.html，使用 admin / admin123 登录
-```
-
-Windows 用户也可直接双击 [`docs/一键启动.bat`](docs/一键启动.bat)：自动检测 JDK、定位 jar、启动后端并打开前端。
-
-相关交付物：[一键初始化脚本 init.sql](docs/init.sql)、[本地部署指南 deploy-local.md](docs/deploy-local.md)、[Windows 一键启动脚本](docs/一键启动.bat)。
-
-## 云端验证与部署
-
-为了实现更简单、更低资源消耗的一键部署，项目已将部署架构升级为**一体化单容器部署（前端打包进后端由后端托管）**。详细部署文档：[Railway 部署指南](docs/deploy-railway.md)、[Render 部署指南](docs/deploy-render.md)、[外部数据库配置](docs/external-database.md)、[故障排查](docs/troubleshooting.md)。
-
-一键自动部署做法：
-
-1. 用 Railway 连接 GitHub 仓库。
-2. Railway 会自动检测并读取根目录下的 [`Dockerfile`](Dockerfile) 进行多阶段构建（前端 Vue 构建后直接打包入后端 Jar 中运行）。
-3. 在 Railway 上另外创建一个空 MySQL 数据库，并根据文档初始化库名 `smart_exam_system`。
-4. 在 Web 服务上绑定公网域名并添加 MySQL 连接串等环境变量，系统即自动运行并上线。
-
-相关配置：
-
-- 根目录多阶段构建描述文件：[`Dockerfile`](Dockerfile)
-- 自动 SPA 路由重定向：[`backend/src/main/java/com/smartexam/controller/SpaController.java`](backend/src/main/java/com/smartexam/controller/SpaController.java)
-- [`.github/workflows/cloud-verify.yml`](.github/workflows/cloud-verify.yml)
-- [`docker-compose.yml`](docker-compose.yml)
-
-## 辅助脚本
-
-Windows 环境可使用 [`scripts`](scripts) 目录下的脚本进行环境检查和启动：
-
-```cmd
-scripts\check-env.cmd
-scripts\run-backend.cmd
-scripts\run-frontend.cmd
-```
-
-其中 [`scripts/check-env.cmd`](scripts/check-env.cmd) 会检查 Java、Maven、Node.js、npm 和前端依赖状态；[`scripts/run-backend.cmd`](scripts/run-backend.cmd) 用于启动后端；[`scripts/run-frontend.cmd`](scripts/run-frontend.cmd) 用于安装依赖并启动前端。
-
-## AI 接入说明
-
-AI 模块当前只做可配置规划和状态接口预留，不影响系统核心运行。
-
-建议通过环境变量配置：
-
-```text
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_API_KEY=你的密钥
-OPENAI_MODEL=gpt-4o-mini
-AI_MOCK_ENABLED=true
-```
-
-若未配置 API Key，系统应返回未启用或模拟模式状态，核心考试流程不受影响。
-
-## 主控文档
-
-所有后续开发以 [`第七组-在线考试系统项目主控文档.md`](第七组-在线考试系统项目主控文档.md) 为主线推进，每完成一个阶段都应同步记录进度、验证结果和可写入实训报告的内容。
+- [backend/README.md](backend/README.md)：后端接口、配置和运行说明。
+- [frontend/README.md](frontend/README.md)：前端页面、运行和构建说明。
+- [docs/ai-design.md](docs/ai-design.md)：AI 功能设计。
+- [docs/api-design.md](docs/api-design.md)：当前 API 分组。
+- [docs/database-design.md](docs/database-design.md)：当前数据库结构说明。
+- [docs/deploy-local.md](docs/deploy-local.md)：本地验收部署。
+- [docs/deploy-railway.md](docs/deploy-railway.md)、[docs/deploy-render.md](docs/deploy-render.md)：云部署。
+- [docs/email-setup.md](docs/email-setup.md)：Resend 邮件配置。
+- [docs/test-records.md](docs/test-records.md)：最新验证记录。
+- [docs/assessment.md](docs/assessment.md)：项目审查和清理记录。

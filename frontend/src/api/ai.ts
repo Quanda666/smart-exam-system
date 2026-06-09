@@ -1,13 +1,5 @@
-import { postJson } from './request';
+import { postForm, postJson } from './request';
 import type { Difficulty, QuestionInfo, QuestionOption, QuestionPayload, QuestionType } from './question';
-
-export interface GenerateQuestionPayload {
-  subject: string;
-  knowledgePoint?: string;
-  questionType: QuestionType;
-  difficulty?: string;
-  count?: number;
-}
 
 export interface SuggestReviewPayload {
   question: string;
@@ -29,6 +21,20 @@ export interface GenerateQuestionBatchPayload {
 
 export type AiGeneratedQuestion = QuestionPayload;
 
+export interface QuestionDocumentPayload {
+  subjectId: number;
+  subjectName: string;
+  knowledgePointId?: number | null;
+  knowledgePointName?: string | null;
+  difficulty: Difficulty;
+  defaultScore: number;
+}
+
+export interface MaterialQuestionPayload extends QuestionDocumentPayload {
+  requirements?: string;
+  typeCounts: Record<QuestionType, number>;
+}
+
 export interface SaveGeneratedQuestionsResult {
   savedCount: number;
   questions: QuestionInfo[];
@@ -45,20 +51,28 @@ export interface WrongQuestionExplainPayload {
   options?: QuestionOption[];
 }
 
-export function generateQuestion(payload: GenerateQuestionPayload) {
-  return postJson<string, GenerateQuestionPayload>('/api/ai/generate-question', payload);
-}
-
 export function generateQuestionDrafts(payload: GenerateQuestionBatchPayload) {
   return postJson<AiGeneratedQuestion[], GenerateQuestionBatchPayload>('/api/ai/questions/generate', payload);
 }
 
-export function saveGeneratedQuestions(questions: AiGeneratedQuestion[]) {
-  return postJson<SaveGeneratedQuestionsResult, { questions: AiGeneratedQuestion[] }>('/api/ai/questions/save', { questions });
+export function importQuestionDocument(file: File, payload: QuestionDocumentPayload) {
+  const form = contextForm(file, payload);
+  return postForm<AiGeneratedQuestion[]>('/api/ai/questions/import-document', form);
 }
 
-export function explainText(text: string) {
-  return postJson<string, { text: string }>('/api/ai/explain', { text });
+export function generateQuestionsFromMaterial(file: File, payload: MaterialQuestionPayload) {
+  const form = contextForm(file, payload);
+  form.set('requirements', payload.requirements || '');
+  form.set('singleChoiceCount', String(payload.typeCounts.SINGLE_CHOICE || 0));
+  form.set('multipleChoiceCount', String(payload.typeCounts.MULTIPLE_CHOICE || 0));
+  form.set('trueFalseCount', String(payload.typeCounts.TRUE_FALSE || 0));
+  form.set('fillBlankCount', String(payload.typeCounts.FILL_BLANK || 0));
+  form.set('subjectiveCount', String(payload.typeCounts.SUBJECTIVE || 0));
+  return postForm<AiGeneratedQuestion[]>('/api/ai/questions/generate-from-material', form);
+}
+
+export function saveGeneratedQuestions(questions: AiGeneratedQuestion[]) {
+  return postJson<SaveGeneratedQuestionsResult, { questions: AiGeneratedQuestion[] }>('/api/ai/questions/save', { questions });
 }
 
 export function explainWrongQuestion(payload: WrongQuestionExplainPayload) {
@@ -67,4 +81,20 @@ export function explainWrongQuestion(payload: WrongQuestionExplainPayload) {
 
 export function suggestReview(payload: SuggestReviewPayload) {
   return postJson<string, SuggestReviewPayload>('/api/ai/suggest-review', payload);
+}
+
+function contextForm(file: File, payload: QuestionDocumentPayload) {
+  const form = new FormData();
+  form.set('file', file);
+  form.set('subjectId', String(payload.subjectId));
+  form.set('subjectName', payload.subjectName);
+  if (payload.knowledgePointId !== undefined && payload.knowledgePointId !== null) {
+    form.set('knowledgePointId', String(payload.knowledgePointId));
+  }
+  if (payload.knowledgePointName) {
+    form.set('knowledgePointName', payload.knowledgePointName);
+  }
+  form.set('difficulty', payload.difficulty);
+  form.set('defaultScore', String(payload.defaultScore));
+  return form;
 }

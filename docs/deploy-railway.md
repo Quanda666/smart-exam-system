@@ -160,56 +160,20 @@ AI_TIMEOUT_SECONDS=30
 
 #### 邮件服务配置（可选，推荐配置）
 
-系统支持邮箱验证码登录和邮箱绑定功能。配置后用户可以：
-- 使用邮箱验证码登录（已绑定邮箱的用户）
-- 在账号中心绑定/更换邮箱
-- 提升账号安全性
-
-**使用 QQ 邮箱 SMTP**（推荐，免费且稳定）：
+系统当前使用 Resend HTTP API 发送验证码邮件，不再使用 SMTP。Railway 环境变量示例：
 
 ```bash
-# QQ 邮箱 SMTP 配置
-SPRING_MAIL_HOST=smtp.qq.com
-SPRING_MAIL_PORT=465
-SPRING_MAIL_USERNAME=your_qq_email@qq.com
-SPRING_MAIL_PASSWORD=your_authorization_code
-SPRING_MAIL_PROTOCOL=smtps
-SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true
-SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_ENABLE=true
-SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=false
+RESEND_API_KEY=re_your_api_key
+RESEND_FROM_EMAIL=onboarding@resend.dev
 ```
 
-**获取 QQ 邮箱授权码**：
-1. 登录 QQ 邮箱网页版：https://mail.qq.com
-2. 进入「设置」→「账户」
-3. 找到「POP3/IMAP/SMTP/Exchange/CardDAV/CalDAV服务」
-4. 开启「IMAP/SMTP服务」或「POP3/SMTP服务」
-5. 生成授权码（16位，如 `abcd efgh ijkl mnop`）
-6. 将授权码填入 `SPRING_MAIL_PASSWORD`（去除空格）
-
-**使用其他邮箱**：
-
-```bash
-# 163 邮箱
-SPRING_MAIL_HOST=smtp.163.com
-SPRING_MAIL_PORT=465
-SPRING_MAIL_USERNAME=your_email@163.com
-SPRING_MAIL_PASSWORD=your_authorization_code
-
-# Gmail（需海外服务器）
-SPRING_MAIL_HOST=smtp.gmail.com
-SPRING_MAIL_PORT=587
-SPRING_MAIL_USERNAME=your_email@gmail.com
-SPRING_MAIL_PASSWORD=your_app_password
-SPRING_MAIL_PROTOCOL=smtp
-SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true
-```
+正式环境建议在 Resend 中验证自己的域名，然后将 `RESEND_FROM_EMAIL` 改为 `noreply@你的域名.com`。
 
 **注意事项**：
-- 邮件服务为**可选配置**，不配置不影响系统核心功能
-- 未配置时，系统会降级：验证码生成但无法发送（仅记录日志）
-- 登录页的「验证码登录」Tab 在未配置邮件时不可用
-- 推荐在生产环境配置邮件服务以提升用户体验
+- 邮件服务为可选配置，不配置不影响核心考试流程。
+- 未配置时，验证码会生成并写入数据库，但不会发送邮件。
+- Resend 测试域名只能发送到已验证的收件邮箱。
+- 详细步骤见 [邮件服务配置指南](./email-setup.md)。
 
 ### 4.3 使用 Railway 变量引用（推荐）
 
@@ -507,7 +471,7 @@ Railway 默认启用了自动部署功能：
    邮件服务未配置，验证码已生成但无法发送: user@example.com -> 123456
    ```
 3. 确认 Railway 环境变量中邮件配置正确
-4. 测试 SMTP 连接（使用邮件客户端或在线工具）
+4. 在 Resend 后台查看 Logs，确认 API Key、发件人和收件人验证状态
 
 ---
 

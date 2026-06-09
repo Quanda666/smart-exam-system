@@ -55,20 +55,6 @@ export interface RegisterOptions {
   classes: Array<{ id: number; className: string; major?: string; grade?: string }>;
 }
 
-export interface OverviewCard {
-  label: string;
-  value: string | number;
-  remark: string;
-}
-
-export interface RoleOverview {
-  role: RoleCode;
-  title: string;
-  description: string;
-  cards: OverviewCard[];
-  nextModules: string[];
-}
-
 export function login(payload: LoginRequest) {
   return postJson<LoginResponse, LoginRequest>('/api/auth/login', payload);
 }
@@ -126,14 +112,4 @@ export interface LoginLog {
 
 export function fetchLoginLogs() {
   return getJson<LoginLog[]>('/api/auth/login-logs');
-}
-
-export function fetchRoleOverview(role: RoleCode) {
-  const pathMap: Record<RoleCode, string> = {
-    ADMIN: '/api/admin/overview',
-    TEACHER: '/api/teacher/overview',
-    STUDENT: '/api/student/overview',
-    GUEST: '/api/student/overview'
-  };
-  return getJson<RoleOverview>(pathMap[role]);
 }
