@@ -273,7 +273,7 @@
 
           <div class="ai-draft-meta">
             <strong>答案</strong>
-            <span>{{ draft.correctAnswer || correctAnswerText(draft) }}</span>
+            <span>{{ draft.correctAnswer || correctAnswerText(draft) || '待教师确认' }}</span>
           </div>
           <div class="ai-draft-meta">
             <strong>解析</strong>

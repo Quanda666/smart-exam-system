@@ -52,7 +52,7 @@ export interface AnswerPayload {
 export interface ExamDetail extends PaperInfo {
   examName: string;
   durationMinutes: number;
-  questions: Array<PaperQuestionInfo & { options: QuestionOption[] }>;
+  questions: Array<PaperQuestionInfo & { options?: Array<Omit<QuestionOption, 'correct'> & { correct?: boolean | number }> }>;
   remainingSeconds?: number;
   draftAnswers?: string | null;
 }

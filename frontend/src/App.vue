@@ -1,5 +1,6 @@
 <template>
-  <main class="app-shell">
+  <ExamTaking v-if="takingExam" :attempt-id="takingExam.attemptId" @submit-success="finishExam" />
+  <main v-else class="app-shell">
     <section v-if="initializing" class="app-loading" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:14px;color:#909399;">
       <el-icon class="is-loading" :size="34"><Loading /></el-icon>
       <span style="font-size:14px;">正在加载…</span>
@@ -119,8 +120,6 @@
         </template>
       </el-dialog>
     </section>
-
-    <ExamTaking v-else-if="takingExam" :attempt-id="takingExam.attemptId" @submit-success="finishExam" />
     <section v-else class="workspace" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
       <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
         <div class="brand">
@@ -192,7 +191,9 @@
         <ExamManagement v-else-if="isExamTaskPath && user" />
         <ExamAnalysis v-else-if="isTeacherAnalysisPath && user" scope="teacher" />
         <StudentInsight v-else-if="isTeacherStudentsPath && user" />
-        <StudentPanel v-else-if="isStudentModulePath && user" :path="currentPath" />
+        <StudentPanel v-else-if="currentPath === '/student/exams' && user" @start-exam="startStudentExam" />
+        <StudentResultsPanel v-else-if="currentPath === '/student/results' && user" />
+        <StudentWrongBook v-else-if="currentPath === '/student/wrong-questions' && user" />
 
         <!-- V2 角色概况 -->
         <AdminDashboard v-else-if="currentPath === '/admin' && user" @navigate="navigateTo" />
@@ -245,6 +246,8 @@ const PaperPanel = defineAsyncComponent(() => import('./components/PaperPanel.vu
 const ReviewPanel = defineAsyncComponent(() => import('./components/ReviewPanel.vue'));
 const ExamTaking = defineAsyncComponent(() => import('./components/ExamTaking.vue'));
 const StudentPanel = defineAsyncComponent(() => import('./components/StudentPanel.vue'));
+const StudentResultsPanel = defineAsyncComponent(() => import('./components/StudentResultsPanel.vue'));
+const StudentWrongBook = defineAsyncComponent(() => import('./components/StudentWrongBook.vue'));
 const UserManagement = defineAsyncComponent(() => import('./components/UserManagement.vue'));
 const RoleManagement = defineAsyncComponent(() => import('./components/RoleManagement.vue'));
 const SystemLog = defineAsyncComponent(() => import('./components/SystemLog.vue'));
@@ -348,7 +351,6 @@ const isLogPath = computed(() => currentPath.value === '/monitor/logs');
 const isAnalysisPath = computed(() => currentPath.value === '/exam/analysis');
 const isExamTaskPath = computed(() => currentPath.value === '/exam-tasks');
 const isTeacherAnalysisPath = computed(() => currentPath.value === '/teacher/analysis');
-const isStudentModulePath = computed(() => ['/student/exams', '/student/results', '/student/wrong-questions'].includes(currentPath.value));
 const isTeacherStudentsPath = computed(() => currentPath.value === '/teacher/students');
 
 async function loadRegisterOptions() {
@@ -521,6 +523,10 @@ async function handleLogout() {
 
 function finishExam() {
   takingExam.value = null;
+}
+
+function startStudentExam(exam: { attemptId: number }) {
+  takingExam.value = { attemptId: exam.attemptId };
 }
 
 function resolveLandingPath(defaultPath: string) {

@@ -225,6 +225,7 @@ public class QuestionBankService {
     private void validateQuestion(QuestionRequest request) {
         String type = normalizeCode(request.getQuestionType());
         String difficulty = normalizeCode(request.getDifficulty());
+        boolean draft = request.getStatus() == null || request.getStatus() == 0;
         if (!ALL_TYPES.contains(type)) {
             throw new IllegalArgumentException("不支持的题型：" + request.getQuestionType());
         }
@@ -240,6 +241,9 @@ public class QuestionBankService {
                 throw new IllegalArgumentException("客观题必须填写选项");
             }
             long correctCount = request.getOptions().stream().filter(option -> Boolean.TRUE.equals(option.getCorrect())).count();
+            if (draft) {
+                return;
+            }
             if ("SINGLE_CHOICE".equals(type) && correctCount != 1) {
                 throw new IllegalArgumentException("单选题必须且只能设置一个正确选项");
             }
@@ -249,7 +253,7 @@ public class QuestionBankService {
             if ("TRUE_FALSE".equals(type) && correctCount != 1) {
                 throw new IllegalArgumentException("判断题必须且只能设置一个正确选项");
             }
-        } else if (trim(request.getCorrectAnswer()) == null || trim(request.getCorrectAnswer()).isBlank()) {
+        } else if (!draft && (trim(request.getCorrectAnswer()) == null || trim(request.getCorrectAnswer()).isBlank())) {
             throw new IllegalArgumentException("非选择题必须填写参考答案");
         }
     }

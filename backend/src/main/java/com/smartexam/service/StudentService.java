@@ -24,7 +24,7 @@ public class StudentService {
 
     public List<GradeInfo> getGrades(AuthUser user) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
-        return jdbcTemplate.query("SELECT ea.id as attemptId, e.exam_name, s.subject_name, ea.score, ea.submit_time, ea.status FROM exam_attempt ea JOIN exam e ON ea.exam_id = e.id JOIN paper p ON e.paper_id = p.id JOIN edu_subject s ON p.subject_id = s.id WHERE ea.user_id = ? AND ea.status = 5 ORDER BY ea.submit_time DESC",
+        return jdbcTemplate.query("SELECT ea.id as attemptId, e.exam_name, s.subject_name, ea.score, ea.submit_time, ea.status FROM exam_attempt ea JOIN exam e ON ea.exam_id = e.id JOIN paper p ON e.paper_id = p.id JOIN edu_subject s ON p.subject_id = s.id WHERE ea.user_id = ? AND ea.status IN (4, 5) ORDER BY ea.submit_time DESC",
                 (rs, rowNum) -> new GradeInfo(
                         rs.getLong("attemptId"),
                         rs.getString("exam_name"),
@@ -47,7 +47,14 @@ public class StudentService {
                         rs.getInt("status")
                 ), attemptId, user.getId());
 
-        List<Map<String, Object>> answers = jdbcTemplate.queryForList("SELECT q.stem, q.question_type, q.correct_answer, q.analysis, ar.answer_content, ar.score, ar.is_correct FROM answer_record ar JOIN question q ON ar.question_id = q.id WHERE ar.attempt_id = ?", attemptId);
+        List<Map<String, Object>> answers = jdbcTemplate.queryForList("""
+                SELECT q.stem, q.question_type AS questionType, q.correct_answer AS correctAnswer,
+                       q.analysis, ar.answer_content AS studentAnswer, ar.score,
+                       ar.is_correct AS isCorrect
+                FROM answer_record ar
+                JOIN question q ON ar.question_id = q.id
+                WHERE ar.attempt_id = ?
+                """, attemptId);
 
         return new ExamResult(gradeInfo, answers);
     }

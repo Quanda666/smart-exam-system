@@ -205,7 +205,8 @@ public class ExamService {
                 """, examId);
         Object paperId = exam.get("paper_id");
         List<Map<String, Object>> questions = jt.queryForList("""
-                SELECT q.id, q.question_type, q.stem, q.difficulty, pq.score
+                SELECT q.id, q.id AS questionId, q.question_type AS questionType, q.stem,
+                       q.difficulty, pq.score, pq.sort_order AS sortOrder
                 FROM paper_question pq
                 JOIN question q ON pq.question_id = q.id
                 WHERE pq.paper_id = ?
@@ -213,9 +214,10 @@ public class ExamService {
                 """, paperId);
 
         for (Map<String, Object> q : questions) {
-            if (List.of("SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE").contains(q.get("question_type"))) {
+            if (List.of("SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE").contains(q.get("questionType"))) {
                 q.put("options", jt.queryForList("""
-                        SELECT option_label, option_content
+                        SELECT option_label AS optionLabel, option_content AS optionContent,
+                               sort_order AS sortOrder
                         FROM question_option
                         WHERE question_id = ?
                         ORDER BY sort_order
@@ -309,6 +311,13 @@ public class ExamService {
                     INSERT INTO answer_record (attempt_id, question_id, answer_content, score, is_correct, review_status)
                     VALUES (?, ?, ?, ?, ?, ?)
                     """, attemptId, questionId, answer, score, isCorrect, reviewStatus);
+            if (reviewStatus == 1 && !isCorrect) {
+                jt.update("""
+                        INSERT INTO wrong_question_book (user_id, question_id, wrong_count, last_wrong_time)
+                        VALUES (?, ?, 1, NOW())
+                        ON DUPLICATE KEY UPDATE wrong_count = wrong_count + 1, last_wrong_time = NOW()
+                        """, user.getId(), questionId);
+            }
             totalScore = totalScore.add(score);
         }
 

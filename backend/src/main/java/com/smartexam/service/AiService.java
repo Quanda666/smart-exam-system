@@ -46,7 +46,7 @@ public class AiService {
     private static final List<String> ALL_TYPES = List.of("SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_BLANK", "SUBJECTIVE");
     private static final List<String> ALL_DIFFICULTIES = List.of("EASY", "MEDIUM", "HARD");
     private static final Pattern QUESTION_START = Pattern.compile("^(?:第\\s*\\d+\\s*题\\s*[：:]?|\\d{1,3}\\s*[.、)）]\\s*).+");
-    private static final Pattern OPTION_LINE = Pattern.compile("^[（(]?([A-Ha-h])[）).、]\\s*(.+)$");
+    private static final Pattern OPTION_MARKER = Pattern.compile("(?<![A-Za-z0-9])([A-Ha-h])\\s*[、.．)）]\\s*");
     private static final Pattern ANSWER_LINE = Pattern.compile("^(?:正确答案|参考答案|答案)\\s*[：:]\\s*(.*)$");
     private static final Pattern ANALYSIS_LINE = Pattern.compile("^(?:答案解析|题目解析|解析)\\s*[：:]\\s*(.*)$");
 
@@ -641,6 +641,14 @@ public class AiService {
     }
 
     private AiGeneratedQuestion normalizeQuestionForType(AiGeneratedQuestion question, GenerateQuestionBatchRequest request, String type, int index) {
+        return normalizeQuestionForType(question, request, type, index, false);
+    }
+
+    private AiGeneratedQuestion normalizeQuestionForType(AiGeneratedQuestion question,
+                                                        GenerateQuestionBatchRequest request,
+                                                        String type,
+                                                        int index,
+                                                        boolean allowIncompleteAnswer) {
         String normalizedType = ALL_TYPES.contains(normalizeCode(type)) ? normalizeCode(type) : inferQuestionType(question);
         String difficulty = normalizeCode(request.getDifficulty());
         GenerateQuestionBatchRequest typedRequest = requestForType(request, normalizedType, 1);
@@ -660,7 +668,7 @@ public class AiService {
         normalized.setAnalysis(truncate(firstNonBlank(normalized.getAnalysis(), "请结合题干条件分析关键概念，按步骤判断后再得出答案。"), 4000));
 
         if (OBJECTIVE_TYPES.contains(normalizedType)) {
-            normalized.setOptions(normalizeObjectiveOptions(normalized, typedRequest, index));
+            normalized.setOptions(normalizeObjectiveOptions(normalized, typedRequest, index, allowIncompleteAnswer));
             normalized.setCorrectAnswer(correctLabels(normalized.getOptions()).stream().collect(Collectors.joining(",")));
         } else {
             normalized.setOptions(List.of());
@@ -681,20 +689,43 @@ public class AiService {
         return questions;
     }
 
-    private List<AiGeneratedQuestionOption> normalizeObjectiveOptions(AiGeneratedQuestion question, GenerateQuestionBatchRequest request, int index) {
+    private List<AiGeneratedQuestionOption> normalizeObjectiveOptions(AiGeneratedQuestion question,
+                                                                      GenerateQuestionBatchRequest request,
+                                                                      int index,
+                                                                      boolean allowIncompleteAnswer) {
         String type = normalizeCode(request.getQuestionType());
+        List<AiGeneratedQuestionOption> raw = question.getOptions() == null ? List.of() : question.getOptions();
         if ("TRUE_FALSE".equals(type)) {
+            if (!raw.isEmpty()) {
+                List<AiGeneratedQuestionOption> normalized = new ArrayList<>();
+                int limit = Math.min(raw.size(), 2);
+                for (int i = 0; i < limit; i++) {
+                    AiGeneratedQuestionOption item = raw.get(i);
+                    String content = blankToNull(item.getOptionContent()) == null
+                            ? (i == 0 ? "正确" : "错误")
+                            : item.getOptionContent().trim();
+                    normalized.add(option(String.valueOf((char) ('A' + i)), truncate(content, 1000), Boolean.TRUE.equals(item.getCorrect())));
+                }
+                if (blankToNull(question.getCorrectAnswer()) == null && correctLabels(normalized).isEmpty()) {
+                    return normalized;
+                }
+            }
             String answer = safeText(question.getCorrectAnswer()).toUpperCase(Locale.ROOT);
             boolean correctIsB = answer.contains("B") || answer.contains("错") || answer.contains("FALSE");
+            if (allowIncompleteAnswer && blankToNull(answer) == null) {
+                return options(
+                        option("A", "正确", false),
+                        option("B", "错误", false)
+                );
+            }
             return options(
                     option("A", "正确", !correctIsB),
                     option("B", "错误", correctIsB)
             );
         }
 
-        List<AiGeneratedQuestionOption> raw = question.getOptions() == null ? List.of() : question.getOptions();
         List<AiGeneratedQuestionOption> normalized = new ArrayList<>();
-        int limit = Math.min(raw.size(), 6);
+        int limit = Math.min(raw.size(), 8);
         for (int i = 0; i < limit; i++) {
             AiGeneratedQuestionOption item = raw.get(i);
             if (blankToNull(item.getOptionContent()) == null) {
@@ -705,18 +736,29 @@ public class AiService {
                     Boolean.TRUE.equals(item.getCorrect())));
         }
         if (normalized.size() < 4) {
+            if (allowIncompleteAnswer && !normalized.isEmpty()) {
+                return normalized;
+            }
             return createLocalQuestionDraft(request, index).getOptions();
         }
 
         Set<String> answerLabels = new HashSet<>(correctLabels(normalized));
-        if (answerLabels.isEmpty()) {
+        boolean hasAnswerText = blankToNull(question.getCorrectAnswer()) != null;
+        if (answerLabels.isEmpty() && hasAnswerText) {
             answerLabels.addAll(labelsMentionedInAnswer(question.getCorrectAnswer(), normalized));
+        }
+        if (answerLabels.isEmpty() && allowIncompleteAnswer) {
+            return normalized;
         }
         if ("SINGLE_CHOICE".equals(type)) {
             String selected = answerLabels.isEmpty() ? "A" : answerLabels.iterator().next();
             normalized.forEach(option -> option.setCorrect(selected.equals(option.getOptionLabel())));
         } else {
             if (answerLabels.size() < 2) {
+                if (allowIncompleteAnswer) {
+                    normalized.forEach(option -> option.setCorrect(answerLabels.contains(option.getOptionLabel())));
+                    return normalized;
+                }
                 answerLabels.add("A");
                 answerLabels.add("B");
             }
@@ -751,7 +793,7 @@ public class AiService {
                 break;
             }
             String type = ALL_TYPES.contains(normalizeCode(question.getQuestionType())) ? normalizeCode(question.getQuestionType()) : inferQuestionType(question);
-            normalized.add(normalizeQuestionForType(question, defaults, type, normalized.size() + 1));
+            normalized.add(normalizeQuestionForType(question, defaults, type, normalized.size() + 1, true));
         }
         return normalized;
     }
@@ -858,9 +900,13 @@ public class AiService {
                 readingAnalysis = true;
                 continue;
             }
-            Matcher optionMatcher = OPTION_LINE.matcher(line);
-            if (optionMatcher.matches()) {
-                parsedOptions.add(option(optionMatcher.group(1).toUpperCase(Locale.ROOT), optionMatcher.group(2).trim(), false));
+            ParsedOptions parsedLineOptions = parseOptionsFromLine(line);
+            if (!parsedLineOptions.options().isEmpty()) {
+                String prefix = stripQuestionNumber(parsedLineOptions.prefix());
+                if (!prefix.isBlank()) {
+                    stem.append(stem.isEmpty() ? "" : "\n").append(prefix);
+                }
+                parsedOptions.addAll(parsedLineOptions.options());
                 readingAnalysis = false;
                 continue;
             }
@@ -898,21 +944,48 @@ public class AiService {
             question.setOptions(List.of());
             question.setCorrectAnswer(firstNonBlank(answer, "请教师补充参考答案"));
         }
-        return normalizeQuestionForType(question, defaults, type, index);
+        return normalizeQuestionForType(question, defaults, type, index, true);
     }
 
     private void markCorrectOptions(List<AiGeneratedQuestionOption> options, String answer, String type) {
         Set<String> labels = extractAnswerLabels(answer);
+        if (labels.isEmpty() && blankToNull(answer) == null) {
+            return;
+        }
         if ("TRUE_FALSE".equals(type) && labels.isEmpty()) {
             String upper = safeText(answer).toUpperCase(Locale.ROOT);
             labels.add(upper.contains("错") || upper.contains("FALSE") ? "B" : "A");
         }
-        if (labels.isEmpty() && !options.isEmpty()) {
-            labels.add(options.get(0).getOptionLabel());
-        }
         for (AiGeneratedQuestionOption option : options) {
             option.setCorrect(labels.contains(option.getOptionLabel()));
         }
+    }
+
+    private ParsedOptions parseOptionsFromLine(String line) {
+        Matcher matcher = OPTION_MARKER.matcher(line);
+        List<MatcherSnapshot> markers = new ArrayList<>();
+        while (matcher.find()) {
+            markers.add(new MatcherSnapshot(matcher.start(), matcher.end(), matcher.group(1).toUpperCase(Locale.ROOT)));
+        }
+        if (markers.isEmpty()) {
+            return new ParsedOptions(line, List.of());
+        }
+        String prefix = line.substring(0, markers.get(0).start()).trim();
+        boolean startsWithOption = prefix.isBlank() || prefix.matches("^[（(\\[]?$");
+        if (markers.size() == 1 && !startsWithOption) {
+            return new ParsedOptions(line, List.of());
+        }
+        List<AiGeneratedQuestionOption> options = new ArrayList<>();
+        for (int i = 0; i < markers.size(); i++) {
+            MatcherSnapshot current = markers.get(i);
+            int nextStart = i + 1 < markers.size() ? markers.get(i + 1).start() : line.length();
+            String content = line.substring(current.end(), nextStart).trim();
+            content = content.replaceFirst("[；;，,、\\s]+$", "").trim();
+            if (!content.isBlank()) {
+                options.add(option(current.label(), content, false));
+            }
+        }
+        return new ParsedOptions(prefix, options);
     }
 
     private Set<String> extractAnswerLabels(String answer) {
@@ -1114,4 +1187,9 @@ public class AiService {
         return value == null ? "" : value;
     }
 
+    private record MatcherSnapshot(int start, int end, String label) {
+    }
+
+    private record ParsedOptions(String prefix, List<AiGeneratedQuestionOption> options) {
+    }
 }

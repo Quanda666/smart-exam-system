@@ -1,44 +1,46 @@
 <template>
-  <section class="question-panel">
+  <section class="paper-page mp-page">
+    <div class="mp-page-header">
+      <div>
+        <h3 class="mp-page-title">试卷生成</h3>
+      </div>
+      <div v-if="canManagePapers" class="mp-page-actions">
+        <el-radio-group v-model="creationMode">
+          <el-radio-button label="manual">手动挑题</el-radio-button>
+          <el-radio-button label="auto">规则组卷</el-radio-button>
+        </el-radio-group>
+        <el-button :icon="Refresh" @click="resetCurrentBuilder">重置工作台</el-button>
+      </div>
+    </div>
+
     <div class="mp-stat-grid">
       <div v-for="card in summaryCards" :key="card.label" class="mp-stat-card">
         <div class="mp-stat-header">{{ card.label }}</div>
         <div class="mp-stat-row">
           <div class="mp-stat-content">
-            <div class="mp-stat-value">{{ card.value }}</div>
+            <div class="mp-stat-value" :class="card.className">{{ card.value }}</div>
             <div class="mp-stat-label">{{ card.remark }}</div>
           </div>
         </div>
       </div>
     </div>
 
-    <el-card shadow="never" class="workbench">
-      <template #header>
-        <div class="card-header">
-          <span>试卷筛选</span>
+    <div v-if="canManagePapers" class="paper-builder-grid">
+      <section class="paper-card builder-card">
+        <div class="paper-card-header">
+          <div>
+            <strong>{{ creationMode === 'manual' ? '手动挑题工作台' : '规则组卷工作台' }}</strong>
+            <span>{{ editingPaperId ? `正在编辑 #${editingPaperId}` : '新建试卷' }}</span>
+          </div>
+          <el-tag :type="creationMode === 'manual' ? 'primary' : 'success'">
+            {{ creationMode === 'manual' ? '手动' : '自动' }}
+          </el-tag>
         </div>
-      </template>
 
-      <div class="paper-toolbar">
-        <el-input v-model="query.keyword" placeholder="按试卷名称、科目搜索" clearable @keyup.enter="loadPapers" />
-        <el-select v-model="query.subjectId" placeholder="科目" clearable>
-          <el-option v-for="subject in subjects" :key="subject.id" :label="subject.subjectName" :value="subject.id" />
-        </el-select>
-        <el-select v-model="query.status" placeholder="状态" clearable>
-          <el-option label="已发布" :value="1" />
-          <el-option label="草稿" :value="0" />
-        </el-select>
-        <el-button type="primary" @click="loadPapers">查询</el-button>
-        <el-button @click="resetQuery">重置</el-button>
-      </div>
-    </el-card>
-
-    <el-tabs v-if="canManagePapers" v-model="creationMode" type="border-card" class="creation-tabs">
-      <el-tab-pane label="手动组卷" name="manual">
-        <el-form class="paper-form" :model="paperForm" label-position="top">
-          <div class="form-grid">
+        <el-form v-if="creationMode === 'manual'" class="paper-builder-form" :model="paperForm" label-position="top">
+          <div class="paper-form-grid">
             <el-form-item label="所属科目">
-              <el-select v-model="paperForm.subjectId" placeholder="请选择科目" @change="handlePaperSubjectChange">
+              <el-select v-model="paperForm.subjectId" placeholder="请选择科目" filterable @change="handlePaperSubjectChange">
                 <el-option v-for="subject in subjects" :key="subject.id" :label="subject.subjectName" :value="subject.id" />
               </el-select>
             </el-form-item>
@@ -52,58 +54,15 @@
               </el-select>
             </el-form-item>
           </div>
-          <el-form-item class="question-stem" label="试卷说明">
+          <el-form-item label="试卷说明">
             <el-input v-model="paperForm.description" type="textarea" :rows="2" placeholder="请输入试卷说明" />
           </el-form-item>
-
-          <div class="question-transfer">
-            <div class="transfer-panel">
-              <div class="panel-header">题库可用题目</div>
-              <div class="panel-body">
-                <div
-                  v-for="question in availableQuestions"
-                  :key="question.id"
-                  class="transfer-item"
-                  @click="addSelectedQuestion(question)"
-                >
-                  {{ typeText(question.questionType) }} / {{ question.stem }}
-                </div>
-                 <el-empty v-if="availableQuestions.length === 0" description="暂无可用题目" :image-size="80"/>
-              </div>
-            </div>
-            <div class="transfer-actions">
-              <el-icon><DArrowRight /></el-icon>
-            </div>
-            <div class="transfer-panel">
-              <div class="panel-header">已选题目 ({{ selectedQuestions.length }} 题 / {{ manualTotalScore }} 分)</div>
-               <div class="panel-body">
-                <div
-                  v-for="(question, index) in selectedQuestions"
-                  :key="question.questionId"
-                  class="transfer-item selected"
-                >
-                  <span>{{ index + 1 }}. {{ question.stem }}</span>
-                  <div class="item-actions">
-                    <el-input-number v-model="question.score" size="small" :min="0.5" :step="0.5" :precision="1" />
-                    <el-button link type="danger" @click="removeSelectedQuestion(index)" :icon="Close" />
-                  </div>
-                </div>
-                <el-empty v-if="selectedQuestions.length === 0" description="请从左侧选择题目" :image-size="80"/>
-              </div>
-            </div>
-          </div>
-
-          <el-form-item class="question-form-actions">
-            <el-button type="primary" @click="savePaper">{{ editingPaperId ? '保存修改' : '创建试卷' }}</el-button>
-            <el-button @click="resetPaperForm">重置</el-button>
-          </el-form-item>
         </el-form>
-      </el-tab-pane>
-      <el-tab-pane label="规则组卷" name="auto">
-         <el-form class="paper-form" :model="generateForm" label-position="top">
-          <div class="form-grid">
+
+        <el-form v-else class="paper-builder-form" :model="generateForm" label-position="top">
+          <div class="paper-form-grid">
             <el-form-item label="所属科目">
-              <el-select v-model="generateForm.subjectId" placeholder="请选择科目" @change="handleGenerateSubjectChange">
+              <el-select v-model="generateForm.subjectId" placeholder="请选择科目" filterable @change="handleGenerateSubjectChange">
                 <el-option v-for="subject in subjects" :key="subject.id" :label="subject.subjectName" :value="subject.id" />
               </el-select>
             </el-form-item>
@@ -117,17 +76,71 @@
               </el-select>
             </el-form-item>
           </div>
-          <el-form-item class="question-stem" label="试卷说明">
-            <el-input v-model="generateForm.description" type="textarea" :rows="2" placeholder="请输入自动组卷说明" />
+          <el-form-item label="试卷说明">
+            <el-input v-model="generateForm.description" type="textarea" :rows="2" placeholder="请输入试卷说明" />
           </el-form-item>
+        </el-form>
 
-          <div class="option-editor">
-            <div class="option-editor-header">
-              <strong>组卷规则</strong>
-              <el-button size="small" @click="addRule">新增规则</el-button>
+        <div v-if="creationMode === 'manual'" class="manual-builder">
+          <div class="question-filter-row">
+            <el-input v-model="manualFilter.keyword" :prefix-icon="Search" placeholder="搜索题干、知识点" clearable />
+            <el-select v-model="manualFilter.questionType" placeholder="题型" clearable>
+              <el-option v-for="item in questionTypes" :key="item.value" :label="item.label" :value="item.value" />
+            </el-select>
+            <el-select v-model="manualFilter.difficulty" placeholder="难度" clearable>
+              <el-option v-for="item in difficulties" :key="item.value" :label="item.label" :value="item.value" />
+            </el-select>
+            <el-select v-model="manualFilter.knowledgePointId" placeholder="知识点" clearable filterable>
+              <el-option v-for="point in manualKnowledgePoints" :key="point.id" :label="point.pointName" :value="point.id" />
+            </el-select>
+          </div>
+
+          <div class="question-pool">
+            <div class="pool-header">
+              <strong>可选题目</strong>
+              <span>{{ filteredAvailableQuestions.length }} / {{ availableQuestions.length }}</span>
             </div>
-            <div v-for="(rule, index) in generateForm.rules" :key="index" class="paper-rule-row">
-              <el-select v-model="rule.knowledgePointId" placeholder="知识点" clearable>
+            <div class="question-pool-list">
+              <article
+                v-for="question in filteredAvailableQuestions"
+                :key="question.id"
+                :class="['question-pool-item', { selected: selectedQuestionIds.has(question.id) }]"
+                @click="addSelectedQuestion(question)"
+              >
+                <div class="question-pool-meta">
+                  <el-tag size="small">{{ typeText(question.questionType) }}</el-tag>
+                  <el-tag size="small" :type="difficultyTagType(question.difficulty)">{{ difficultyText(question.difficulty) }}</el-tag>
+                  <span>{{ question.knowledgePointName || '未指定知识点' }}</span>
+                </div>
+                <p>{{ question.stem }}</p>
+                <div class="question-pool-footer">
+                  <span>{{ Number(question.defaultScore || 5) }} 分</span>
+                  <el-button
+                    size="small"
+                    type="primary"
+                    plain
+                    :icon="Plus"
+                    :disabled="selectedQuestionIds.has(question.id)"
+                    @click.stop="addSelectedQuestion(question)"
+                  >
+                    {{ selectedQuestionIds.has(question.id) ? '已加入' : '加入' }}
+                  </el-button>
+                </div>
+              </article>
+              <el-empty v-if="filteredAvailableQuestions.length === 0" description="暂无可选题目" :image-size="80" />
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="auto-builder">
+          <div class="rule-toolbar">
+            <strong>组卷规则</strong>
+            <el-button size="small" type="primary" plain :icon="Plus" @click="addRule">新增规则</el-button>
+          </div>
+          <div class="rule-list">
+            <article v-for="(rule, index) in generateForm.rules" :key="index" class="rule-card">
+              <div class="rule-index">{{ index + 1 }}</div>
+              <el-select v-model="rule.knowledgePointId" placeholder="知识点" clearable filterable>
                 <el-option v-for="point in generateKnowledgePoints" :key="point.id" :label="point.pointName" :value="point.id" />
               </el-select>
               <el-select v-model="rule.questionType" placeholder="题型">
@@ -138,25 +151,68 @@
               </el-select>
               <el-input-number v-model="rule.count" :min="1" controls-position="right" />
               <el-input-number v-model="rule.score" :min="0.5" :step="0.5" :precision="1" controls-position="right" />
-              <el-button link type="danger" @click="removeRule(index)">删除</el-button>
-            </div>
+              <el-button link type="danger" :icon="Close" @click="removeRule(index)">删除</el-button>
+            </article>
           </div>
-
-          <el-form-item class="question-form-actions">
-            <el-button type="primary" @click="submitGeneratePaper">执行规则组卷</el-button>
-          </el-form-item>
-        </el-form>
-      </el-tab-pane>
-    </el-tabs>
-
-    <el-card shadow="never" class="workbench">
-      <template #header>
-        <div class="card-header">
-          <span>试卷列表（共 {{ totalPapers }} 份）</span>
-          <el-button size="small" :icon="Download" :loading="exporting" @click="exportPapers">导出</el-button>
         </div>
-      </template>
+      </section>
 
+      <aside class="paper-card basket-card">
+        <div class="paper-card-header">
+          <div>
+            <strong>{{ creationMode === 'manual' ? '当前试卷篮' : '规则预览' }}</strong>
+            <span>{{ creationMode === 'manual' ? `${selectedQuestions.length} 题 / ${manualTotalScore} 分` : `${ruleTotalCount} 题 / ${ruleTotalScore} 分` }}</span>
+          </div>
+        </div>
+
+        <div v-if="creationMode === 'manual'" class="basket-scroll">
+          <article v-for="(question, index) in selectedQuestions" :key="question.questionId" class="basket-item">
+            <div class="basket-item-main">
+              <strong>{{ index + 1 }}. {{ question.stem }}</strong>
+              <span>{{ typeText(question.questionType) }} · {{ difficultyText(question.difficulty) }} · {{ question.knowledgePointName || '未指定知识点' }}</span>
+            </div>
+            <div class="basket-item-actions">
+              <el-input-number v-model="question.score" size="small" :min="0.5" :step="0.5" :precision="1" />
+              <el-button link type="danger" :icon="Close" @click="removeSelectedQuestion(index)" />
+            </div>
+          </article>
+          <el-empty v-if="selectedQuestions.length === 0" description="尚未选择题目" :image-size="80" />
+        </div>
+
+        <div v-else class="basket-scroll">
+          <article v-for="(rule, index) in generateForm.rules" :key="index" class="rule-summary-item">
+            <strong>{{ index + 1 }}. {{ typeText(rule.questionType) }}</strong>
+            <span>{{ rule.knowledgePointId ? pointName(rule.knowledgePointId) : '不限知识点' }} · {{ difficultyText(rule.difficulty || undefined) }}</span>
+            <small>{{ rule.count }} 题 × {{ rule.score }} 分</small>
+          </article>
+        </div>
+
+        <div class="basket-footer">
+          <el-button v-if="creationMode === 'manual'" type="primary" :icon="Check" @click="savePaper">
+            {{ editingPaperId ? '保存修改' : '创建试卷' }}
+          </el-button>
+          <el-button v-else type="success" :icon="MagicStick" @click="submitGeneratePaper">执行组卷</el-button>
+          <el-button @click="resetCurrentBuilder">重置</el-button>
+        </div>
+      </aside>
+    </div>
+
+    <div class="mp-toolbar paper-list-toolbar">
+      <el-input v-model="query.keyword" :prefix-icon="Search" placeholder="按试卷名称、科目搜索" clearable @keyup.enter="loadPapers" />
+      <el-select v-model="query.subjectId" placeholder="科目" clearable>
+        <el-option v-for="subject in subjects" :key="subject.id" :label="subject.subjectName" :value="subject.id" />
+      </el-select>
+      <el-select v-model="query.status" placeholder="状态" clearable>
+        <el-option label="已发布" :value="1" />
+        <el-option label="草稿" :value="0" />
+      </el-select>
+      <span class="mp-toolbar-spacer"></span>
+      <el-button type="primary" :icon="Search" @click="loadPapers">查询</el-button>
+      <el-button :icon="Refresh" @click="resetQuery">重置</el-button>
+      <el-button :icon="Download" :loading="exporting" @click="exportPapers">导出</el-button>
+    </div>
+
+    <div class="mp-table-card">
       <div v-if="canManagePapers && selectedPapers.length > 0" class="mp-batch-bar">
         已选择 <span class="mp-batch-count">{{ selectedPapers.length }}</span> 份
         <span class="mp-batch-bar-spacer"></span>
@@ -166,14 +222,14 @@
         <el-button size="small" text @click="clearSelection">取消选择</el-button>
       </div>
 
-      <el-table ref="tableRef" :data="papers" border class="question-table" @selection-change="onSelectionChange">
+      <el-table ref="tableRef" :data="papers" border @selection-change="onSelectionChange">
         <el-table-column v-if="canManagePapers" type="selection" width="46" />
         <el-table-column prop="id" label="ID" width="70" />
-        <el-table-column label="试卷" min-width="240" show-overflow-tooltip>
+        <el-table-column label="试卷" min-width="260" show-overflow-tooltip>
           <template #default="scope">
-            <div class="stem-cell">
+            <div class="paper-name-cell">
               <strong>{{ scope.row.paperName }}</strong>
-              <small>{{ scope.row.subjectName }} / {{ scope.row.description || '无说明' }}</small>
+              <span>{{ scope.row.subjectName }} · {{ scope.row.description || '无说明' }}</span>
             </div>
           </template>
         </el-table-column>
@@ -187,16 +243,16 @@
         <el-table-column prop="creatorName" label="创建人" width="120" />
         <el-table-column v-if="canManagePapers" label="操作" width="280" fixed="right">
           <template #default="scope">
-            <el-button link type="primary" @click="previewPaper(Number(scope.row.id))">预览</el-button>
-            <el-button link type="primary" @click="editPaper(Number(scope.row.id))">编辑</el-button>
+            <el-button link type="primary" :icon="View" @click="previewPaper(Number(scope.row.id))">预览</el-button>
+            <el-button link type="primary" :icon="EditPen" @click="editPaper(Number(scope.row.id))">编辑</el-button>
             <el-button link type="warning" @click="togglePaperStatus(scope.row as PaperInfo)">
               {{ scope.row.status === 1 ? '撤回' : '发布' }}
             </el-button>
-            <el-button link type="danger" @click="removePaper(Number(scope.row.id))">删除</el-button>
+            <el-button link type="danger" :icon="Delete" @click="removePaper(Number(scope.row.id))">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
-      <div class="paper-pagination">
+      <div class="mp-pager">
         <el-pagination
           v-model:current-page="currentPage"
           v-model:page-size="pageSize"
@@ -207,16 +263,18 @@
           @size-change="handleSizeChange"
         />
       </div>
-    </el-card>
+    </div>
 
-    <el-drawer v-model="previewVisible" title="试卷预览" size="52%">
+    <el-drawer v-model="previewVisible" title="试卷预览" size="56%">
       <div v-if="preview" class="paper-preview">
-        <h3>{{ preview.paperName }}</h3>
-        <p>{{ preview.subjectName }} / {{ preview.totalScore }} 分 / {{ preview.questionCount }} 题</p>
-        <div v-for="question in preview.questions || []" :key="question.questionId" class="paper-preview-question">
-          <strong>{{ question.sortOrder }}. {{ question.stem }}（{{ question.score }}分）</strong>
-          <small>{{ typeText(question.questionType) }} / {{ difficultyText(question.difficulty) }} / {{ question.knowledgePointName || '未指定知识点' }}</small>
+        <div class="preview-title">
+          <h3>{{ preview.paperName }}</h3>
+          <span>{{ preview.subjectName }} · {{ preview.totalScore }} 分 · {{ preview.questionCount }} 题</span>
         </div>
+        <article v-for="question in preview.questions || []" :key="question.questionId" class="paper-preview-question">
+          <strong>{{ question.sortOrder }}. {{ question.stem }}（{{ question.score }}分）</strong>
+          <small>{{ typeText(question.questionType) }} · {{ difficultyText(question.difficulty) }} · {{ question.knowledgePointName || '未指定知识点' }}</small>
+        </article>
       </div>
     </el-drawer>
   </section>
@@ -225,7 +283,18 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Close, DArrowRight, Download } from '@element-plus/icons-vue';
+import {
+  Check,
+  Close,
+  Delete,
+  Download,
+  EditPen,
+  MagicStick,
+  Plus,
+  Refresh,
+  Search,
+  View
+} from '@element-plus/icons-vue';
 import { exportToCsv } from '../utils/exportCsv';
 import { listKnowledgePoints, listSubjects, type KnowledgePointInfo, type SubjectInfo } from '../api/basic';
 import { listQuestions, type Difficulty, type QuestionInfo, type QuestionType } from '../api/question';
@@ -272,13 +341,11 @@ const currentPage = ref(1);
 const pageSize = ref(10);
 const totalPapers = ref(0);
 const summary = ref({ total: 0, published: 0, draft: 0, totalQuestions: 0 });
-const selectedQuestionId = ref<number | null>(null);
 const selectedQuestions = ref<PaperQuestionInfo[]>([]);
 const editingPaperId = ref<number | null>(null);
 const previewVisible = ref(false);
 const preview = ref<PaperInfo | null>(null);
-const creationMode = ref('manual');
-
+const creationMode = ref<'manual' | 'auto'>('manual');
 const tableRef = ref<{ clearSelection: () => void }>();
 const selectedPapers = ref<PaperInfo[]>([]);
 const exporting = ref(false);
@@ -287,6 +354,18 @@ const query = reactive<{ keyword: string; subjectId: number | null; status: numb
   keyword: '',
   subjectId: null,
   status: null
+});
+
+const manualFilter = reactive<{
+  keyword: string;
+  questionType: QuestionType | null;
+  difficulty: Difficulty | null;
+  knowledgePointId: number | null;
+}>({
+  keyword: '',
+  questionType: null,
+  difficulty: null,
+  knowledgePointId: null
 });
 
 const paperForm = reactive<PaperPayload>({
@@ -306,17 +385,33 @@ const generateForm = reactive<GeneratePaperPayload>({
 });
 
 const canManagePapers = computed(() => props.role === 'ADMIN' || props.role === 'TEACHER');
-
 const manualTotalScore = computed(() => selectedQuestions.value.reduce((sum, item) => sum + Number(item.score || 0), 0));
+const ruleTotalCount = computed(() => generateForm.rules.reduce((sum, rule) => sum + Number(rule.count || 0), 0));
+const ruleTotalScore = computed(() => generateForm.rules.reduce((sum, rule) => sum + Number(rule.count || 0) * Number(rule.score || 0), 0));
+const selectedQuestionIds = computed(() => new Set(selectedQuestions.value.map((item) => item.questionId)));
 
 const summaryCards = computed(() => [
-  { label: '试卷总数', value: summary.value.total || 0, remark: '已创建试卷' },
-  { label: '已发布', value: summary.value.published || 0, remark: '可用于考试任务' },
-  { label: '草稿', value: summary.value.draft || 0, remark: '待教师确认发布' },
-  { label: '累计题量', value: summary.value.totalQuestions || 0, remark: '试卷题目总数' }
+  { label: '试卷总数', value: summary.value.total || 0, remark: '已创建', className: '' },
+  { label: '已发布', value: summary.value.published || 0, remark: '可用于考试', className: 'mp-val-ok' },
+  { label: '草稿', value: summary.value.draft || 0, remark: '待确认', className: 'mp-val-warn' },
+  { label: '累计题量', value: summary.value.totalQuestions || 0, remark: '题目总数', className: '' }
 ]);
 
+const manualKnowledgePoints = computed(() => knowledgePoints.value.filter((point) => point.subjectId === paperForm.subjectId));
 const generateKnowledgePoints = computed(() => knowledgePoints.value.filter((point) => point.subjectId === generateForm.subjectId));
+
+const filteredAvailableQuestions = computed(() => {
+  const keyword = manualFilter.keyword.trim().toLowerCase();
+  return availableQuestions.value.filter((question) => {
+    const matchKeyword = !keyword
+      || question.stem.toLowerCase().includes(keyword)
+      || (question.knowledgePointName || '').toLowerCase().includes(keyword);
+    return matchKeyword
+      && (!manualFilter.questionType || question.questionType === manualFilter.questionType)
+      && (!manualFilter.difficulty || question.difficulty === manualFilter.difficulty)
+      && (!manualFilter.knowledgePointId || question.knowledgePointId === manualFilter.knowledgePointId);
+  });
+});
 
 onMounted(async () => {
   await loadBootstrapData();
@@ -389,8 +484,8 @@ function handleSizeChange(size: number) {
 }
 
 async function handlePaperSubjectChange() {
-  selectedQuestionId.value = null;
   selectedQuestions.value = [];
+  manualFilter.knowledgePointId = null;
   await loadAvailableQuestions();
 }
 
@@ -399,8 +494,7 @@ function handleGenerateSubjectChange() {
 }
 
 function addSelectedQuestion(question: QuestionInfo) {
-  if (selectedQuestions.value.some((item) => item.questionId === question.id)) {
-    ElMessage.warning('试卷不能重复添加同一道题');
+  if (selectedQuestionIds.value.has(question.id)) {
     return;
   }
   selectedQuestions.value.push({
@@ -472,6 +566,7 @@ async function editPaper(id: number) {
   try {
     const response = await getPaper(id);
     const paper = response.data;
+    creationMode.value = 'manual';
     editingPaperId.value = paper.id;
     paperForm.subjectId = paper.subjectId;
     paperForm.paperName = paper.paperName;
@@ -479,8 +574,7 @@ async function editPaper(id: number) {
     paperForm.status = paper.status;
     await loadAvailableQuestions();
     selectedQuestions.value = (paper.questions || []).map((item, index) => ({ ...item, sortOrder: item.sortOrder || index + 1 }));
-    ElMessage.success('已载入试卷，可编辑题目与分值');
-    creationMode.value = 'manual';
+    ElMessage.success('已载入试卷');
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '试卷详情加载失败');
   }
@@ -508,11 +602,15 @@ async function togglePaperStatus(row: PaperInfo) {
 }
 
 async function removePaper(id: number) {
-  await ElMessageBox.confirm('确认删除该试卷吗？后续已发布考试任务时应改为撤回。', '删除确认', {
-    type: 'warning',
-    confirmButtonText: '确认删除',
-    cancelButtonText: '取消'
-  });
+  try {
+    await ElMessageBox.confirm('确认删除该试卷吗？', '删除确认', {
+      type: 'warning',
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消'
+    });
+  } catch {
+    return;
+  }
   try {
     await deletePaper(id);
     ElMessage.success('试卷已删除');
@@ -539,7 +637,7 @@ async function batchSetStatus(next: number) {
     return;
   }
   try {
-    await Promise.all(rows.map((r) => updatePaperStatus(r.id, next)));
+    await Promise.all(rows.map((row) => updatePaperStatus(row.id, next)));
     ElMessage.success(`已${next === 1 ? '发布' : '撤回'} ${rows.length} 份试卷`);
     clearSelection();
     await loadPapers();
@@ -552,14 +650,16 @@ async function batchDelete() {
   const rows = selectedPapers.value;
   if (rows.length === 0) return;
   try {
-    await ElMessageBox.confirm(`确认删除选中的 ${rows.length} 份试卷吗？该操作不可恢复。`, '批量删除', {
-      type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消'
+    await ElMessageBox.confirm(`确认删除选中的 ${rows.length} 份试卷吗？`, '批量删除', {
+      type: 'warning',
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消'
     });
   } catch {
     return;
   }
   try {
-    await Promise.all(rows.map((r) => deletePaper(r.id)));
+    await Promise.all(rows.map((row) => deletePaper(row.id)));
     ElMessage.success(`已删除 ${rows.length} 份试卷`);
     clearSelection();
     await loadPapers();
@@ -572,15 +672,15 @@ async function exportPapers() {
   exporting.value = true;
   try {
     const response = await listPapers({ ...query, page: 1, size: 10000 });
-    const rows = response.data.list.map((p) => ({
-      id: p.id,
-      paperName: p.paperName,
-      subject: p.subjectName || '',
-      questionCount: p.questionCount,
-      totalScore: p.totalScore,
-      status: statusText(p.status),
-      creator: p.creatorName || '',
-      description: p.description || ''
+    const rows = response.data.list.map((paper) => ({
+      id: paper.id,
+      paperName: paper.paperName,
+      subject: paper.subjectName || '',
+      questionCount: paper.questionCount,
+      totalScore: paper.totalScore,
+      status: statusText(paper.status),
+      creator: paper.creatorName || '',
+      description: paper.description || ''
     }));
     exportToCsv(`试卷列表_${new Date().toISOString().slice(0, 10)}`, [
       { key: 'id', label: 'ID' },
@@ -600,6 +700,14 @@ async function exportPapers() {
   }
 }
 
+function resetCurrentBuilder() {
+  if (creationMode.value === 'manual') {
+    resetPaperForm();
+  } else {
+    resetGenerateForm();
+  }
+}
+
 function resetPaperForm() {
   editingPaperId.value = null;
   paperForm.subjectId = subjects.value[0]?.id || 0;
@@ -607,8 +715,19 @@ function resetPaperForm() {
   paperForm.description = '';
   paperForm.status = 0;
   selectedQuestions.value = [];
-  selectedQuestionId.value = null;
+  manualFilter.keyword = '';
+  manualFilter.questionType = null;
+  manualFilter.difficulty = null;
+  manualFilter.knowledgePointId = null;
   loadAvailableQuestions();
+}
+
+function resetGenerateForm() {
+  generateForm.subjectId = subjects.value[0]?.id || 0;
+  generateForm.paperName = '';
+  generateForm.description = '';
+  generateForm.status = 0;
+  generateForm.rules = [defaultRule()];
 }
 
 function defaultRule(): GenerateRulePayload {
@@ -637,25 +756,40 @@ async function submitGeneratePaper() {
     ElMessage.warning('请选择科目并填写试卷名称');
     return;
   }
+  if (generateForm.rules.some((rule) => !rule.questionType || !rule.count || !rule.score)) {
+    ElMessage.warning('请完整填写组卷规则');
+    return;
+  }
   try {
-    await generatePaper({ ...generateForm, paperName: generateForm.paperName.trim(), description: generateForm.description.trim() });
+    await generatePaper({
+      ...generateForm,
+      paperName: generateForm.paperName.trim(),
+      description: generateForm.description.trim()
+    });
     ElMessage.success('规则组卷成功');
-    generateForm.paperName = '';
-    generateForm.description = '';
-    generateForm.status = 0;
-    generateForm.rules = [defaultRule()];
+    resetGenerateForm();
     await loadPapers();
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '规则组卷失败');
   }
 }
 
+function pointName(id: number) {
+  return knowledgePoints.value.find((point) => point.id === id)?.pointName || `知识点 #${id}`;
+}
+
 function typeText(type?: string) {
   return questionTypes.find((item) => item.value === type)?.label || type || '未知题型';
 }
 
-function difficultyText(value?: string) {
-  return difficulties.find((item) => item.value === value)?.label || value || '未指定难度';
+function difficultyText(value?: string | null) {
+  return difficulties.find((item) => item.value === value)?.label || value || '不限难度';
+}
+
+function difficultyTagType(value?: string) {
+  if (value === 'EASY') return 'success';
+  if (value === 'HARD') return 'danger';
+  return 'warning';
 }
 
 function statusText(status: number) {
@@ -664,183 +798,302 @@ function statusText(status: number) {
 </script>
 
 <style scoped>
-.question-panel {
-  padding: 16px;
-}
-
-.question-summary-grid {
+.paper-builder-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
   gap: 16px;
-  margin-bottom: 16px;
+  align-items: stretch;
 }
 
-.question-summary-card {
-  padding: 16px;
-  border-radius: 4px;
-  border: 1px solid #e0e0e0;
+.paper-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+}
+
+.builder-card,
+.basket-card {
+  padding: 18px;
+}
+
+.paper-card-header {
   display: flex;
-  flex-direction: column;
-}
-
-.question-summary-card span {
-  color: #666;
-}
-
-.question-summary-card strong {
-  font-size: 2em;
-  margin: 4px 0;
-}
-
-.question-summary-card small {
-  color: #999;
-}
-
-.paper-toolbar {
-  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 12px;
   margin-bottom: 16px;
 }
 
-.creation-tabs {
-  margin-top: 16px;
-}
-
-.paper-form {
-  padding: 16px;
-}
-
-.form-grid {
+.paper-card-header div {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
+  gap: 4px;
 }
 
-.paper-question-picker {
+.paper-card-header strong {
+  font-size: 16px;
+  color: #111827;
+}
+
+.paper-card-header span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.paper-builder-form {
+  margin-bottom: 16px;
+}
+
+.paper-form-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(260px, 1.4fr) 140px;
+  gap: 12px;
+}
+
+.manual-builder,
+.auto-builder {
+  display: grid;
+  gap: 14px;
+}
+
+.question-filter-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 140px 140px minmax(180px, 0.8fr);
+  gap: 10px;
+}
+
+.question-pool {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.pool-header,
+.rule-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.option-editor {
-  margin-top: 20px;
-}
-
-.option-editor-header {
-  display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e5e7eb;
 }
 
-.question-form-actions {
-  margin-top: 20px;
+.pool-header span,
+.rule-toolbar span {
+  color: #64748b;
+  font-size: 12px;
 }
 
-.paper-rule-row {
+.question-pool-list {
+  display: grid;
+  gap: 10px;
+  max-height: 420px;
+  overflow: auto;
+  padding: 12px;
+}
+
+.question-pool-item {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s;
+}
+
+.question-pool-item:hover {
+  border-color: #409eff;
+  background: #f8fbff;
+}
+
+.question-pool-item.selected {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.question-pool-item p {
+  margin: 0;
+  line-height: 1.65;
+  color: #1f2937;
+  overflow-wrap: anywhere;
+}
+
+.question-pool-meta,
+.question-pool-footer {
   display: flex;
-  gap: 8px;
   align-items: center;
-  margin-bottom: 8px;
-}
-.paper-rule-row .el-input-number {
-  width: 100px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.question-table {
-  margin-top: 16px;
+.question-pool-meta span,
+.question-pool-footer span {
+  color: #64748b;
+  font-size: 12px;
 }
 
-.stem-cell {
+.question-pool-footer {
+  justify-content: space-between;
+}
+
+.rule-list {
+  display: grid;
+  gap: 10px;
+}
+
+.rule-card {
+  display: grid;
+  grid-template-columns: 34px minmax(150px, 1fr) 130px 120px 110px 120px 70px;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.rule-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-weight: 700;
+}
+
+.basket-card {
   display: flex;
   flex-direction: column;
+  min-height: 420px;
 }
 
-.stem-cell small {
-  color: #999;
-  font-size: 0.8em;
+.basket-scroll {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
 }
 
-.paper-preview h3 {
+.basket-item,
+.rule-summary-item {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.basket-item-main {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.basket-item-main strong,
+.rule-summary-item strong {
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.basket-item-main span,
+.rule-summary-item span,
+.rule-summary-item small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.basket-item-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.basket-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding-top: 14px;
+  margin-top: 14px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.paper-list-toolbar > .el-input {
+  width: min(360px, 100%);
+}
+
+.paper-list-toolbar > .el-select {
+  width: 160px;
+}
+
+.paper-name-cell {
+  display: grid;
+  gap: 4px;
+}
+
+.paper-name-cell span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.preview-title {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.preview-title h3 {
   margin: 0;
+  font-size: 20px;
 }
 
-.paper-preview p {
-  color: #666;
+.preview-title span {
+  color: #64748b;
+}
+
+.paper-preview {
+  display: grid;
+  gap: 12px;
 }
 
 .paper-preview-question {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #f0f0f0;
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
 }
 
 .paper-preview-question strong {
-  display: block;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
 }
+
 .paper-preview-question small {
-  color: #999;
+  color: #64748b;
 }
 
-.question-transfer {
-  display: flex;
-  gap: 20px;
-  margin-top: 20px;
-}
+@media (max-width: 1180px) {
+  .paper-builder-grid,
+  .paper-form-grid,
+  .question-filter-row,
+  .rule-card {
+    grid-template-columns: 1fr;
+  }
 
-.transfer-panel {
-  flex: 1;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  display: flex;
-  flex-direction: column;
-}
-
-.panel-header {
-  padding: 8px 12px;
-  background-color: #f5f7fa;
-  border-bottom: 1px solid #ddd;
-}
-
-.panel-body {
-  flex-grow: 1;
-  overflow-y: auto;
-  padding: 8px;
-}
-
-.transfer-item {
-  padding: 6px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  margin-bottom: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.transfer-item:hover {
-  background-color: #f0f2f5;
-}
-
-.transfer-item.selected {
-  background-color: #ecf5ff;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.transfer-actions {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.item-actions {
-  display: flex;
-  align-items: center;
-}
-.paper-pagination {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
+  .basket-footer {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

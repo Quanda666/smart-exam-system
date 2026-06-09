@@ -1,5 +1,8 @@
 package com.smartexam.service;
 
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -48,6 +51,9 @@ public class DocumentTextExtractorService {
             if (normalized.isBlank()) {
                 throw new IllegalArgumentException("文档未抽取到可识别文本，请确认文件不是扫描图片或加密文档");
             }
+            if ("pdf".equals(extension) && looksLikePdfNoise(normalized)) {
+                throw new IllegalArgumentException("PDF文本提取结果疑似字体/语言标记，无法可靠识别题目；请改用Word/TXT，或先将PDF转换为可复制文本后再上传");
+            }
             return normalized;
         } catch (IOException ex) {
             throw new IllegalArgumentException("文档读取失败：" + ex.getMessage(), ex);
@@ -90,6 +96,11 @@ public class DocumentTextExtractorService {
     }
 
     private String extractPdf(byte[] bytes) throws IOException {
+        String byPdfBox = extractPdfByPdfBox(bytes);
+        if (!looksLikePdfNoise(normalizeText(byPdfBox))) {
+            return byPdfBox;
+        }
+
         StringBuilder builder = new StringBuilder();
         int cursor = 0;
         while (cursor < bytes.length) {
@@ -122,6 +133,14 @@ public class DocumentTextExtractorService {
             extracted = extractBinaryStrings(bytes);
         }
         return extracted;
+    }
+
+    private String extractPdfByPdfBox(byte[] bytes) throws IOException {
+        try (PDDocument document = Loader.loadPDF(bytes)) {
+            PDFTextStripper stripper = new PDFTextStripper();
+            stripper.setSortByPosition(true);
+            return stripper.getText(document);
+        }
     }
 
     private String extractLegacyOffice(byte[] bytes) {
@@ -284,11 +303,32 @@ public class DocumentTextExtractorService {
     private String normalizeText(String text) {
         String normalized = CONTROL_CHARS.matcher(text == null ? "" : text).replaceAll(" ");
         normalized = normalized.replace('\u00A0', ' ')
+                .replace('\u200B', ' ')
                 .replaceAll("[ \\t\\x0B\\f\\r]+", " ")
                 .replaceAll(" *\\n *", "\n")
                 .replaceAll("\\n{3,}", "\n\n")
                 .trim();
         return normalized.length() > MAX_TEXT_LENGTH ? normalized.substring(0, MAX_TEXT_LENGTH) : normalized;
+    }
+
+    private boolean looksLikePdfNoise(String text) {
+        String value = text == null ? "" : text.trim();
+        if (value.isBlank()) {
+            return true;
+        }
+        String compact = value.replaceAll("\\s+", " ");
+        int langMarkers = countMatches(compact, "\\b(?:en-US|zh-CN|zh-TW|ja-JP|ko-KR)\\b");
+        int questionMarkers = countMatches(compact, "(?:\\d{1,3}\\s*[.、)）]|[一二三四五六七八九十]+[、.])");
+        long chinese = compact.chars().filter(ch -> ch >= 0x4e00 && ch <= 0x9fa5).count();
+        long mathUseful = compact.chars().filter(ch -> Character.isDigit(ch) || "＋+-*/=()（）√∑∞∫≤≥<>_".indexOf(ch) >= 0).count();
+        int words = compact.isBlank() ? 0 : compact.split("\\s+").length;
+        boolean mostlyLanguageTags = words > 30 && langMarkers > words * 0.35;
+        boolean tooFewUsefulChars = chinese + mathUseful < 20 && questionMarkers == 0;
+        return mostlyLanguageTags || tooFewUsefulChars;
+    }
+
+    private int countMatches(String text, String regex) {
+        return (int) Pattern.compile(regex).matcher(text).results().count();
     }
 
     private String unescapeXml(String text) {
