@@ -68,7 +68,12 @@ public class StudentService {
                         rs.getString("analysis"),
                         rs.getInt("wrong_count"),
                         rs.getTimestamp("last_wrong_time").toString(),
-                        jdbcTemplate.queryForList("SELECT option_label, option_content, is_correct FROM question_option WHERE question_id = ? ORDER BY sort_order", rs.getLong("question_id"))
+                        jdbcTemplate.queryForList("""
+                                SELECT option_label AS optionLabel, option_content AS optionContent, is_correct AS correct
+                                FROM question_option
+                                WHERE question_id = ?
+                                ORDER BY sort_order
+                                """, rs.getLong("question_id"))
                 ), user.getId());
     }
 

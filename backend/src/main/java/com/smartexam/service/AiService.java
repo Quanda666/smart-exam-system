@@ -1,8 +1,14 @@
 package com.smartexam.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartexam.config.AiProperties;
+import com.smartexam.dto.ai.AiGeneratedQuestion;
+import com.smartexam.dto.ai.AiGeneratedQuestionOption;
+import com.smartexam.dto.ai.GenerateQuestionBatchRequest;
 import com.smartexam.dto.ai.GenerateQuestionRequest;
 import com.smartexam.dto.ai.SuggestReviewRequest;
+import com.smartexam.dto.ai.WrongQuestionExplainRequest;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -11,18 +17,31 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.StringJoiner;
+import java.util.stream.Collectors;
 
 @Service
 public class AiService {
 
+    private static final List<String> OBJECTIVE_TYPES = List.of("SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE");
+    private static final List<String> ALL_TYPES = List.of("SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_BLANK", "SUBJECTIVE");
+    private static final List<String> ALL_DIFFICULTIES = List.of("EASY", "MEDIUM", "HARD");
+
     private final AiProperties aiProperties;
     private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
 
-    public AiService(AiProperties aiProperties) {
+    public AiService(AiProperties aiProperties, ObjectMapper objectMapper) {
         this.aiProperties = aiProperties;
+        this.objectMapper = objectMapper;
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         int timeoutMs = Math.max(1, aiProperties.getTimeoutSeconds()) * 1000;
         factory.setConnectTimeout(timeoutMs);
@@ -38,9 +57,40 @@ public class AiService {
         return callAi(prompt);
     }
 
+    public List<AiGeneratedQuestion> generateQuestionDrafts(GenerateQuestionBatchRequest request) {
+        validateBatchRequest(request);
+        if (isMockMode()) {
+            return buildLocalQuestionDrafts(request);
+        }
+
+        String prompt = buildQuestionDraftPrompt(request);
+        String content = requestRemote(prompt, aiProperties.getApiKey());
+        List<AiGeneratedQuestion> parsed = parseGeneratedQuestions(content);
+        if (parsed.isEmpty()) {
+            throw new IllegalStateException("AI 未返回可用题目草稿");
+        }
+
+        List<AiGeneratedQuestion> normalized = new ArrayList<>();
+        int count = normalizedCount(request.getCount());
+        for (int i = 0; i < parsed.size() && normalized.size() < count; i++) {
+            normalized.add(normalizeGeneratedQuestion(parsed.get(i), request, i + 1));
+        }
+        while (normalized.size() < count) {
+            normalized.add(createLocalQuestionDraft(request, normalized.size() + 1));
+        }
+        return normalized;
+    }
+
     public String explain(String text) {
         String prompt = "请解释以下内容：\n" + text;
         return callAi(prompt);
+    }
+
+    public String explainWrongQuestion(WrongQuestionExplainRequest request) {
+        if (isMockMode()) {
+            return buildLocalWrongQuestionExplanation(request);
+        }
+        return requestRemote(buildWrongQuestionPrompt(request), aiProperties.getApiKey());
     }
 
     public String suggestReview(SuggestReviewRequest request) {
@@ -59,6 +109,11 @@ public class AiService {
         return requestRemote(prompt, apiKey);
     }
 
+    private boolean isMockMode() {
+        String apiKey = aiProperties.getApiKey();
+        return aiProperties.isMockEnabled() || apiKey == null || apiKey.isBlank();
+    }
+
     private String requestRemote(String prompt, String apiKey) {
         try {
             String url = aiProperties.getBaseUrl() + "/chat/completions";
@@ -69,7 +124,11 @@ public class AiService {
 
             Map<String, Object> body = new HashMap<>();
             body.put("model", aiProperties.getModel());
-            body.put("messages", List.of(Map.of("role", "user", "content", prompt)));
+            body.put("temperature", 0.25);
+            body.put("messages", List.of(
+                    Map.of("role", "system", "content", "你是智慧在线考试系统的教学 AI 助手，回答必须严谨、可直接落地到教学业务。"),
+                    Map.of("role", "user", "content", prompt)
+            ));
 
             ResponseEntity<Map> response = restTemplate.postForEntity(url, new HttpEntity<>(body, headers), Map.class);
             String content = extractContent(response.getBody());
@@ -93,5 +152,343 @@ public class AiService {
             }
         }
         return null;
+    }
+
+    private void validateBatchRequest(GenerateQuestionBatchRequest request) {
+        String type = normalizeCode(request.getQuestionType());
+        String difficulty = normalizeCode(request.getDifficulty());
+        if (!ALL_TYPES.contains(type)) {
+            throw new IllegalArgumentException("不支持的题型：" + request.getQuestionType());
+        }
+        if (!ALL_DIFFICULTIES.contains(difficulty)) {
+            throw new IllegalArgumentException("不支持的难度：" + request.getDifficulty());
+        }
+    }
+
+    private String buildQuestionDraftPrompt(GenerateQuestionBatchRequest request) {
+        String topic = topicName(request);
+        return """
+                请为在线考试题库生成题目草稿，只返回 JSON，不要输出 Markdown、解释或代码块。
+                JSON 格式必须是一个数组，每个元素包含：
+                subjectId, knowledgePointId, questionType, difficulty, stem, correctAnswer, analysis, defaultScore, status, options。
+
+                业务要求：
+                - 科目：%s（ID=%d）
+                - 知识点：%s（ID=%s）
+                - 题型：%s
+                - 难度：%s
+                - 数量：%d
+                - 默认分值：%s
+                - 题干必须清晰完整，不能出现“根据教材”“如下图”等无法独立作答的表达。
+                - 解析必须说明关键思路，不能只重复答案。
+                - status 固定为 0，表示草稿。
+                - SINGLE_CHOICE 必须给 4 个选项且只有 1 个 correct=true。
+                - MULTIPLE_CHOICE 必须给 4 个选项且至少 2 个 correct=true。
+                - TRUE_FALSE 必须给 A=正确、B=错误 两个选项且只有 1 个 correct=true。
+                - FILL_BLANK 和 SUBJECTIVE 的 options 必须为空数组，correctAnswer 必须可用于阅卷参考。
+                - correctAnswer 对客观题填写正确选项标识，例如 A 或 A,B。
+                - 不要编造图片、附件、外部材料。
+                %s
+                """.formatted(
+                safeText(request.getSubjectName()),
+                request.getSubjectId(),
+                topic,
+                request.getKnowledgePointId() == null ? "null" : request.getKnowledgePointId(),
+                normalizeCode(request.getQuestionType()),
+                normalizeCode(request.getDifficulty()),
+                normalizedCount(request.getCount()),
+                request.getDefaultScore() == null ? BigDecimal.valueOf(5) : request.getDefaultScore(),
+                blankToNull(request.getRequirements()) == null ? "" : "- 补充要求：" + request.getRequirements().trim()
+        );
+    }
+
+    private List<AiGeneratedQuestion> parseGeneratedQuestions(String content) {
+        try {
+            String json = extractJson(content);
+            JsonNode root = objectMapper.readTree(json);
+            JsonNode questionsNode = root.isArray() ? root : root.get("questions");
+            if (questionsNode == null || !questionsNode.isArray()) {
+                return List.of();
+            }
+            List<AiGeneratedQuestion> questions = new ArrayList<>();
+            for (JsonNode node : questionsNode) {
+                questions.add(objectMapper.convertValue(node, AiGeneratedQuestion.class));
+            }
+            return questions;
+        } catch (Exception ex) {
+            throw new IllegalStateException("AI 返回内容无法解析为题目草稿：" + ex.getMessage(), ex);
+        }
+    }
+
+    private String extractJson(String content) {
+        String text = content == null ? "" : content.trim();
+        if (text.startsWith("```")) {
+            int firstLine = text.indexOf('\n');
+            int lastFence = text.lastIndexOf("```");
+            if (firstLine >= 0 && lastFence > firstLine) {
+                text = text.substring(firstLine + 1, lastFence).trim();
+            }
+        }
+
+        int arrayStart = text.indexOf('[');
+        int arrayEnd = text.lastIndexOf(']');
+        int objectStart = text.indexOf('{');
+        int objectEnd = text.lastIndexOf('}');
+        if (arrayStart >= 0 && arrayEnd > arrayStart && (objectStart < 0 || arrayStart < objectStart)) {
+            return text.substring(arrayStart, arrayEnd + 1);
+        }
+        if (objectStart >= 0 && objectEnd > objectStart) {
+            return text.substring(objectStart, objectEnd + 1);
+        }
+        throw new IllegalArgumentException("未找到 JSON 内容");
+    }
+
+    private List<AiGeneratedQuestion> buildLocalQuestionDrafts(GenerateQuestionBatchRequest request) {
+        List<AiGeneratedQuestion> questions = new ArrayList<>();
+        for (int i = 1; i <= normalizedCount(request.getCount()); i++) {
+            questions.add(createLocalQuestionDraft(request, i));
+        }
+        return questions;
+    }
+
+    private AiGeneratedQuestion createLocalQuestionDraft(GenerateQuestionBatchRequest request, int index) {
+        String type = normalizeCode(request.getQuestionType());
+        String difficulty = normalizeCode(request.getDifficulty());
+        String topic = topicName(request);
+        AiGeneratedQuestion question = new AiGeneratedQuestion();
+        question.setSubjectId(request.getSubjectId());
+        question.setKnowledgePointId(request.getKnowledgePointId());
+        question.setQuestionType(type);
+        question.setDifficulty(difficulty);
+        question.setDefaultScore(request.getDefaultScore());
+        question.setStatus(0);
+
+        if ("SINGLE_CHOICE".equals(type)) {
+            question.setStem("关于“" + topic + "”，下列说法正确的是？（AI草稿 " + index + "）");
+            question.setOptions(options(
+                    option("A", topic + "需要结合概念、条件和应用场景理解", true),
+                    option("B", topic + "只需要记住名称即可完成所有判断", false),
+                    option("C", topic + "与本课程其他知识点没有关联", false),
+                    option("D", topic + "在考试中只能以主观题形式出现", false)
+            ));
+            question.setCorrectAnswer("A");
+        } else if ("MULTIPLE_CHOICE".equals(type)) {
+            question.setStem("学习“" + topic + "”时，以下哪些做法有助于正确掌握该知识点？（AI草稿 " + index + "）");
+            question.setOptions(options(
+                    option("A", "先明确核心概念及适用条件", true),
+                    option("B", "结合典型例题分析解题步骤", true),
+                    option("C", "忽略题目中的限定条件", false),
+                    option("D", "把相近概念进行对比归纳", true)
+            ));
+            question.setCorrectAnswer("A,B,D");
+        } else if ("TRUE_FALSE".equals(type)) {
+            question.setStem("判断：掌握“" + topic + "”时，只记忆结论而不理解适用条件，容易导致迁移应用错误。（AI草稿 " + index + "）");
+            question.setOptions(options(
+                    option("A", "正确", true),
+                    option("B", "错误", false)
+            ));
+            question.setCorrectAnswer("A");
+        } else if ("FILL_BLANK".equals(type)) {
+            question.setStem("请写出“" + topic + "”中一个必须关注的关键条件或核心概念。（AI草稿 " + index + "）");
+            question.setCorrectAnswer(topic + "的核心概念、适用条件或关键步骤之一");
+            question.setOptions(List.of());
+        } else {
+            question.setStem("请结合一个具体例子，说明你对“" + topic + "”的理解，并指出常见错误。（AI草稿 " + index + "）");
+            question.setCorrectAnswer("应说明核心概念、适用条件、示例过程，并能指出至少一个常见误区。");
+            question.setOptions(List.of());
+        }
+        question.setAnalysis("本题用于检查学生是否真正理解“" + topic + "”，作答时应先抓住核心概念，再结合条件判断，避免只凭关键词作答。");
+        return question;
+    }
+
+    private AiGeneratedQuestion normalizeGeneratedQuestion(AiGeneratedQuestion question, GenerateQuestionBatchRequest request, int index) {
+        String type = normalizeCode(request.getQuestionType());
+        String difficulty = normalizeCode(request.getDifficulty());
+        AiGeneratedQuestion normalized = question == null ? createLocalQuestionDraft(request, index) : question;
+        normalized.setSubjectId(request.getSubjectId());
+        normalized.setKnowledgePointId(request.getKnowledgePointId());
+        normalized.setQuestionType(type);
+        normalized.setDifficulty(difficulty);
+        normalized.setDefaultScore(request.getDefaultScore());
+        normalized.setStatus(0);
+
+        if (blankToNull(normalized.getStem()) == null) {
+            normalized.setStem(createLocalQuestionDraft(request, index).getStem());
+        } else {
+            normalized.setStem(truncate(normalized.getStem().trim(), 4000));
+        }
+        normalized.setAnalysis(truncate(firstNonBlank(normalized.getAnalysis(), "请结合题干条件分析关键概念，按步骤判断后再得出答案。"), 4000));
+
+        if (OBJECTIVE_TYPES.contains(type)) {
+            normalized.setOptions(normalizeObjectiveOptions(normalized, request, index));
+            normalized.setCorrectAnswer(correctLabels(normalized.getOptions()).stream().collect(Collectors.joining(",")));
+        } else {
+            normalized.setOptions(List.of());
+            normalized.setCorrectAnswer(truncate(firstNonBlank(normalized.getCorrectAnswer(), createLocalQuestionDraft(request, index).getCorrectAnswer()), 4000));
+        }
+        return normalized;
+    }
+
+    private List<AiGeneratedQuestionOption> normalizeObjectiveOptions(AiGeneratedQuestion question, GenerateQuestionBatchRequest request, int index) {
+        String type = normalizeCode(request.getQuestionType());
+        if ("TRUE_FALSE".equals(type)) {
+            String answer = safeText(question.getCorrectAnswer()).toUpperCase(Locale.ROOT);
+            boolean correctIsB = answer.contains("B") || answer.contains("错") || answer.contains("FALSE");
+            return options(
+                    option("A", "正确", !correctIsB),
+                    option("B", "错误", correctIsB)
+            );
+        }
+
+        List<AiGeneratedQuestionOption> raw = question.getOptions() == null ? List.of() : question.getOptions();
+        List<AiGeneratedQuestionOption> normalized = new ArrayList<>();
+        int limit = Math.min(raw.size(), 6);
+        for (int i = 0; i < limit; i++) {
+            AiGeneratedQuestionOption item = raw.get(i);
+            if (blankToNull(item.getOptionContent()) == null) {
+                continue;
+            }
+            normalized.add(option(String.valueOf((char) ('A' + normalized.size())),
+                    truncate(item.getOptionContent().trim(), 1000),
+                    Boolean.TRUE.equals(item.getCorrect())));
+        }
+        if (normalized.size() < 4) {
+            return createLocalQuestionDraft(request, index).getOptions();
+        }
+
+        Set<String> answerLabels = new HashSet<>(correctLabels(normalized));
+        if (answerLabels.isEmpty()) {
+            answerLabels.addAll(labelsMentionedInAnswer(question.getCorrectAnswer(), normalized));
+        }
+        if ("SINGLE_CHOICE".equals(type)) {
+            String selected = answerLabels.isEmpty() ? "A" : answerLabels.iterator().next();
+            normalized.forEach(option -> option.setCorrect(selected.equals(option.getOptionLabel())));
+        } else {
+            if (answerLabels.size() < 2) {
+                answerLabels.add("A");
+                answerLabels.add("B");
+            }
+            normalized.forEach(option -> option.setCorrect(answerLabels.contains(option.getOptionLabel())));
+        }
+        return normalized;
+    }
+
+    private Set<String> labelsMentionedInAnswer(String correctAnswer, List<AiGeneratedQuestionOption> options) {
+        String answer = safeText(correctAnswer).toUpperCase(Locale.ROOT);
+        Set<String> labels = new HashSet<>();
+        for (AiGeneratedQuestionOption option : options) {
+            String label = option.getOptionLabel();
+            if (label != null && !label.isBlank() && answer.contains(label.toUpperCase(Locale.ROOT))) {
+                labels.add(label);
+            }
+        }
+        return labels;
+    }
+
+    private Set<String> correctLabels(List<AiGeneratedQuestionOption> options) {
+        return options.stream()
+                .filter(option -> Boolean.TRUE.equals(option.getCorrect()))
+                .map(AiGeneratedQuestionOption::getOptionLabel)
+                .collect(Collectors.toCollection(HashSet::new));
+    }
+
+    private String buildWrongQuestionPrompt(WrongQuestionExplainRequest request) {
+        String options = optionsToText(request.getOptions());
+        return """
+                请作为耐心但高效的考试辅导老师，为学生讲解一道错题。
+                输出中文，按以下四段组织，每段 2-4 句：错因定位、正确思路、关键知识点、下次作答提醒。
+                不要泛泛鼓励，不要编造题外背景。
+
+                题型：%s
+                错误次数：%s
+                题干：%s
+                选项：
+                %s
+                学生答案：%s
+                正确答案：%s
+                原解析：%s
+                """.formatted(
+                firstNonBlank(request.getQuestionType(), "未标注"),
+                request.getWrongCount() == null ? "未记录" : request.getWrongCount(),
+                safeText(request.getStem()),
+                options.isBlank() ? "无" : options,
+                firstNonBlank(request.getStudentAnswer(), "未提供"),
+                firstNonBlank(request.getCorrectAnswer(), "未提供"),
+                firstNonBlank(request.getAnalysis(), "暂无")
+        );
+    }
+
+    private String buildLocalWrongQuestionExplanation(WrongQuestionExplainRequest request) {
+        String type = firstNonBlank(request.getQuestionType(), "题目");
+        String answer = firstNonBlank(request.getCorrectAnswer(), "参考答案未提供");
+        String analysis = firstNonBlank(request.getAnalysis(), "这道题需要先定位题干条件，再对应到核心概念判断。");
+        int wrongCount = request.getWrongCount() == null ? 1 : request.getWrongCount();
+        return "【错因定位】\n"
+                + "这道" + type + "已经错了 " + wrongCount + " 次，优先检查是否只抓住了题干关键词，却没有核对限定条件。"
+                + (request.getStudentAnswer() == null || request.getStudentAnswer().isBlank() ? "" : "\n你的答案是：" + request.getStudentAnswer() + "，需要和参考答案逐项对照。")
+                + "\n\n【正确思路】\n"
+                + "先把题干中的条件圈出来，再判断每个选项或答案点是否满足这些条件。参考答案是：" + answer + "。"
+                + "\n\n【关键知识点】\n"
+                + analysis
+                + "\n\n【下次作答提醒】\n"
+                + "遇到同类题时先写出判断依据，再选答案；如果是选择题，逐项排除比直接凭印象选择更稳。";
+    }
+
+    private String optionsToText(List<AiGeneratedQuestionOption> options) {
+        if (options == null || options.isEmpty()) {
+            return "";
+        }
+        StringJoiner joiner = new StringJoiner("\n");
+        for (AiGeneratedQuestionOption option : options) {
+            joiner.add(firstNonBlank(option.getOptionLabel(), "?") + ". " + safeText(option.getOptionContent()));
+        }
+        return joiner.toString();
+    }
+
+    private List<AiGeneratedQuestionOption> options(AiGeneratedQuestionOption... options) {
+        return new ArrayList<>(List.of(options));
+    }
+
+    private AiGeneratedQuestionOption option(String label, String content, boolean correct) {
+        AiGeneratedQuestionOption option = new AiGeneratedQuestionOption();
+        option.setOptionLabel(label);
+        option.setOptionContent(content);
+        option.setCorrect(correct);
+        return option;
+    }
+
+    private String topicName(GenerateQuestionBatchRequest request) {
+        String knowledgePoint = blankToNull(request.getKnowledgePointName());
+        return knowledgePoint == null ? safeText(request.getSubjectName()) : knowledgePoint;
+    }
+
+    private int normalizedCount(Integer count) {
+        int value = count == null ? 3 : count;
+        return Math.max(1, Math.min(value, 10));
+    }
+
+    private String normalizeCode(String value) {
+        return safeText(value).trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String firstNonBlank(String first, String fallback) {
+        String trimmed = blankToNull(first);
+        return trimmed == null ? fallback : trimmed;
+    }
+
+    private String blankToNull(String value) {
+        String trimmed = value == null ? null : value.trim();
+        return trimmed == null || trimmed.isBlank() ? null : trimmed;
+    }
+
+    private String safeText(String value) {
+        return value == null ? "" : value;
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
     }
 }

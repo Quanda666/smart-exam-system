@@ -50,6 +50,20 @@
         </div>
       </template>
 
+      <div class="ai-generator-strip">
+        <div class="ai-generator-main">
+          <span class="ai-generator-title">AI 出题台</span>
+          <el-input-number v-model="aiSettings.count" :min="1" :max="10" controls-position="right" />
+          <el-input
+            v-model="aiSettings.requirements"
+            clearable
+            maxlength="200"
+            placeholder="补充要求：考察重点、场景、易错点"
+          />
+        </div>
+        <el-button type="success" :icon="MagicStick" :loading="aiGenerating" @click="aiGenerateQuestion">生成草稿</el-button>
+      </div>
+
       <el-form class="question-form" :model="questionForm" label-position="top">
         <el-form-item label="所属科目">
           <el-select v-model="questionForm.subjectId" placeholder="请选择科目" @change="handleFormSubjectChange">
@@ -108,7 +122,7 @@
         <el-form-item class="question-form-actions" label="操作">
           <el-button type="primary" @click="saveQuestion">{{ editingQuestionId ? '保存修改' : '新增题目' }}</el-button>
           <el-button @click="resetQuestionForm">重置</el-button>
-          <el-button @click="aiGenerateQuestion" type="success" plain>AI辅助出题</el-button>
+          <el-button @click="aiGenerateQuestion" :icon="MagicStick" :loading="aiGenerating" type="success" plain>AI生成草稿</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -190,13 +204,57 @@
         />
       </div>
     </el-card>
+
+    <el-dialog v-model="aiDialogVisible" title="AI题目草稿" width="960px" class="ai-draft-dialog">
+      <div class="ai-draft-toolbar">
+        <span>共生成 {{ aiDrafts.length }} 道题，保存时统一进入草稿状态</span>
+        <el-button type="primary" :icon="DocumentChecked" :loading="aiSaving" :disabled="aiDrafts.length === 0" @click="saveAiDrafts">
+          全部保存
+        </el-button>
+      </div>
+
+      <div class="ai-draft-list">
+        <article v-for="(draft, index) in aiDrafts" :key="`${draft.questionType}-${index}`" class="ai-draft-item">
+          <header class="ai-draft-head">
+            <div class="ai-draft-tags">
+              <el-tag>{{ typeText(draft.questionType) }}</el-tag>
+              <el-tag :type="difficultyTag(draft.difficulty)">{{ difficultyText(draft.difficulty) }}</el-tag>
+              <el-tag type="info">{{ draft.defaultScore }} 分</el-tag>
+            </div>
+            <el-button size="small" type="primary" plain :icon="Check" @click="applyAiDraft(draft)">套用</el-button>
+          </header>
+
+          <p class="ai-draft-stem">{{ index + 1 }}. {{ draft.stem }}</p>
+
+          <div v-if="isObjectiveType(draft.questionType)" class="ai-draft-options">
+            <span
+              v-for="option in draft.options"
+              :key="option.optionLabel"
+              class="ai-option"
+              :class="{ 'is-correct': isCorrectOption(option.correct) }"
+            >
+              {{ option.optionLabel }}. {{ option.optionContent }}
+            </span>
+          </div>
+
+          <div class="ai-draft-meta">
+            <strong>答案</strong>
+            <span>{{ draft.correctAnswer || correctAnswerText(draft) }}</span>
+          </div>
+          <div class="ai-draft-meta">
+            <strong>解析</strong>
+            <span>{{ draft.analysis || '暂无解析' }}</span>
+          </div>
+        </article>
+      </div>
+    </el-dialog>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Download } from '@element-plus/icons-vue';
+import { Check, DocumentChecked, Download, MagicStick } from '@element-plus/icons-vue';
 import { exportToCsv } from '../utils/exportCsv';
 import { listKnowledgePoints, listSubjects, type KnowledgePointInfo, type SubjectInfo } from '../api/basic';
 import {
@@ -212,7 +270,7 @@ import {
   type QuestionPayload,
   type QuestionType
 } from '../api/question';
-import { generateQuestion } from '../api/ai';
+import { generateQuestionDrafts, saveGeneratedQuestions, type AiGeneratedQuestion } from '../api/ai';
 import type { RoleCode } from '../api/auth';
 
 const props = defineProps<{
@@ -245,6 +303,14 @@ const editingQuestionId = ref<number | null>(null);
 const tableRef = ref<{ clearSelection: () => void }>();
 const selectedQuestions = ref<QuestionInfo[]>([]);
 const exporting = ref(false);
+const aiGenerating = ref(false);
+const aiSaving = ref(false);
+const aiDialogVisible = ref(false);
+const aiDrafts = ref<AiGeneratedQuestion[]>([]);
+const aiSettings = reactive({
+  count: 3,
+  requirements: ''
+});
 
 const query = reactive<{
   keyword: string;
@@ -621,6 +687,7 @@ function difficultyTag(value: string) {
 function statusText(status: number) {
   return status === 1 ? '已发布' : '草稿';
 }
+
 async function aiGenerateQuestion() {
   const subject = subjects.value.find(s => s.id === questionForm.subjectId);
   if (!subject) {
@@ -628,26 +695,233 @@ async function aiGenerateQuestion() {
     return;
   }
   const knowledgePoint = knowledgePoints.value.find(k => k.id === questionForm.knowledgePointId);
+  aiGenerating.value = true;
   try {
-    const response = await generateQuestion({
-      subject: subject.subjectName,
-      knowledgePoint: knowledgePoint?.pointName,
+    const response = await generateQuestionDrafts({
+      subjectId: subject.id,
+      subjectName: subject.subjectName,
+      knowledgePointId: knowledgePoint?.id ?? null,
+      knowledgePointName: knowledgePoint?.pointName ?? null,
       questionType: questionForm.questionType,
       difficulty: questionForm.difficulty,
+      count: aiSettings.count,
+      defaultScore: Number(questionForm.defaultScore || 5),
+      requirements: aiSettings.requirements.trim()
     });
-    // For simplicity, this example just logs the AI-generated content.
-    // A real implementation would parse this content and fill the form.
-    console.log('AI-generated question content:', response.data);
-    ElMessage.success('AI已生成题目内容，请在控制台查看并手动填充');
+    aiDrafts.value = response.data.map(normalizeAiDraft);
+    aiDialogVisible.value = true;
+    ElMessage.success(`已生成 ${aiDrafts.value.length} 道题目草稿`);
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : 'AI辅助出题失败');
+  } finally {
+    aiGenerating.value = false;
   }
+}
+
+async function saveAiDrafts() {
+  if (aiDrafts.value.length === 0) return;
+  try {
+    await ElMessageBox.confirm(`确认保存 ${aiDrafts.value.length} 道 AI 草稿到题库吗？`, '保存AI草稿', {
+      type: 'warning',
+      confirmButtonText: '保存为草稿',
+      cancelButtonText: '取消'
+    });
+  } catch {
+    return;
+  }
+  aiSaving.value = true;
+  try {
+    const response = await saveGeneratedQuestions(aiDrafts.value.map((draft) => ({ ...draft, status: 0 })));
+    ElMessage.success(`已保存 ${response.data.savedCount} 道AI题目草稿`);
+    aiDialogVisible.value = false;
+    aiDrafts.value = [];
+    await loadQuestions();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : 'AI草稿保存失败');
+  } finally {
+    aiSaving.value = false;
+  }
+}
+
+function applyAiDraft(draft: AiGeneratedQuestion) {
+  editingQuestionId.value = null;
+  setQuestionForm(draft);
+  aiDialogVisible.value = false;
+  ElMessage.success('已套用AI草稿，可继续编辑后保存');
+}
+
+function setQuestionForm(payload: QuestionPayload) {
+  questionForm.subjectId = payload.subjectId;
+  questionForm.knowledgePointId = payload.knowledgePointId;
+  questionForm.questionType = payload.questionType;
+  questionForm.difficulty = payload.difficulty;
+  questionForm.stem = payload.stem;
+  questionForm.correctAnswer = payload.correctAnswer || '';
+  questionForm.analysis = payload.analysis || '';
+  questionForm.defaultScore = Number(payload.defaultScore || 5);
+  questionForm.status = payload.status ?? 0;
+  questionForm.options = payload.options?.length
+    ? payload.options.map((option) => ({ ...option, correct: isCorrectOption(option.correct) }))
+    : defaultOptions(payload.questionType);
+}
+
+function normalizeAiDraft(draft: AiGeneratedQuestion): AiGeneratedQuestion {
+  const normalized: AiGeneratedQuestion = {
+    subjectId: Number(draft.subjectId || questionForm.subjectId),
+    knowledgePointId: draft.knowledgePointId ?? null,
+    questionType: draft.questionType,
+    difficulty: draft.difficulty,
+    stem: draft.stem || '',
+    correctAnswer: draft.correctAnswer || '',
+    analysis: draft.analysis || '',
+    defaultScore: Number(draft.defaultScore || questionForm.defaultScore || 5),
+    status: 0,
+    options: draft.options || []
+  };
+  if (isObjectiveType(normalized.questionType)) {
+    normalized.correctAnswer = correctAnswerText(normalized);
+  } else {
+    normalized.options = [];
+  }
+  return normalized;
+}
+
+function correctAnswerText(question: QuestionPayload) {
+  if (!isObjectiveType(question.questionType)) {
+    return question.correctAnswer || '';
+  }
+  return (question.options || [])
+    .filter((option) => isCorrectOption(option.correct))
+    .map((option) => option.optionLabel)
+    .join(',');
 }
 </script>
 <style scoped>
+.ai-generator-strip {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  margin-bottom: 16px;
+  border: 1px solid #dce4f2;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.ai-generator-main {
+  display: grid;
+  grid-template-columns: minmax(92px, auto) 120px minmax(240px, 1fr);
+  gap: 12px;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.ai-generator-title {
+  font-weight: 700;
+  color: #1f2937;
+  white-space: nowrap;
+}
+
+.ai-draft-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  color: #606266;
+}
+
+.ai-draft-list {
+  display: grid;
+  gap: 14px;
+  max-height: 64vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.ai-draft-item {
+  padding: 14px;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.ai-draft-head,
+.ai-draft-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-draft-head {
+  justify-content: space-between;
+}
+
+.ai-draft-stem {
+  margin: 12px 0;
+  line-height: 1.7;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.ai-draft-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ai-option {
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fafafa;
+  color: #374151;
+  line-height: 1.5;
+}
+
+.ai-option.is-correct {
+  border-color: #95d475;
+  background: #f0f9eb;
+  color: #2f6b1f;
+  font-weight: 600;
+}
+
+.ai-draft-meta {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.ai-draft-meta strong {
+  color: #111827;
+}
+
 .question-pagination {
   margin-top: 16px;
   display: flex;
   justify-content: flex-end;
+}
+
+@media (max-width: 900px) {
+  .ai-generator-strip {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ai-generator-main {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-draft-toolbar,
+  .ai-draft-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 </style>

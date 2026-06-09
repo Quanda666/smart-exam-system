@@ -31,7 +31,14 @@
           </el-table-column>
           <el-table-column label="操作">
             <template #default="scope">
-              <el-button link type="primary" @click="aiExplainWrong(scope.row as WrongQuestion)">AI讲解</el-button>
+              <el-button
+                link
+                type="primary"
+                :loading="aiExplainingQuestionId === scope.row.questionId"
+                @click="aiExplainWrong(scope.row as WrongQuestion)"
+              >
+                AI讲解
+              </el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -59,14 +66,19 @@
         </div>
       </div>
     </el-drawer>
+
+    <el-dialog v-model="aiExplainVisible" :title="aiExplainTitle" width="720px" class="ai-explain-dialog">
+      <el-skeleton v-if="aiExplainingQuestionId" :rows="5" animated />
+      <div v-else class="ai-explain-content">{{ aiExplanation }}</div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import { getGrades, getExamResult, getWrongQuestions, getKnowledgePointMastery, type GradeInfo, type ExamResult, type WrongQuestion } from '../api/student';
-import { explainText } from '../api/ai';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { explainWrongQuestion } from '../api/ai';
+import { ElMessage } from 'element-plus';
 import * as echarts from 'echarts';
 import ExamList from './ExamList.vue';
 import ExamTaking from './ExamTaking.vue';
@@ -89,6 +101,10 @@ const drawerVisible = ref(false);
 const examResult = ref<ExamResult | null>(null);
 const masteryChart = ref<HTMLElement | null>(null);
 const takingExam = ref<{ attemptId: number } | null>(null);
+const aiExplainVisible = ref(false);
+const aiExplanation = ref('');
+const aiExplainTitle = ref('AI错题讲解');
+const aiExplainingQuestionId = ref<number | null>(null);
 
 watch(activeTab, (newTab) => {
   switch (newTab) {
@@ -188,15 +204,38 @@ const initMasteryChart = () => {
   }
 };
 const aiExplainWrong = async (item: WrongQuestion) => {
+  aiExplainVisible.value = true;
+  aiExplanation.value = '';
+  aiExplainTitle.value = `AI讲解：${item.stem.slice(0, 24)}`;
+  aiExplainingQuestionId.value = item.questionId;
   try {
-    const response = await explainText(item.stem + "\n正确答案: " + item.correctAnswer + "\n解析: " + (item.analysis || '暂无'));
-    ElMessageBox.alert(response.data, 'AI 讲解', {
-      confirmButtonText: '关闭',
+    const response = await explainWrongQuestion({
+      questionId: item.questionId,
+      stem: item.stem,
+      questionType: item.questionType,
+      correctAnswer: item.correctAnswer,
+      analysis: item.analysis,
+      wrongCount: item.wrongCount,
+      options: (item.options || [])
+        .filter((option) => Boolean(option.optionLabel && option.optionContent))
+        .map((option) => ({
+          optionLabel: option.optionLabel,
+          optionContent: option.optionContent,
+          correct: isCorrectValue(option.correct ?? option.isCorrect)
+        }))
     });
+    aiExplanation.value = response.data;
   } catch (error) {
-    ElMessage.error('AI讲解请求失败');
+    aiExplainVisible.value = false;
+    ElMessage.error(error instanceof Error ? error.message : 'AI讲解请求失败');
+  } finally {
+    aiExplainingQuestionId.value = null;
   }
 };
+
+function isCorrectValue(value: boolean | number | undefined) {
+  return value === true || value === 1;
+}
 </script>
 
 <style scoped>
@@ -227,5 +266,11 @@ const aiExplainWrong = async (item: WrongQuestion) => {
 :deep(.el-tabs__content) {
   flex-grow: 1;
   overflow-y: auto;
+}
+
+.ai-explain-content {
+  white-space: pre-wrap;
+  line-height: 1.8;
+  color: #1f2937;
 }
 </style>

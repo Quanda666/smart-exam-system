@@ -33,7 +33,8 @@ export interface WrongQuestion {
     options: Array<{
         optionLabel: string;
         optionContent: string;
-        isCorrect: boolean;
+        correct?: boolean | number;
+        isCorrect?: boolean | number;
     }>;
 }
 
