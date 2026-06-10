@@ -225,8 +225,9 @@ public class AiService {
         }
         try {
             Long userId = AuthContext.getSession() == null ? null : AuthContext.getSession().getUser().getId();
+            ensureAiUsageLogTable(jdbcTemplate);
             jdbcTemplate.update("""
-                    INSERT INTO ai_usage_log (user_id, scene, prompt, response, success, error_message)
+                    INSERT INTO ai_usage_log (user_id, scene, prompt, `response`, `success`, error_message)
                     VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     userId,
@@ -237,6 +238,28 @@ public class AiService {
                     truncate(errorMessage, 500));
         } catch (Exception ignore) {
             // AI 日志不能影响主业务流程。
+        }
+    }
+
+    private void ensureAiUsageLogTable(JdbcTemplate jdbcTemplate) {
+        try {
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS ai_usage_log (
+                      id            BIGINT       NOT NULL AUTO_INCREMENT,
+                      user_id       BIGINT       DEFAULT NULL,
+                      scene         VARCHAR(64)  DEFAULT NULL,
+                      prompt        TEXT         DEFAULT NULL,
+                      `response`    TEXT         DEFAULT NULL,
+                      `success`     TINYINT      NOT NULL DEFAULT 1,
+                      error_message VARCHAR(500) DEFAULT NULL,
+                      created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      PRIMARY KEY (id),
+                      KEY idx_ai_log_user (user_id),
+                      KEY idx_ai_log_scene_success_time (scene, `success`, created_at)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 调用日志'
+                    """);
+        } catch (Exception ignored) {
+            // 写入日志不能影响 AI 主流程；表不存在时后续 INSERT 也会被外层捕获。
         }
     }
 

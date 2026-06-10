@@ -563,12 +563,13 @@ CREATE TABLE IF NOT EXISTS ai_usage_log (
   user_id       BIGINT       DEFAULT NULL,
   scene         VARCHAR(64)  DEFAULT NULL,
   prompt        TEXT         DEFAULT NULL,
-  response      TEXT         DEFAULT NULL,
-  success       TINYINT      NOT NULL DEFAULT 1,
+  `response`    TEXT         DEFAULT NULL,
+  `success`     TINYINT      NOT NULL DEFAULT 1,
   error_message VARCHAR(500) DEFAULT NULL,
   created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  KEY idx_ai_log_user (user_id)
+  KEY idx_ai_log_user (user_id),
+  KEY idx_ai_log_scene_success_time (scene, `success`, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 调用日志';
 
 -- ---------- V2.0: 邮箱验证 ----------

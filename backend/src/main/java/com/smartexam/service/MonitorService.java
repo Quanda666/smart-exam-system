@@ -48,6 +48,7 @@ public class MonitorService {
 
     public PageResult<Map<String, Object>> getAiUsageLogs(int page, int size, String scene, Boolean success, AuthUser user) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        ensureAiUsageLogTable(jdbcTemplate);
         int safeSize = size <= 0 ? 10 : Math.min(size, 100);
         int safePage = Math.max(1, page);
         int offset = (safePage - 1) * safeSize;
@@ -63,7 +64,7 @@ public class MonitorService {
             params.add(scene.trim());
         }
         if (success != null) {
-            where.append(" AND l.success = ?");
+            where.append(" AND l.`success` = ?");
             params.add(Boolean.TRUE.equals(success) ? 1 : 0);
         }
 
@@ -81,8 +82,8 @@ public class MonitorService {
                        u.real_name AS userName,
                        l.scene,
                        l.prompt,
-                       l.response,
-                       l.success,
+                       l.`response` AS response,
+                       l.`success` AS success,
                        l.error_message AS errorMessage,
                        l.created_at AS createdAt
                 FROM ai_usage_log l
@@ -92,6 +93,28 @@ public class MonitorService {
                 LIMIT ? OFFSET ?
                 """, listParams.toArray());
         return PageResult.of(list, total == null ? 0 : total, safePage, safeSize);
+    }
+
+    private void ensureAiUsageLogTable(JdbcTemplate jdbcTemplate) {
+        try {
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS ai_usage_log (
+                      id            BIGINT       NOT NULL AUTO_INCREMENT,
+                      user_id       BIGINT       DEFAULT NULL,
+                      scene         VARCHAR(64)  DEFAULT NULL,
+                      prompt        TEXT         DEFAULT NULL,
+                      `response`    TEXT         DEFAULT NULL,
+                      `success`     TINYINT      NOT NULL DEFAULT 1,
+                      error_message VARCHAR(500) DEFAULT NULL,
+                      created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      PRIMARY KEY (id),
+                      KEY idx_ai_log_user (user_id),
+                      KEY idx_ai_log_scene_success_time (scene, `success`, created_at)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 调用日志'
+                    """);
+        } catch (Exception ignored) {
+            // 查询时建表只是旧库兜底；失败时交给后续查询暴露真实数据库错误。
+        }
     }
 
     private JdbcTemplate requireJdbcTemplate() {

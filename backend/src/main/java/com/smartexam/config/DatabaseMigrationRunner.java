@@ -50,6 +50,7 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
         ensureRolePermissionTable(jdbc);
         ensureQuestionSourceColumns(jdbc);
         ensureRagTables(jdbc);
+        ensureAiUsageLogTable(jdbc);
         ensureV4Tables(jdbc);
         backfillV4Data(jdbc);
         backfillRolePermissions(jdbc);
@@ -227,6 +228,43 @@ public class DatabaseMigrationRunner implements ApplicationRunner {
                   KEY idx_material_outline_material (material_id, outline_order)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='课程资料知识点大纲'
                 """);
+    }
+
+    /** AI 审计日志表：兼容旧库跳过 schema.sql 或部分字段缺失的场景。 */
+    private void ensureAiUsageLogTable(JdbcTemplate jdbc) {
+        executeQuietly(jdbc, "创建 ai_usage_log 表", """
+                CREATE TABLE IF NOT EXISTS ai_usage_log (
+                  id            BIGINT       NOT NULL AUTO_INCREMENT,
+                  user_id       BIGINT       DEFAULT NULL,
+                  scene         VARCHAR(64)  DEFAULT NULL,
+                  prompt        TEXT         DEFAULT NULL,
+                  `response`    TEXT         DEFAULT NULL,
+                  `success`     TINYINT      NOT NULL DEFAULT 1,
+                  error_message VARCHAR(500) DEFAULT NULL,
+                  created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  PRIMARY KEY (id),
+                  KEY idx_ai_log_user (user_id),
+                  KEY idx_ai_log_scene_success_time (scene, `success`, created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 调用日志'
+                """);
+        addColumnIfMissing(jdbc, "ai_usage_log", "user_id",
+                "ALTER TABLE ai_usage_log ADD COLUMN user_id BIGINT DEFAULT NULL AFTER id");
+        addColumnIfMissing(jdbc, "ai_usage_log", "scene",
+                "ALTER TABLE ai_usage_log ADD COLUMN scene VARCHAR(64) DEFAULT NULL AFTER user_id");
+        addColumnIfMissing(jdbc, "ai_usage_log", "prompt",
+                "ALTER TABLE ai_usage_log ADD COLUMN prompt TEXT DEFAULT NULL AFTER scene");
+        addColumnIfMissing(jdbc, "ai_usage_log", "response",
+                "ALTER TABLE ai_usage_log ADD COLUMN `response` TEXT DEFAULT NULL AFTER prompt");
+        addColumnIfMissing(jdbc, "ai_usage_log", "success",
+                "ALTER TABLE ai_usage_log ADD COLUMN `success` TINYINT NOT NULL DEFAULT 1 AFTER `response`");
+        addColumnIfMissing(jdbc, "ai_usage_log", "error_message",
+                "ALTER TABLE ai_usage_log ADD COLUMN error_message VARCHAR(500) DEFAULT NULL AFTER `success`");
+        addColumnIfMissing(jdbc, "ai_usage_log", "created_at",
+                "ALTER TABLE ai_usage_log ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER error_message");
+        addIndexIfMissing(jdbc, "ai_usage_log", "idx_ai_log_user",
+                "ALTER TABLE ai_usage_log ADD INDEX idx_ai_log_user (user_id)");
+        addIndexIfMissing(jdbc, "ai_usage_log", "idx_ai_log_scene_success_time",
+                "ALTER TABLE ai_usage_log ADD INDEX idx_ai_log_scene_success_time (scene, `success`, created_at)");
     }
 
     /** V4.0：创建课程、开课、授课、选课、公告目标、考试目标等新关系表。 */

@@ -205,6 +205,10 @@ public class MenuService {
             if (children.isEmpty()) {
                 continue;
             }
+            if (children.size() == 1) {
+                result.add(children.get(0));
+                continue;
+            }
             parent.setChildren(children);
             result.add(parent);
         }

@@ -172,16 +172,26 @@
             </div>
           </div>
         </nav>
+
+        <div class="sidebar-footer">
+          <button
+            type="button"
+            class="sidebar-toggle"
+            @click="sidebarCollapsed = !sidebarCollapsed"
+            :title="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
+          >
+            <el-icon :size="18">
+              <DArrowRight v-if="sidebarCollapsed" />
+              <DArrowLeft v-else />
+            </el-icon>
+            <span>收起侧边栏</span>
+          </button>
+        </div>
       </aside>
 
       <div class="content-panel">
         <header class="topbar">
           <div class="topbar-left">
-            <button class="hamburger-btn" @click="sidebarCollapsed = !sidebarCollapsed" :title="sidebarCollapsed ? '展开菜单' : '收起菜单'">
-              <span class="hamburger-line"></span>
-              <span class="hamburger-line"></span>
-              <span class="hamburger-line"></span>
-            </button>
             <div>
               <div class="crumb">
                 <a class="crumb-link" @click="navigateTo(user.defaultPath)">{{ user.roleLabel }}</a>
@@ -241,7 +251,7 @@ import {
   Lock, Message, User, Loading,
   DataAnalysis, OfficeBuilding, Management, Connection, Bell, Collection,
   Document, PieChart, Notebook, Files, Calendar, EditPen, TrendCharts,
-  DataLine, House, Clock, Tickets, Reading, ArrowDown
+  DataLine, House, Clock, Tickets, Reading, ArrowDown, DArrowLeft, DArrowRight
 } from '@element-plus/icons-vue';
 
 // 侧边栏菜单图标映射（后端返回图标名 → Element Plus 组件）
@@ -656,14 +666,17 @@ function navigateTo(path: string, mode: NavigateMode = 'push') {
 }
 
 function flattenMenus(items: MenuItem[]): MenuItem[] {
-  return items.flatMap((item) => item.children?.length ? [item, ...item.children] : [item]);
+  return items.flatMap((item) => item.children?.length ? item.children : [item]);
 }
 
 function normalizeMenus(items: MenuItem[]): MenuItem[] {
-  if (items.some((item) => item.children?.length)) {
-    return items;
-  }
-  return items.map((item) => ({ ...item, children: [] }));
+  return items.flatMap((item) => {
+    const children = item.children ?? [];
+    if (children.length === 1) {
+      return [{ ...children[0], children: [] }];
+    }
+    return [{ ...item, children }];
+  });
 }
 
 function menuKey(item: MenuItem) {
