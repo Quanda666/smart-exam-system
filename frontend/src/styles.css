@@ -40,7 +40,6 @@
 }
 
 /* 智能列数调整：根据卡片数量优化布局，避免最后一行只有1-2个卡片 */
-.mp-stat-grid:has(.mp-stat-card:nth-last-child(6):first-child) { grid-template-columns: repeat(3, 1fr); } /* 6个 → 3列 */
 .mp-stat-grid:has(.mp-stat-card:nth-last-child(7):first-child) { grid-template-columns: repeat(4, 1fr); } /* 7个 → 4列 */
 .mp-stat-grid:has(.mp-stat-card:nth-last-child(8):first-child) { grid-template-columns: repeat(4, 1fr); } /* 8个 → 4列 */
 .mp-stat-grid:has(.mp-stat-card:nth-last-child(9):first-child) { grid-template-columns: repeat(3, 1fr); } /* 9个 → 3列 */
