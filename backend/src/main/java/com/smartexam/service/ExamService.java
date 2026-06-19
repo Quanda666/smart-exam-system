@@ -187,7 +187,7 @@ public class ExamService {
                 WHERE e.deleted = 0
                   AND (? IS NULL OR e.status = ?)
                   AND (? IS NULL OR e.id = ?)
-                  AND (? IS NULL OR e.exam_name LIKE CONCAT('%', ?, '%') OR p.paper_name LIKE CONCAT('%', ?, '%'))
+                  AND (? IS NULL OR e.exam_name LIKE CONCAT('%', ?, '%') OR p.paper_name LIKE CONCAT('%', ?, '%')) 
                 """
                 + listScopeSql +
                 """
@@ -271,7 +271,7 @@ public class ExamService {
                 FROM exam e
                 JOIN paper p ON p.id = e.paper_id
                 JOIN edu_subject s ON s.id = p.subject_id
-                LEFT JOIN sys_user u ON u.id = e.created_by
+                LEFT JOIN sys_user u ON u.id = e.created_by 
                 """
                 + whereSql +
                 """
@@ -312,7 +312,7 @@ public class ExamService {
                        l.status, l.trigger_source AS triggerSource, l.node_id AS nodeId,
                        l.duration_ms AS durationMs, l.message, l.created_at AS createdAt
                 FROM exam_approval_reminder_log l
-                LEFT JOIN sys_user u ON u.id = l.triggered_by
+                LEFT JOIN sys_user u ON u.id = l.triggered_by 
                 """
                 + whereSql +
                 """
@@ -627,7 +627,7 @@ public class ExamService {
                 FROM sys_user u
                 LEFT JOIN student_profile sp ON sp.user_id = u.id AND sp.deleted = 0
                 LEFT JOIN edu_class c ON c.id = sp.primary_class_id AND c.deleted = 0
-                WHERE u.deleted = 0 AND u.status = 1 AND u.id IN (
+                WHERE u.deleted = 0 AND u.status = 1 AND u.id IN ( 
                 """
                 + placeholders +
                 """
@@ -1141,7 +1141,7 @@ public class ExamService {
                 JOIN edu_subject s ON s.id = p.subject_id
                 LEFT JOIN score_release sr ON sr.exam_id = e.id
                 WHERE e.deleted = 0
-                  AND (? IS NULL OR e.exam_name LIKE CONCAT('%', ?, '%') OR p.paper_name LIKE CONCAT('%', ?, '%'))
+                  AND (? IS NULL OR e.exam_name LIKE CONCAT('%', ?, '%') OR p.paper_name LIKE CONCAT('%', ?, '%')) 
                 """
                 + scopeSql +
                 """
@@ -1480,7 +1480,7 @@ public class ExamService {
                 LEFT JOIN sys_user pub ON pub.id = sr.published_by
                 LEFT JOIN sys_user rev ON rev.id = sr.revoked_by
                 WHERE e.deleted = 0
-                  AND (? IS NULL OR e.exam_name LIKE CONCAT('%', ?, '%') OR p.paper_name LIKE CONCAT('%', ?, '%'))
+                  AND (? IS NULL OR e.exam_name LIKE CONCAT('%', ?, '%') OR p.paper_name LIKE CONCAT('%', ?, '%')) 
                 """
                 + scopeSql +
                 """
@@ -2614,7 +2614,7 @@ public class ExamService {
                 JOIN sys_user u ON u.id = a.user_id
                 JOIN paper p ON p.id = e.paper_id
                 LEFT JOIN student_profile sp ON sp.user_id = u.id AND sp.deleted = 0
-                LEFT JOIN edu_class c ON c.id = sp.primary_class_id AND c.deleted = 0
+                LEFT JOIN edu_class c ON c.id = sp.primary_class_id AND c.deleted = 0 
                 """
                 + whereSql +
                 """
@@ -4712,7 +4712,7 @@ public class ExamService {
                 SELECT DISTINCT e.id
                 FROM exam e
                 JOIN exam_target et ON et.exam_id = e.id
-                WHERE e.deleted = 0 AND e.status = ? AND et.target_type = ? AND et.target_id IN (
+                WHERE e.deleted = 0 AND e.status = ? AND et.target_type = ? AND et.target_id IN ( 
                 """
                 + placeholders +
                 """

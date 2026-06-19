@@ -120,7 +120,7 @@ public class NotificationService {
         Long total = jt.queryForObject("""
                 SELECT COUNT(*)
                 FROM notification n
-                LEFT JOIN sys_user u ON u.id = n.user_id
+                LEFT JOIN sys_user u ON u.id = n.user_id 
                 """
                 + where, Long.class, params.toArray());
         List<Object> listParams = new ArrayList<>(params);
@@ -140,7 +140,7 @@ public class NotificationService {
                        n.is_read AS isRead,
                        n.created_at AS createdAt
                 FROM notification n
-                LEFT JOIN sys_user u ON u.id = n.user_id
+                LEFT JOIN sys_user u ON u.id = n.user_id 
                 """
                 + where +
                 """
@@ -172,7 +172,7 @@ public class NotificationService {
                        n.is_read AS isRead,
                        n.created_at AS createdAt
                 FROM notification n
-                LEFT JOIN sys_user u ON u.id = n.user_id
+                LEFT JOIN sys_user u ON u.id = n.user_id 
                 """
                 + where +
                 """
@@ -225,7 +225,7 @@ public class NotificationService {
                        related_id AS relatedId,
                        is_read AS isRead,
                        created_at AS createdAt
-                FROM notification
+                FROM notification 
                 """
                 + where +
                 """

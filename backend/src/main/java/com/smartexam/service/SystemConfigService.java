@@ -80,7 +80,7 @@ public class SystemConfigService {
         Long total = jt.queryForObject("""
                 SELECT COUNT(*)
                 FROM system_config_log l
-                LEFT JOIN sys_user actor ON actor.id = l.actor_id
+                LEFT JOIN sys_user actor ON actor.id = l.actor_id 
                 """
                 + where,
                 Long.class, params.toArray());
@@ -99,7 +99,7 @@ public class SystemConfigService {
                        actor.username AS actorUsername,
                        l.created_at AS createdAt
                 FROM system_config_log l
-                LEFT JOIN sys_user actor ON actor.id = l.actor_id
+                LEFT JOIN sys_user actor ON actor.id = l.actor_id 
                 """
                 + where +
                 """
@@ -132,7 +132,7 @@ public class SystemConfigService {
                        actor.username AS actorUsername,
                        l.created_at AS createdAt
                 FROM system_config_log l
-                LEFT JOIN sys_user actor ON actor.id = l.actor_id
+                LEFT JOIN sys_user actor ON actor.id = l.actor_id 
                 """
                 + where +
                 """

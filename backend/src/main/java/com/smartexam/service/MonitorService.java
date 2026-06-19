@@ -145,7 +145,7 @@ public class MonitorService {
                        client_event_id AS clientEventId,
                        client_event_time AS clientEventTime,
                        event_time AS eventTime
-                FROM cheat_event
+                FROM cheat_event 
                 """
                 + where +
                 """
@@ -389,7 +389,7 @@ public class MonitorService {
                 LEFT JOIN exam_candidate_snapshot ecs ON ecs.exam_id = a.exam_id AND ecs.user_id = a.user_id
                 LEFT JOIN student_profile sp ON sp.user_id = a.user_id AND sp.deleted = 0
                 LEFT JOIN edu_class c ON c.id = sp.primary_class_id AND c.deleted = 0
-                WHERE a.exam_id = ?
+                WHERE a.exam_id = ? 
                 """
                 + studentScopeSql +
                 """
@@ -1310,7 +1310,7 @@ public class MonitorService {
         listParams.add(offset);
         List<Map<String, Object>> list = jdbcTemplate.queryForList("""
                 SELECT l.id, l.operator_id, l.operator_name, l.action, l.target, l.detail, l.ip, l.created_at
-                FROM operation_log l
+                FROM operation_log l 
                 """
                 + where +
                 """
@@ -1328,7 +1328,7 @@ public class MonitorService {
         appendOperationLogFilters(where, params, logId, keyword, action, target, startFrom, startTo);
         List<Map<String, Object>> logs = jdbcTemplate.queryForList("""
                 SELECT l.id, l.operator_id, l.operator_name, l.action, l.target, l.detail, l.ip, l.created_at
-                FROM operation_log l
+                FROM operation_log l 
                 """
                 + where +
                 """
@@ -1419,7 +1419,7 @@ public class MonitorService {
                          WHEN UPPER(l.action) LIKE '%FAILED%' OR UPPER(l.action) LIKE '%FAILURE%' OR l.action LIKE '%失败%' THEN 0
                          ELSE 1
                        END AS success
-                FROM operation_log l
+                FROM operation_log l 
                 """
                 + where +
                 """
@@ -1442,7 +1442,7 @@ public class MonitorService {
                          WHEN UPPER(l.action) LIKE '%FAILED%' OR UPPER(l.action) LIKE '%FAILURE%' OR l.action LIKE '%失败%' THEN 0
                          ELSE 1
                        END AS success
-                FROM operation_log l
+                FROM operation_log l 
                 """
                 + where +
                 """
@@ -1538,7 +1538,7 @@ public class MonitorService {
         Long total = jdbcTemplate.queryForObject("""
                 SELECT COUNT(*)
                 FROM ai_usage_log l
-                LEFT JOIN sys_user u ON u.id = l.user_id
+                LEFT JOIN sys_user u ON u.id = l.user_id 
                 """
                 + where, Long.class, params.toArray());
 
@@ -1556,7 +1556,7 @@ public class MonitorService {
                        l.error_message AS errorMessage,
                        l.created_at AS createdAt
                 FROM ai_usage_log l
-                LEFT JOIN sys_user u ON u.id = l.user_id
+                LEFT JOIN sys_user u ON u.id = l.user_id 
                 """
                 + where +
                 """
@@ -1584,7 +1584,7 @@ public class MonitorService {
                        l.error_message AS errorMessage,
                        l.created_at AS createdAt
                 FROM ai_usage_log l
-                LEFT JOIN sys_user u ON u.id = l.user_id
+                LEFT JOIN sys_user u ON u.id = l.user_id 
                 """
                 + where +
                 """
@@ -1687,7 +1687,7 @@ public class MonitorService {
                 FROM score_release_log l
                 JOIN exam e ON e.id = l.exam_id
                 JOIN paper p ON p.id = e.paper_id
-                LEFT JOIN sys_user u ON u.id = l.actor_id
+                LEFT JOIN sys_user u ON u.id = l.actor_id 
                 """
                 + where, Long.class, params.toArray());
 
@@ -1707,7 +1707,7 @@ public class MonitorService {
                 FROM score_release_log l
                 JOIN exam e ON e.id = l.exam_id
                 JOIN paper p ON p.id = e.paper_id
-                LEFT JOIN sys_user u ON u.id = l.actor_id
+                LEFT JOIN sys_user u ON u.id = l.actor_id 
                 """
                 + where +
                 """
@@ -1735,7 +1735,7 @@ public class MonitorService {
                 FROM score_release_log l
                 JOIN exam e ON e.id = l.exam_id
                 JOIN paper p ON p.id = e.paper_id
-                LEFT JOIN sys_user u ON u.id = l.actor_id
+                LEFT JOIN sys_user u ON u.id = l.actor_id 
                 """
                 + where +
                 """
@@ -1783,7 +1783,7 @@ public class MonitorService {
                 FROM exam_approval_log l
                 JOIN exam e ON e.id = l.exam_id
                 JOIN paper p ON p.id = e.paper_id
-                LEFT JOIN sys_user u ON u.id = l.actor_id
+                LEFT JOIN sys_user u ON u.id = l.actor_id 
                 """ + where, Long.class, params.toArray());
 
         List<Object> listParams = new ArrayList<>(params);
@@ -1802,7 +1802,7 @@ public class MonitorService {
                 FROM exam_approval_log l
                 JOIN exam e ON e.id = l.exam_id
                 JOIN paper p ON p.id = e.paper_id
-                LEFT JOIN sys_user u ON u.id = l.actor_id
+                LEFT JOIN sys_user u ON u.id = l.actor_id 
                 """
                 + where +
                 """
@@ -1830,7 +1830,7 @@ public class MonitorService {
                 FROM exam_approval_log l
                 JOIN exam e ON e.id = l.exam_id
                 JOIN paper p ON p.id = e.paper_id
-                LEFT JOIN sys_user u ON u.id = l.actor_id
+                LEFT JOIN sys_user u ON u.id = l.actor_id 
                 """
                 + where +
                 """
@@ -1878,7 +1878,7 @@ public class MonitorService {
         Long total = jdbcTemplate.queryForObject("""
                 SELECT COUNT(*)
                 FROM exam_approval_reminder_log l
-                LEFT JOIN sys_user u ON u.id = l.triggered_by
+                LEFT JOIN sys_user u ON u.id = l.triggered_by 
                 """
                 + where, Long.class, params.toArray());
 
@@ -1894,7 +1894,7 @@ public class MonitorService {
                        l.status, l.trigger_source AS triggerSource, l.node_id AS nodeId,
                        l.duration_ms AS durationMs, l.message, l.created_at AS createdAt
                 FROM exam_approval_reminder_log l
-                LEFT JOIN sys_user u ON u.id = l.triggered_by
+                LEFT JOIN sys_user u ON u.id = l.triggered_by 
                 """
                 + where +
                 """
@@ -1919,7 +1919,7 @@ public class MonitorService {
                        l.status, l.trigger_source AS triggerSource, l.node_id AS nodeId,
                        l.duration_ms AS durationMs, l.message, l.created_at AS createdAt
                 FROM exam_approval_reminder_log l
-                LEFT JOIN sys_user u ON u.id = l.triggered_by
+                LEFT JOIN sys_user u ON u.id = l.triggered_by 
                 """
                 + where +
                 """
@@ -1971,7 +1971,7 @@ public class MonitorService {
                 JOIN sys_user student ON student.id = l.user_id
                 LEFT JOIN sys_user actor ON actor.id = l.actor_id
                 LEFT JOIN question q ON q.id = l.question_id
-                LEFT JOIN exam_question_snapshot eqs ON eqs.exam_id = e.id AND eqs.question_id = l.question_id
+                LEFT JOIN exam_question_snapshot eqs ON eqs.exam_id = e.id AND eqs.question_id = l.question_id 
                 """ + where, Long.class, params.toArray());
 
         List<Object> listParams = new ArrayList<>(params);
@@ -1996,7 +1996,7 @@ public class MonitorService {
                 LEFT JOIN student_profile sp ON sp.user_id = l.user_id AND sp.deleted = 0
                 LEFT JOIN sys_user actor ON actor.id = l.actor_id
                 LEFT JOIN question q ON q.id = l.question_id
-                LEFT JOIN exam_question_snapshot eqs ON eqs.exam_id = e.id AND eqs.question_id = l.question_id
+                LEFT JOIN exam_question_snapshot eqs ON eqs.exam_id = e.id AND eqs.question_id = l.question_id 
                 """
                 + where +
                 """
@@ -2031,7 +2031,7 @@ public class MonitorService {
                 LEFT JOIN student_profile sp ON sp.user_id = l.user_id AND sp.deleted = 0
                 LEFT JOIN sys_user actor ON actor.id = l.actor_id
                 LEFT JOIN question q ON q.id = l.question_id
-                LEFT JOIN exam_question_snapshot eqs ON eqs.exam_id = e.id AND eqs.question_id = l.question_id
+                LEFT JOIN exam_question_snapshot eqs ON eqs.exam_id = e.id AND eqs.question_id = l.question_id 
                 """
                 + where +
                 """
@@ -2083,7 +2083,7 @@ public class MonitorService {
                 LEFT JOIN student_profile sp ON sp.user_id = l.user_id AND sp.deleted = 0
                 LEFT JOIN sys_user reviewer ON reviewer.id = l.reviewer_id
                 LEFT JOIN question q ON q.id = l.question_id
-                LEFT JOIN exam_question_snapshot eqs ON eqs.exam_id = e.id AND eqs.question_id = l.question_id
+                LEFT JOIN exam_question_snapshot eqs ON eqs.exam_id = e.id AND eqs.question_id = l.question_id 
                 """
                 + where, Long.class, params.toArray());
 
@@ -2107,7 +2107,7 @@ public class MonitorService {
                 LEFT JOIN student_profile sp ON sp.user_id = l.user_id AND sp.deleted = 0
                 LEFT JOIN sys_user reviewer ON reviewer.id = l.reviewer_id
                 LEFT JOIN question q ON q.id = l.question_id
-                LEFT JOIN exam_question_snapshot eqs ON eqs.exam_id = e.id AND eqs.question_id = l.question_id
+                LEFT JOIN exam_question_snapshot eqs ON eqs.exam_id = e.id AND eqs.question_id = l.question_id 
                 """
                 + where +
                 """
@@ -2140,7 +2140,7 @@ public class MonitorService {
                 LEFT JOIN student_profile sp ON sp.user_id = l.user_id AND sp.deleted = 0
                 LEFT JOIN sys_user reviewer ON reviewer.id = l.reviewer_id
                 LEFT JOIN question q ON q.id = l.question_id
-                LEFT JOIN exam_question_snapshot eqs ON eqs.exam_id = e.id AND eqs.question_id = l.question_id
+                LEFT JOIN exam_question_snapshot eqs ON eqs.exam_id = e.id AND eqs.question_id = l.question_id 
                 """
                 + where +
                 """
