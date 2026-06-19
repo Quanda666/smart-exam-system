@@ -434,6 +434,10 @@ function draftCacheAlertText(value?: string) {
   gap: 16px;
 }
 
+.system-config-page :deep(.el-table) {
+  max-width: 100%;
+}
+
 .audit-toolbar {
   display: grid;
   grid-template-columns: minmax(180px, 240px) minmax(130px, 160px) minmax(180px, 240px) minmax(240px, 320px) auto auto auto minmax(0, 1fr);
