@@ -74,47 +74,47 @@
         >
           <template #title>
             <div class="monitor-operation-audit-content">
-              <span>{{ lastMonitorOperationAudit.action }} audit recorded: {{ monitorOperationAuditText(lastMonitorOperationAudit.operationLogIds) }}</span>
-              <el-button link type="primary" :icon="DocumentCopy" @click="copyLatestMonitorOperationAuditId">Copy audit ID</el-button>
-              <el-button link type="primary" :icon="DocumentCopy" @click="copyLatestMonitorOperationAuditLink">Copy audit link</el-button>
+              <span>{{ lastMonitorOperationAudit.action }} 已记录审计：{{ monitorOperationAuditText(lastMonitorOperationAudit.operationLogIds) }}</span>
+              <el-button link type="primary" :icon="DocumentCopy" @click="copyLatestMonitorOperationAuditId">复制审计ID</el-button>
+              <el-button link type="primary" :icon="DocumentCopy" @click="copyLatestMonitorOperationAuditLink">复制审计链接</el-button>
             </div>
           </template>
         </el-alert>
 
         <div class="session-filter-row">
-          <el-select v-model="sessionFilter.status" class="session-status-filter" placeholder="Status">
-            <el-option label="All status" value="ALL" />
-            <el-option label="Online" value="ONLINE" />
-            <el-option label="Offline" value="OFFLINE" />
-            <el-option label="Submitted" value="SUBMITTED" />
+          <el-select v-model="sessionFilter.status" class="session-status-filter" placeholder="状态">
+            <el-option label="全部状态" value="ALL" />
+            <el-option label="在线" value="ONLINE" />
+            <el-option label="离线" value="OFFLINE" />
+            <el-option label="已交卷" value="SUBMITTED" />
           </el-select>
-          <el-select v-model="sessionFilter.minRiskScore" class="session-risk-filter" placeholder="Risk">
-            <el-option label="All risk" :value="-1" />
-            <el-option label="Risk > 0" :value="1" />
-            <el-option :label="`Risk >= ${thresholds.warning}`" :value="thresholds.warning" />
-            <el-option :label="`Risk >= ${thresholds.high}`" :value="thresholds.high" />
+          <el-select v-model="sessionFilter.minRiskScore" class="session-risk-filter" placeholder="风险">
+            <el-option label="全部风险" :value="-1" />
+            <el-option label="风险 > 0" :value="1" />
+            <el-option :label="`风险 >= ${thresholds.warning}`" :value="thresholds.warning" />
+            <el-option :label="`风险 >= ${thresholds.high}`" :value="thresholds.high" />
           </el-select>
-          <el-select v-model="sessionFilter.latestNotificationStatus" class="session-notification-filter" placeholder="Latest notification">
-            <el-option label="All notifications" value="ALL" />
-            <el-option label="Sent" value="SENT" />
-            <el-option label="Unread" value="UNREAD" />
-            <el-option label="Read" value="READ" />
-            <el-option label="No notification" value="NONE" />
+          <el-select v-model="sessionFilter.latestNotificationStatus" class="session-notification-filter" placeholder="通知状态">
+            <el-option label="全部通知" value="ALL" />
+            <el-option label="已发送" value="SENT" />
+            <el-option label="未读" value="UNREAD" />
+            <el-option label="已读" value="READ" />
+            <el-option label="无通知" value="NONE" />
           </el-select>
-          <el-select v-model="sessionFilter.rulesConfirmationStatus" class="session-rules-filter" placeholder="Rules">
-            <el-option label="All rules" value="ALL" />
-            <el-option label="Confirmed" value="CONFIRMED" />
-            <el-option label="Missing" value="MISSING" />
+          <el-select v-model="sessionFilter.rulesConfirmationStatus" class="session-rules-filter" placeholder="规则确认">
+            <el-option label="全部规则" value="ALL" />
+            <el-option label="已确认" value="CONFIRMED" />
+            <el-option label="未确认" value="MISSING" />
           </el-select>
-          <el-select v-model="sessionFilter.latestActionType" class="session-action-filter" placeholder="Latest action">
-            <el-option label="All actions" value="ALL" />
-            <el-option label="Rules reminder" value="RULES_REMINDER" />
-            <el-option label="Student reminder" value="WARN" />
-            <el-option label="Acknowledged" value="ACKNOWLEDGE" />
-            <el-option label="Force submit" value="FORCE_SUBMIT" />
-            <el-option label="Note" value="NOTE" />
+          <el-select v-model="sessionFilter.latestActionType" class="session-action-filter" placeholder="处置类型">
+            <el-option label="全部处置" value="ALL" />
+            <el-option label="规则提醒" value="RULES_REMINDER" />
+            <el-option label="提醒学生" value="WARN" />
+            <el-option label="已关注" value="ACKNOWLEDGE" />
+            <el-option label="强制交卷" value="FORCE_SUBMIT" />
+            <el-option label="备注" value="NOTE" />
           </el-select>
-          <el-button plain :disabled="sessionLoading" @click="resetSessionFilters">Reset</el-button>
+          <el-button plain :disabled="sessionLoading" @click="resetSessionFilters">重置</el-button>
           <span class="filter-count">{{ filteredSessions.length }}/{{ sessions.length }}</span>
         </div>
 
@@ -132,11 +132,11 @@
             <strong>{{ metrics.submitted }}</strong>
           </div>
           <div class="metric-card draft">
-            <span>Saved drafts</span>
+            <span>草稿已保存</span>
             <strong>{{ metrics.savedDrafts }}</strong>
           </div>
           <div class="metric-card timeout">
-            <span>Time critical</span>
+            <span>时间紧急</span>
             <strong>{{ metrics.timeCritical }}</strong>
           </div>
           <div class="metric-card risk">
@@ -154,7 +154,7 @@
             :aria-pressed="isUnreadNoticeFilterActive"
             @click="applyUnreadNoticeFilter"
           >
-            <span>Unread notices</span>
+            <span>未读通知</span>
             <strong>{{ metrics.unreadNotices }}</strong>
           </button>
           <button
@@ -164,7 +164,7 @@
             :aria-pressed="isMissingRulesFilterActive"
             @click="applyMissingRulesFilter"
           >
-            <span>Missing rules</span>
+            <span>未确认规则</span>
             <strong>{{ metrics.missingRules }}</strong>
           </button>
           <button
@@ -174,7 +174,7 @@
             :aria-pressed="isRulesReminderFilterActive"
             @click="applyRulesReminderFilter"
           >
-            <span>Rules reminders</span>
+            <span>规则提醒</span>
             <strong>{{ metrics.rulesReminders }}</strong>
           </button>
           <button
@@ -184,7 +184,7 @@
             :aria-pressed="isPendingRulesReminderFilterActive"
             @click="applyPendingRulesReminderFilter"
           >
-            <span>Pending reminders</span>
+            <span>待处理提醒</span>
             <strong>{{ metrics.pendingRulesReminders }}</strong>
           </button>
           <button
@@ -194,7 +194,7 @@
             :aria-pressed="isConfirmedRulesReminderFilterActive"
             @click="applyConfirmedRulesReminderFilter"
           >
-            <span>Confirmed reminders</span>
+            <span>已确认提醒</span>
             <strong>{{ metrics.confirmedRulesReminders }}</strong>
           </button>
         </div>
@@ -229,18 +229,18 @@
           <el-table-column label="最后心跳" min-width="165">
             <template #default="scope">{{ formatDateTime(scope.row.lastHeartbeatAt) }}</template>
           </el-table-column>
-          <el-table-column label="Runtime" min-width="230">
+          <el-table-column label="剩余时间" min-width="230">
             <template #default="scope">
               <div class="runtime-cell">
                 <strong :class="{ danger: isTimeCritical(scope.row as MonitorSession) }">
                   {{ remainingTimeText(scope.row as MonitorSession) }}
                 </strong>
-                <span>Deadline: {{ formatDateTime(scope.row.deadlineAt) }}</span>
+                <span>截止时间：{{ formatDateTime(scope.row.deadlineAt) }}</span>
                 <span>{{ draftTelemetryText(scope.row as MonitorSession) }}</span>
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="Rules" min-width="165">
+          <el-table-column label="规则确认" min-width="165">
             <template #default="scope">{{ formatDateTime(scope.row.rulesConfirmedAt) }}</template>
           </el-table-column>
           <el-table-column label="最近处置" min-width="190">
@@ -266,22 +266,22 @@
                   link
                   type="primary"
                   :icon="DocumentCopy"
-                  title="Copy notification audit ID"
-                  aria-label="Copy notification audit ID"
+                  title="复制通知审计ID"
+                  aria-label="复制通知审计ID"
                   @click.stop="copyNotificationAuditId(scope.row.latestActionNotificationId)"
                 >
-                  Copy audit ID
+                  复制审计ID
                 </el-button>
                 <el-button
                   v-if="scope.row.latestActionNotificationId"
                   link
                   type="primary"
                   :icon="DocumentCopy"
-                  title="Copy notification audit link"
-                  aria-label="Copy notification audit link"
+                  title="复制通知审计链接"
+                  aria-label="复制通知审计链接"
                   @click.stop="copyNotificationAuditLink(scope.row.latestActionNotificationId)"
                 >
-                  Copy link
+                  复制链接
                 </el-button>
                 <span v-if="scope.row.latestActionNote">{{ scope.row.latestActionNote }}</span>
               </div>
@@ -301,10 +301,10 @@
                 link
                 type="warning"
                 :disabled="!canSendRulesReminder(scope.row as MonitorSession)"
-                :title="rulesReminderUnavailableReason(scope.row as MonitorSession) || 'Send rules reminder'"
+                :title="rulesReminderUnavailableReason(scope.row as MonitorSession) || '发送规则提醒'"
                 @click="openAction(scope.row as MonitorSession, 'RULES_REMINDER')"
               >
-                Rules
+                规则
               </el-button>
               <el-button
                 link
@@ -319,7 +319,7 @@
         </el-table>
         <el-empty
           v-if="selectedExamId && !sessionLoading && sessions.length > 0 && filteredSessions.length === 0"
-          description="No monitor sessions match the filters"
+          description="没有符合筛选条件的监考会话"
         />
 
         <el-empty v-if="selectedExamId && !sessionLoading && sessions.length === 0" description="暂无学生进入考试" />
@@ -366,7 +366,7 @@
       />
 
       <el-tabs v-model="drawerTab">
-        <el-tab-pane label="Health" name="health">
+        <el-tab-pane label="健康状态" name="health">
           <div v-if="incidentDetail" class="incident-overview">
             <div class="incident-health-line">
               <el-tag :type="incidentHealthTagType(incidentDetail.health.level)" effect="dark">
@@ -377,46 +377,46 @@
 
             <div class="incident-stat-grid">
               <div class="incident-card">
-                <span>Runtime</span>
+                <span>运行状态</span>
                 <strong>{{ incidentRemainingText(incidentDetail) }}</strong>
-                <small>Status: {{ attemptStatusText(incidentDetail.attempt.attemptStatus) }}</small>
-                <small>Deadline: {{ formatDateTime(incidentDetail.attempt.deadlineAt) }}</small>
-                <small>Heartbeat: {{ formatDateTime(incidentDetail.attempt.lastHeartbeatAt || incidentDetail.session.lastHeartbeatAt) }}</small>
+                <small>状态：{{ attemptStatusText(incidentDetail.attempt.attemptStatus) }}</small>
+                <small>截止时间：{{ formatDateTime(incidentDetail.attempt.deadlineAt) }}</small>
+                <small>心跳：{{ formatDateTime(incidentDetail.attempt.lastHeartbeatAt || incidentDetail.session.lastHeartbeatAt) }}</small>
               </div>
               <div class="incident-card">
-                <span>Draft</span>
+                <span>草稿</span>
                 <strong>{{ draftEvidenceText(incidentDetail) }}</strong>
                 <small>{{ draftFilledText(incidentDetail) }}</small>
-                <small>Saved: {{ formatDateTime(incidentDetail.draft.updatedAt || incidentDetail.attempt.lastDraftSavedAt) }}</small>
-                <small>Client: {{ incidentDetail.draft.clientDraftId || '-' }}</small>
+                <small>保存时间：{{ formatDateTime(incidentDetail.draft.updatedAt || incidentDetail.attempt.lastDraftSavedAt) }}</small>
+                <small>客户端ID：{{ incidentDetail.draft.clientDraftId || '-' }}</small>
               </div>
               <div class="incident-card">
-                <span>Submission</span>
+                <span>提交</span>
                 <strong>{{ submissionEvidenceText(incidentDetail) }}</strong>
-                <small>Time: {{ formatDateTime(incidentDetail.attempt.submitTime) }}</small>
-                <small>Reason: {{ incidentDetail.attempt.submitReason || '-' }}</small>
-                <small>Hash: {{ payloadHashText(incidentDetail.attempt.submitPayloadHash) }}</small>
+                <small>时间：{{ formatDateTime(incidentDetail.attempt.submitTime) }}</small>
+                <small>原因：{{ incidentDetail.attempt.submitReason || '-' }}</small>
+                <small>哈希：{{ payloadHashText(incidentDetail.attempt.submitPayloadHash) }}</small>
               </div>
               <div class="incident-card">
-                <span>Answers</span>
+                <span>答案</span>
                 <strong>{{ incidentAnswerStatsText(incidentDetail) }}</strong>
-                <small>Recorded: {{ incidentDetail.answerStats.recordedCount }}</small>
-                <small>Reviewed: {{ incidentDetail.answerStats.reviewedCount }}</small>
-                <small>Pending review: {{ incidentDetail.answerStats.pendingReviewCount }}</small>
+                <small>已记录：{{ incidentDetail.answerStats.recordedCount }}</small>
+                <small>已批阅：{{ incidentDetail.answerStats.reviewedCount }}</small>
+                <small>待批阅：{{ incidentDetail.answerStats.pendingReviewCount }}</small>
               </div>
               <div class="incident-card">
-                <span>Risk</span>
+                <span>风险</span>
                 <strong>{{ incidentDetail.session.riskScore || 0 }} · {{ riskLevelText(incidentDetail.session.riskLevel) }}</strong>
-                <small>Events: {{ incidentDetail.session.eventCount || 0 }}</small>
-                <small>Last event: {{ eventTypeText(incidentDetail.session.lastEventType) }}</small>
-                <small>Last event time: {{ formatDateTime(incidentDetail.session.lastEventAt) }}</small>
+                <small>事件数：{{ incidentDetail.session.eventCount || 0 }}</small>
+                <small>最后事件：{{ eventTypeText(incidentDetail.session.lastEventType) }}</small>
+                <small>事件时间：{{ formatDateTime(incidentDetail.session.lastEventAt) }}</small>
               </div>
               <div class="incident-card">
-                <span>Force Submit</span>
+                <span>强制交卷</span>
                 <strong>{{ forceSubmitEvidenceText(incidentDetail) }}</strong>
-                <small>Time: {{ formatDateTime(incidentDetail.forceSubmitEvidence.submitTime) }}</small>
-                <small>Handler: {{ incidentDetail.forceSubmitEvidence.action?.handlerName || '-' }}</small>
-                <small>Notice: {{ incidentDetail.forceSubmitEvidence.action?.notificationId || '-' }}</small>
+                <small>时间：{{ formatDateTime(incidentDetail.forceSubmitEvidence.submitTime) }}</small>
+                <small>处理人：{{ incidentDetail.forceSubmitEvidence.action?.handlerName || '-' }}</small>
+                <small>通知：{{ incidentDetail.forceSubmitEvidence.action?.notificationId || '-' }}</small>
               </div>
             </div>
 
@@ -431,7 +431,7 @@
               </el-tag>
               <el-empty
                 v-if="incidentDetail.health.findings.length === 0"
-                description="No incident findings"
+                description="无异常发现"
               />
             </div>
           </div>
@@ -440,8 +440,8 @@
 
         <el-tab-pane label="事件" name="events">
           <div class="event-filter-row">
-            <el-select v-model="eventFilter.eventType" class="event-type-filter" placeholder="Event type">
-              <el-option label="All events" value="ALL" />
+            <el-select v-model="eventFilter.eventType" class="event-type-filter" placeholder="事件类型">
+              <el-option label="全部事件" value="ALL" />
               <el-option
                 v-for="option in monitorEventTypeOptions"
                 :key="option.value"
@@ -454,19 +454,19 @@
               class="event-time-filter"
               type="datetimerange"
               value-format="YYYY-MM-DDTHH:mm:ss"
-              start-placeholder="Start"
-              end-placeholder="End"
+              start-placeholder="开始时间"
+              end-placeholder="结束时间"
             />
-            <el-select v-model="eventFilter.minRiskScore" class="event-risk-filter" placeholder="Risk">
-              <el-option label="All risk" :value="-1" />
-              <el-option label="Risk > 0" :value="1" />
-              <el-option :label="`Risk >= ${thresholds.warning}`" :value="thresholds.warning" />
-              <el-option :label="`Risk >= ${thresholds.high}`" :value="thresholds.high" />
+            <el-select v-model="eventFilter.minRiskScore" class="event-risk-filter" placeholder="风险">
+              <el-option label="全部风险" :value="-1" />
+              <el-option label="风险 > 0" :value="1" />
+              <el-option :label="`风险 >= ${thresholds.warning}`" :value="thresholds.warning" />
+              <el-option :label="`风险 >= ${thresholds.high}`" :value="thresholds.high" />
             </el-select>
             <el-button type="primary" plain :icon="Search" :loading="eventLoading" @click="reloadActiveEvents">
-              Filter
+              筛选
             </el-button>
-            <el-button plain :disabled="eventLoading" @click="resetEventFilters">Reset</el-button>
+            <el-button plain :disabled="eventLoading" @click="resetEventFilters">重置</el-button>
           </div>
           <el-timeline v-loading="eventLoading">
             <el-timeline-item
@@ -508,22 +508,22 @@
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy notification audit ID"
-                    aria-label="Copy notification audit ID"
+                    title="复制通知审计ID"
+                    aria-label="复制通知审计ID"
                     @click="copyNotificationAuditId(action.notificationId)"
                   >
-                    Copy audit ID
+                    复制审计ID
                   </el-button>
                   <el-button
                     v-if="action.notificationId"
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy notification audit link"
-                    aria-label="Copy notification audit link"
+                    title="复制通知审计链接"
+                    aria-label="复制通知审计链接"
                     @click="copyNotificationAuditLink(action.notificationId)"
                   >
-                    Copy link
+                    复制链接
                   </el-button>
                 </div>
                 <p>{{ action.note || '-' }}</p>
@@ -543,7 +543,7 @@
             <el-option label="已关注" value="ACKNOWLEDGE" />
             <el-option label="提醒学生" value="WARN" :disabled="actionTarget?.attemptStatus !== 1" />
             <el-option
-              label="Rules reminder"
+              label="规则提醒"
               value="RULES_REMINDER"
               :disabled="!actionTarget || !canSendRulesReminder(actionTarget)"
             />
@@ -792,9 +792,9 @@ async function copyNotificationAuditId(notificationId?: number | string | null) 
   try {
     const value = await copyNotificationAuditIdToClipboard(notificationId);
     if (!value) return;
-    ElMessage.success(`Notification audit ID copied: ${value}`);
+    ElMessage.success(`通知审计ID已复制：${value}`);
   } catch {
-    ElMessage.error('Failed to copy notification audit ID');
+    ElMessage.error('复制通知审计ID失败');
   }
 }
 
@@ -802,9 +802,9 @@ async function copyNotificationAuditLink(notificationId?: number | string | null
   try {
     const link = await copyNotificationAuditLinkToClipboard(notificationId);
     if (!link) return;
-    ElMessage.success('Notification audit link copied');
+    ElMessage.success('通知审计链接已复制');
   } catch {
-    ElMessage.error('Failed to copy notification audit link');
+    ElMessage.error('复制通知审计链接失败');
   }
 }
 
@@ -1090,9 +1090,9 @@ async function copyLatestMonitorOperationAuditId() {
   if (!ids?.length) return;
   try {
     await copyOperationLogIdToClipboard(ids.join(','));
-    ElMessage.success('Audit ID copied');
+    ElMessage.success('审计ID已复制');
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : 'Audit ID copy failed');
+    ElMessage.error(error instanceof Error ? error.message : '审计ID复制失败');
   }
 }
 
@@ -1101,9 +1101,9 @@ async function copyLatestMonitorOperationAuditLink() {
   if (!id) return;
   try {
     await copyOperationLogLinkToClipboard(id);
-    ElMessage.success('Audit link copied');
+    ElMessage.success('审计链接已复制');
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : 'Audit link copy failed');
+    ElMessage.error(error instanceof Error ? error.message : '审计链接复制失败');
   }
 }
 
