@@ -2672,6 +2672,10 @@ function scoreAppealHandlingResultText(value?: string | null) {
   margin-bottom: 16px;
 }
 
+.log-tabs :deep(.el-tab-pane) {
+  overflow-x: auto;
+}
+
 .score-release-id-cell,
 .approval-reminder-id-cell,
 .exam-approval-id-cell,
