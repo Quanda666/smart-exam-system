@@ -34,7 +34,7 @@
     </div>
 
     <div class="mp-table-card">
-      <el-table v-loading="loading" :data="configs" border style="width: 100%">
+      <el-table ref="tableRef" v-loading="loading" :data="configs" border style="width: 100%">
         <el-table-column prop="configKey" label="配置项" min-width="180" />
         <el-table-column label="分类" min-width="95">
           <template #default="scope">
@@ -176,7 +176,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { Clock, DocumentCopy, Download, Refresh } from '@element-plus/icons-vue';
 import {
@@ -193,6 +193,7 @@ import {
   copySystemConfigAuditLinkToClipboard
 } from '../utils/clipboard';
 import { formatDateTime } from '../utils/dateFormat';
+import { useSidebarCollapsed } from '../composables/useSidebarCollapsed';
 
 const loading = ref(false);
 const saving = ref(false);
@@ -217,6 +218,8 @@ const auditQuery = ref({
   configKey: ''
 });
 const auditDateRange = ref<[string, string] | null>(null);
+const tableRef = ref();
+const sidebarCollapsed = useSidebarCollapsed();
 
 const categories = ['EXAM', 'APPROVAL', 'MONITOR', 'SCORE', 'SYSTEM', 'GENERAL'];
 const summaryCards = computed(() => [
@@ -253,6 +256,12 @@ const draftCacheLastFlushText = computed(() => {
 
 onMounted(async () => {
   await Promise.all([loadConfigs(), loadDraftCacheStatus()]);
+});
+
+watch(sidebarCollapsed, () => {
+  nextTick(() => {
+    tableRef.value?.doLayout();
+  });
 });
 
 async function loadConfigs() {

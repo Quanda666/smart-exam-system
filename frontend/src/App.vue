@@ -391,7 +391,8 @@ const availableClasses = ref<Array<{ id: number; className: string }>>([]);
 const userProfileRef = ref<{ openProfileDialog: () => void; openAccountPanel: (panel?: string | null) => void } | null>(null);
 
 // 侧边栏（折叠状态持久化为个人偏好，刷新/重登保持）
-const sidebarCollapsed = ref(localStorage.getItem('pref_sidebar_collapsed') === '1');
+import { useSidebarCollapsed } from './composables/useSidebarCollapsed';
+const sidebarCollapsed = useSidebarCollapsed();
 watch(sidebarCollapsed, (collapsed) => {
   localStorage.setItem('pref_sidebar_collapsed', collapsed ? '1' : '0');
 });
