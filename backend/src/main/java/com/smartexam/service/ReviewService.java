@@ -185,7 +185,11 @@ public class ReviewService {
                        COUNT(DISTINCT CASE WHEN a.status = 5 THEN a.id END) AS completedAttemptCount,
                        COUNT(DISTINCT CASE WHEN a.status = 1 THEN a.id END) AS activeAttemptCount,
                        COALESCE(SUM(CASE WHEN ar.review_status = 0 THEN 1 ELSE 0 END), 0) AS pendingAnswerCount,
-                       COALESCE(SUM(CASE WHEN ar.review_status = 0 AND """ + openRecheckCondition + """ THEN 1 ELSE 0 END), 0) AS pendingRecheckAnswerCount,
+                       COALESCE(SUM(CASE WHEN ar.review_status = 0 AND
+                """
+                + openRecheckCondition +
+                """
+                 THEN 1 ELSE 0 END), 0) AS pendingRecheckAnswerCount,
                        COALESCE(SUM(CASE WHEN ar.review_status = 1 THEN 1 ELSE 0 END), 0) AS reviewedAnswerCount,
                        COUNT(ar.id) AS reviewableAnswerCount,
                        ROUND(
@@ -195,7 +199,11 @@ public class ReviewService {
                          2
                        ) AS progressPercent,
                        MIN(CASE WHEN ar.review_status = 0 AND a.status = 4 THEN a.id END) AS firstPendingAttemptId,
-                       MIN(CASE WHEN ar.review_status = 0 AND """ + openRecheckCondition + """ THEN a.id END) AS firstRecheckAttemptId,
+                       MIN(CASE WHEN ar.review_status = 0 AND
+                """
+                + openRecheckCondition +
+                """
+                 THEN a.id END) AS firstRecheckAttemptId,
                        MIN(CASE WHEN ar.review_status = 0 THEN a.submit_time END) AS oldestPendingSubmitAt,
                        (SELECT COUNT(DISTINCT sa_count.id)
                         FROM score_appeal sa_count

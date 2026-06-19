@@ -81,7 +81,9 @@ public class SystemConfigService {
                 SELECT COUNT(*)
                 FROM system_config_log l
                 LEFT JOIN sys_user actor ON actor.id = l.actor_id
-                """ + where, Long.class, params.toArray());
+                """
+                + where,
+                Long.class, params.toArray());
         List<Object> listParams = new ArrayList<>(params);
         listParams.add(safeSize);
         listParams.add(offset);
@@ -98,7 +100,9 @@ public class SystemConfigService {
                        l.created_at AS createdAt
                 FROM system_config_log l
                 LEFT JOIN sys_user actor ON actor.id = l.actor_id
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT ? OFFSET ?
                 """, listParams.toArray());
@@ -129,7 +133,9 @@ public class SystemConfigService {
                        l.created_at AS createdAt
                 FROM system_config_log l
                 LEFT JOIN sys_user actor ON actor.id = l.actor_id
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT 5000
                 """, params.toArray());

@@ -121,7 +121,8 @@ public class NotificationService {
                 SELECT COUNT(*)
                 FROM notification n
                 LEFT JOIN sys_user u ON u.id = n.user_id
-                """ + where, Long.class, params.toArray());
+                """
+                + where, Long.class, params.toArray());
         List<Object> listParams = new ArrayList<>(params);
         listParams.add(safeSize);
         listParams.add(offset);
@@ -140,7 +141,9 @@ public class NotificationService {
                        n.created_at AS createdAt
                 FROM notification n
                 LEFT JOIN sys_user u ON u.id = n.user_id
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY n.created_at DESC, n.id DESC
                 LIMIT ? OFFSET ?
                 """, listParams.toArray());
@@ -170,7 +173,9 @@ public class NotificationService {
                        n.created_at AS createdAt
                 FROM notification n
                 LEFT JOIN sys_user u ON u.id = n.user_id
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY n.created_at DESC, n.id DESC
                 LIMIT 5000
                 """, params.toArray());
@@ -221,7 +226,9 @@ public class NotificationService {
                        is_read AS isRead,
                        created_at AS createdAt
                 FROM notification
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY created_at DESC
                 LIMIT ? OFFSET ?
                 """, listParams.toArray());

@@ -496,7 +496,9 @@ public class ScoreAppealService {
                     LEFT JOIN question q ON q.id = ar.question_id
                     SET ar.review_status = 0
                     WHERE ar.attempt_id = ?
-                """ + EXPECTED_ANSWER_SCOPE_CONDITION + """
+                """
+                + EXPECTED_ANSWER_SCOPE_CONDITION +
+                """
                       AND COALESCE(eqs.question_type, q.question_type, '') IN ('FILL_BLANK', 'SUBJECTIVE')
                     """, attemptId);
         }

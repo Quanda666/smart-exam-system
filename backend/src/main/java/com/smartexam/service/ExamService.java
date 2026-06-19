@@ -188,7 +188,9 @@ public class ExamService {
                   AND (? IS NULL OR e.status = ?)
                   AND (? IS NULL OR e.id = ?)
                   AND (? IS NULL OR e.exam_name LIKE CONCAT('%', ?, '%') OR p.paper_name LIKE CONCAT('%', ?, '%'))
-                """ + listScopeSql + """
+                """
+                + listScopeSql +
+                """
                 ORDER BY e.id DESC
                 LIMIT ? OFFSET ?
                 """, listParams.toArray());
@@ -270,7 +272,9 @@ public class ExamService {
                 JOIN paper p ON p.id = e.paper_id
                 JOIN edu_subject s ON s.id = p.subject_id
                 LEFT JOIN sys_user u ON u.id = e.created_by
-                """ + whereSql + """
+                """
+                + whereSql +
+                """
                 ORDER BY
                   CASE WHEN e.status = 0 THEN 0 ELSE 1 END,
                   e.start_time ASC,
@@ -309,7 +313,9 @@ public class ExamService {
                        l.duration_ms AS durationMs, l.message, l.created_at AS createdAt
                 FROM exam_approval_reminder_log l
                 LEFT JOIN sys_user u ON u.id = l.triggered_by
-                """ + whereSql + """
+                """
+                + whereSql +
+                """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT ? OFFSET ?
                 """, listParams.toArray());
@@ -622,7 +628,9 @@ public class ExamService {
                 LEFT JOIN student_profile sp ON sp.user_id = u.id AND sp.deleted = 0
                 LEFT JOIN edu_class c ON c.id = sp.primary_class_id AND c.deleted = 0
                 WHERE u.deleted = 0 AND u.status = 1 AND u.id IN (
-                """ + placeholders + """
+                """
+                + placeholders +
+                """
                 )
                 ORDER BY c.class_name, sp.student_no, u.real_name
                 """, studentIds.toArray());
@@ -1134,7 +1142,9 @@ public class ExamService {
                 LEFT JOIN score_release sr ON sr.exam_id = e.id
                 WHERE e.deleted = 0
                   AND (? IS NULL OR e.exam_name LIKE CONCAT('%', ?, '%') OR p.paper_name LIKE CONCAT('%', ?, '%'))
-                """ + scopeSql + """
+                """
+                + scopeSql +
+                """
                 ORDER BY
                   CASE WHEN e.status = 0 THEN 0
                        WHEN e.status = 1 AND e.start_time <= NOW() AND (e.end_time IS NULL OR e.end_time >= NOW()) THEN 1
@@ -1471,7 +1481,9 @@ public class ExamService {
                 LEFT JOIN sys_user rev ON rev.id = sr.revoked_by
                 WHERE e.deleted = 0
                   AND (? IS NULL OR e.exam_name LIKE CONCAT('%', ?, '%') OR p.paper_name LIKE CONCAT('%', ?, '%'))
-                """ + scopeSql + """
+                """
+                + scopeSql +
+                """
                 ORDER BY
                   CASE WHEN COALESCE(sr.status, 0) = 1 THEN 4 ELSE 0 END,
                   e.end_time DESC,
@@ -2603,7 +2615,9 @@ public class ExamService {
                 JOIN paper p ON p.id = e.paper_id
                 LEFT JOIN student_profile sp ON sp.user_id = u.id AND sp.deleted = 0
                 LEFT JOIN edu_class c ON c.id = sp.primary_class_id AND c.deleted = 0
-                """ + whereSql + """
+                """
+                + whereSql +
+                """
                 ORDER BY openForVerification DESC, a.status ASC, e.start_time ASC, a.id ASC
                 LIMIT ? OFFSET ?
                 """, withLeadingParams(listParams, EXAM_STATUS_PUBLISHED, EXAM_STATUS_PUBLISHED));
@@ -4699,7 +4713,9 @@ public class ExamService {
                 FROM exam e
                 JOIN exam_target et ON et.exam_id = e.id
                 WHERE e.deleted = 0 AND e.status = ? AND et.target_type = ? AND et.target_id IN (
-                """ + placeholders + """
+                """
+                + placeholders +
+                """
                 )
                   AND NOT EXISTS (
                       SELECT 1 FROM exam_candidate_snapshot ecs WHERE ecs.exam_id = e.id

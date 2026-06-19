@@ -146,7 +146,9 @@ public class MonitorService {
                        client_event_time AS clientEventTime,
                        event_time AS eventTime
                 FROM cheat_event
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY event_time DESC, id DESC
                 """, params.toArray());
     }
@@ -388,7 +390,9 @@ public class MonitorService {
                 LEFT JOIN student_profile sp ON sp.user_id = a.user_id AND sp.deleted = 0
                 LEFT JOIN edu_class c ON c.id = sp.primary_class_id AND c.deleted = 0
                 WHERE a.exam_id = ?
-                """ + studentScopeSql + """
+                """
+                + studentScopeSql +
+                """
                 ORDER BY
                   CASE
                     WHEN a.status = 1 AND s.risk_score > 0 THEN 0
@@ -1307,7 +1311,9 @@ public class MonitorService {
         List<Map<String, Object>> list = jdbcTemplate.queryForList("""
                 SELECT l.id, l.operator_id, l.operator_name, l.action, l.target, l.detail, l.ip, l.created_at
                 FROM operation_log l
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT ? OFFSET ?
                 """, listParams.toArray());
@@ -1323,7 +1329,9 @@ public class MonitorService {
         List<Map<String, Object>> logs = jdbcTemplate.queryForList("""
                 SELECT l.id, l.operator_id, l.operator_name, l.action, l.target, l.detail, l.ip, l.created_at
                 FROM operation_log l
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT 5000
                 """, params.toArray());
@@ -1412,7 +1420,9 @@ public class MonitorService {
                          ELSE 1
                        END AS success
                 FROM operation_log l
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT ? OFFSET ?
                 """, listParams.toArray());
@@ -1433,7 +1443,9 @@ public class MonitorService {
                          ELSE 1
                        END AS success
                 FROM operation_log l
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT 5000
                 """, params.toArray());
@@ -1527,7 +1539,8 @@ public class MonitorService {
                 SELECT COUNT(*)
                 FROM ai_usage_log l
                 LEFT JOIN sys_user u ON u.id = l.user_id
-                """ + where, Long.class, params.toArray());
+                """
+                + where, Long.class, params.toArray());
 
         List<Object> listParams = new ArrayList<>(params);
         listParams.add(safeSize);
@@ -1544,7 +1557,9 @@ public class MonitorService {
                        l.created_at AS createdAt
                 FROM ai_usage_log l
                 LEFT JOIN sys_user u ON u.id = l.user_id
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT ? OFFSET ?
                 """, listParams.toArray());
@@ -1570,7 +1585,9 @@ public class MonitorService {
                        l.created_at AS createdAt
                 FROM ai_usage_log l
                 LEFT JOIN sys_user u ON u.id = l.user_id
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT 5000
                 """, params.toArray());
@@ -1671,7 +1688,8 @@ public class MonitorService {
                 JOIN exam e ON e.id = l.exam_id
                 JOIN paper p ON p.id = e.paper_id
                 LEFT JOIN sys_user u ON u.id = l.actor_id
-                """ + where, Long.class, params.toArray());
+                """
+                + where, Long.class, params.toArray());
 
         List<Object> listParams = new ArrayList<>(params);
         listParams.add(safeSize);
@@ -1690,7 +1708,9 @@ public class MonitorService {
                 JOIN exam e ON e.id = l.exam_id
                 JOIN paper p ON p.id = e.paper_id
                 LEFT JOIN sys_user u ON u.id = l.actor_id
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT ? OFFSET ?
                 """, listParams.toArray());
@@ -1716,7 +1736,9 @@ public class MonitorService {
                 JOIN exam e ON e.id = l.exam_id
                 JOIN paper p ON p.id = e.paper_id
                 LEFT JOIN sys_user u ON u.id = l.actor_id
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT 5000
                 """, params.toArray());
@@ -1781,7 +1803,9 @@ public class MonitorService {
                 JOIN exam e ON e.id = l.exam_id
                 JOIN paper p ON p.id = e.paper_id
                 LEFT JOIN sys_user u ON u.id = l.actor_id
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT ? OFFSET ?
                 """, listParams.toArray());
@@ -1807,7 +1831,9 @@ public class MonitorService {
                 JOIN exam e ON e.id = l.exam_id
                 JOIN paper p ON p.id = e.paper_id
                 LEFT JOIN sys_user u ON u.id = l.actor_id
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT 5000
                 """, params.toArray());
@@ -1853,7 +1879,8 @@ public class MonitorService {
                 SELECT COUNT(*)
                 FROM exam_approval_reminder_log l
                 LEFT JOIN sys_user u ON u.id = l.triggered_by
-                """ + where, Long.class, params.toArray());
+                """
+                + where, Long.class, params.toArray());
 
         List<Object> listParams = new ArrayList<>(params);
         listParams.add(safeSize);
@@ -1868,7 +1895,9 @@ public class MonitorService {
                        l.duration_ms AS durationMs, l.message, l.created_at AS createdAt
                 FROM exam_approval_reminder_log l
                 LEFT JOIN sys_user u ON u.id = l.triggered_by
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT ? OFFSET ?
                 """, listParams.toArray());
@@ -1891,7 +1920,9 @@ public class MonitorService {
                        l.duration_ms AS durationMs, l.message, l.created_at AS createdAt
                 FROM exam_approval_reminder_log l
                 LEFT JOIN sys_user u ON u.id = l.triggered_by
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT 5000
                 """, params.toArray());
@@ -1966,7 +1997,9 @@ public class MonitorService {
                 LEFT JOIN sys_user actor ON actor.id = l.actor_id
                 LEFT JOIN question q ON q.id = l.question_id
                 LEFT JOIN exam_question_snapshot eqs ON eqs.exam_id = e.id AND eqs.question_id = l.question_id
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT ? OFFSET ?
                 """, listParams.toArray());
@@ -1999,7 +2032,9 @@ public class MonitorService {
                 LEFT JOIN sys_user actor ON actor.id = l.actor_id
                 LEFT JOIN question q ON q.id = l.question_id
                 LEFT JOIN exam_question_snapshot eqs ON eqs.exam_id = e.id AND eqs.question_id = l.question_id
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT 5000
                 """, params.toArray());
@@ -2049,7 +2084,8 @@ public class MonitorService {
                 LEFT JOIN sys_user reviewer ON reviewer.id = l.reviewer_id
                 LEFT JOIN question q ON q.id = l.question_id
                 LEFT JOIN exam_question_snapshot eqs ON eqs.exam_id = e.id AND eqs.question_id = l.question_id
-                """ + where, Long.class, params.toArray());
+                """
+                + where, Long.class, params.toArray());
 
         List<Object> listParams = new ArrayList<>(params);
         listParams.add(safeSize);
@@ -2072,7 +2108,9 @@ public class MonitorService {
                 LEFT JOIN sys_user reviewer ON reviewer.id = l.reviewer_id
                 LEFT JOIN question q ON q.id = l.question_id
                 LEFT JOIN exam_question_snapshot eqs ON eqs.exam_id = e.id AND eqs.question_id = l.question_id
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT ? OFFSET ?
                 """, listParams.toArray());
@@ -2103,7 +2141,9 @@ public class MonitorService {
                 LEFT JOIN sys_user reviewer ON reviewer.id = l.reviewer_id
                 LEFT JOIN question q ON q.id = l.question_id
                 LEFT JOIN exam_question_snapshot eqs ON eqs.exam_id = e.id AND eqs.question_id = l.question_id
-                """ + where + """
+                """
+                + where +
+                """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT 5000
                 """, params.toArray());
