@@ -63,11 +63,11 @@ public class ReviewService {
         String normalizedReviewType = normalizeReviewType(reviewType);
         JdbcTemplate jt = requireJdbcTemplate();
         String openRecheckCondition = openRecheckAnswerCondition();
-        StringBuilder sql = new StringBuilder("""
+        String sqlTemplate = """
                 SELECT a.id AS attemptId, e.id AS examId, e.exam_name AS examName, u.real_name AS studentName,
                        COUNT(ar.id) AS pendingCount,
-                       COALESCE(SUM(CASE WHEN """ + openRecheckCondition + """ THEN 1 ELSE 0 END), 0) AS recheckTaskCount,
-                       CASE WHEN COALESCE(SUM(CASE WHEN """ + openRecheckCondition + """ THEN 1 ELSE 0 END), 0) > 0
+                       COALESCE(SUM(CASE WHEN %s THEN 1 ELSE 0 END), 0) AS recheckTaskCount,
+                       CASE WHEN COALESCE(SUM(CASE WHEN %s THEN 1 ELSE 0 END), 0) > 0
                             THEN 1 ELSE 0 END AS recheckRequired,
                        (SELECT COUNT(DISTINCT sa_count.id)
                         FROM score_appeal sa_count
@@ -140,7 +140,8 @@ public class ReviewService {
                 JOIN sys_user u ON u.id = a.user_id
                 JOIN answer_record ar ON ar.attempt_id = a.id
                 WHERE a.status = 4 AND ar.review_status = 0
-                """);
+                """;
+        StringBuilder sql = new StringBuilder(sqlTemplate.formatted(openRecheckCondition, openRecheckCondition));
         sql.append(EXPECTED_ANSWER_SCOPE_CONDITION);
         List<Object> params = new ArrayList<>();
         if (safeExamId != null) {
