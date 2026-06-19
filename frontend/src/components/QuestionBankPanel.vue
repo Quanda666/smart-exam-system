@@ -87,7 +87,8 @@
         </div>
         <div class="ai-generator-actions">
           <el-button type="success" :icon="MagicStick" :loading="aiGenerating" @click="aiGenerateQuestion">生成草稿</el-button>
-          <el-button type="primary" plain :icon="DocumentAdd" :loading="aiImporting" @click="pickQuestionDocument">识别题目文档</el-button>
+          <el-button type="primary" plain :icon="Upload" :loading="excelImporting" @click="pickExcelFile">Excel 导入</el-button>
+          <el-button type="info" plain :icon="View" @click="templatePreviewVisible = true">查看模板</el-button>
         </div>
       </div>
 
@@ -108,7 +109,7 @@
         <el-button type="primary" :icon="Upload" :loading="aiMaterialGenerating" :disabled="materialQuestionTotalInvalid" @click="pickMaterialDocument">上传材料生成</el-button>
       </div>
 
-      <input ref="questionDocInputRef" class="hidden-file-input" type="file" :accept="AI_DOCUMENT_ACCEPT" @change="handleQuestionDocumentSelected" />
+      <input ref="excelInputRef" class="hidden-file-input" type="file" accept=".xlsx,.xls" @change="handleExcelSelected" />
       <input ref="materialDocInputRef" class="hidden-file-input" type="file" :accept="AI_DOCUMENT_ACCEPT" @change="handleMaterialDocumentSelected" />
 
       <el-form class="question-form" :model="questionForm" label-position="top">
@@ -359,13 +360,50 @@
       </el-timeline>
       <el-empty v-if="!logLoading && reviewLogs.length === 0" description="暂无日志" />
     </el-drawer>
+
+    <el-dialog v-model="templatePreviewVisible" title="Excel 题目导入模板" width="880px">
+      <div class="template-preview">
+        <div class="template-description">
+          <el-alert type="info" :closable="false">
+            <template #title>
+              <strong>使用说明</strong>
+            </template>
+            <ol>
+              <li>点击"下载模板"按钮获取标准 Excel 模板文件</li>
+              <li>在模板中按格式填写题目信息（参考示例行）</li>
+              <li>题型支持：单选、多选、判断、填空、主观</li>
+              <li>客观题选项格式：每行一个选项，使用 A. B. C. D. 格式</li>
+              <li>答案格式：单选填 A，多选填 A,B,C，判断填 A 或 B</li>
+              <li>填写完成后点击"Excel 导入"按钮上传文件</li>
+            </ol>
+          </el-alert>
+        </div>
+
+        <div class="template-example">
+          <h4>模板格式示例：</h4>
+          <el-table :data="templateExampleData" border>
+            <el-table-column prop="type" label="题型" width="80" />
+            <el-table-column prop="stem" label="题干" min-width="180" show-overflow-tooltip />
+            <el-table-column prop="options" label="选项" min-width="140" show-overflow-tooltip />
+            <el-table-column prop="answer" label="答案" width="80" />
+            <el-table-column prop="analysis" label="解析" min-width="160" show-overflow-tooltip />
+            <el-table-column prop="score" label="分值" width="70" />
+          </el-table>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="templatePreviewVisible = false">关闭</el-button>
+        <el-button type="primary" :icon="Download" @click="downloadTemplate">下载模板</el-button>
+      </template>
+    </el-dialog>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Check, DocumentAdd, DocumentChecked, DocumentCopy, Download, MagicStick, Upload } from '@element-plus/icons-vue';
+import { Check, DocumentAdd, DocumentChecked, DocumentCopy, Download, MagicStick, Upload, View } from '@element-plus/icons-vue';
 import { exportToCsv } from '../utils/exportCsv';
 import { listKnowledgePoints, listSubjects, type KnowledgePointInfo, type SubjectInfo } from '../api/basic';
 import {
@@ -392,6 +430,8 @@ import {
   generateQuestionDrafts,
   generateQuestionsFromMaterial,
   importQuestionDocument,
+  importQuestionExcel,
+  downloadQuestionTemplate,
   saveGeneratedQuestions,
   type AiGeneratedQuestion
 } from '../api/ai';
@@ -449,13 +489,15 @@ const summary = ref<QuestionSummary>({ ...emptySummary });
 const editingQuestionId = ref<number | null>(null);
 
 const tableRef = ref<{ clearSelection: () => void }>();
-const questionDocInputRef = ref<HTMLInputElement | null>(null);
+const excelInputRef = ref<HTMLInputElement | null>(null);
 const materialDocInputRef = ref<HTMLInputElement | null>(null);
 const selectedQuestions = ref<QuestionInfo[]>([]);
 const exporting = ref(false);
 const aiGenerating = ref(false);
 const aiImporting = ref(false);
 const aiMaterialGenerating = ref(false);
+const excelImporting = ref(false);
+const templatePreviewVisible = ref(false);
 const aiSaving = ref(false);
 const aiDialogVisible = ref(false);
 const aiDialogTitle = ref('AI题目草稿');
@@ -476,6 +518,33 @@ const materialCounts = reactive<Record<QuestionType, number>>({
   FILL_BLANK: 1,
   SUBJECTIVE: 0
 });
+
+const templateExampleData = [
+  {
+    type: '单选',
+    stem: '以下哪个是 Java 的基本数据类型？',
+    options: 'A. String\nB. int\nC. Integer\nD. Object',
+    answer: 'B',
+    analysis: 'int 是 Java 的 8 种基本数据类型之一',
+    score: '5'
+  },
+  {
+    type: '多选',
+    stem: '以下哪些是 Spring 框架的核心模块？',
+    options: 'A. Spring Core\nB. Spring MVC\nC. Spring Boot\nD. Spring AOP',
+    answer: 'A,B,D',
+    analysis: 'Spring Boot 是基于 Spring 的快速开发框架',
+    score: '5'
+  },
+  {
+    type: '判断',
+    stem: 'Java 中的 String 是可变的。',
+    options: 'A. 正确\nB. 错误',
+    answer: 'B',
+    analysis: 'String 在 Java 中是不可变的',
+    score: '3'
+  }
+];
 const materialQuestionTotalValue = computed(() => materialQuestionTotal());
 const materialQuestionTotalExceeded = computed(() => materialQuestionTotalValue.value > AI_MATERIAL_TOTAL_COUNT);
 const materialQuestionTotalInvalid = computed(() => materialQuestionTotalValue.value <= 0 || materialQuestionTotalExceeded.value);
@@ -1137,6 +1206,11 @@ function pickQuestionDocument() {
   questionDocInputRef.value?.click();
 }
 
+function pickExcelFile() {
+  if (!currentDocumentContext()) return;
+  excelInputRef.value?.click();
+}
+
 function pickMaterialDocument() {
   if (!currentDocumentContext()) return;
   if (!validateMaterialQuestionCounts()) return;
@@ -1158,6 +1232,34 @@ async function handleQuestionDocumentSelected(event: Event) {
     ElMessage.error(error instanceof Error ? error.message : '题目文档识别失败');
   } finally {
     aiImporting.value = false;
+  }
+}
+
+async function handleExcelSelected(event: Event) {
+  const file = selectedFile(event);
+  if (!file) return;
+
+  const filename = file.name.toLowerCase();
+  if (!filename.endsWith('.xlsx') && !filename.endsWith('.xls')) {
+    ElMessage.error('仅支持 .xlsx 或 .xls 格式的 Excel 文件');
+    return;
+  }
+
+  const context = currentDocumentContext();
+  if (!context) return;
+
+  excelImporting.value = true;
+  try {
+    const response = await importQuestionExcel(file, context);
+    showAiDrafts(response.data, `Excel 导入：${file.name}`);
+    ElMessage.success(`已成功导入 ${aiDrafts.value.length} 道题目草稿`);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : 'Excel 导入失败');
+  } finally {
+    excelImporting.value = false;
+    if (excelInputRef.value) {
+      excelInputRef.value.value = '';
+    }
   }
 }
 
@@ -1188,6 +1290,17 @@ function showAiDrafts(drafts: AiGeneratedQuestion[], title: string) {
   aiDialogTitle.value = title;
   aiDrafts.value = drafts.map(normalizeAiDraft);
   aiDialogVisible.value = true;
+}
+
+function downloadTemplate() {
+  const url = downloadQuestionTemplate();
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = '题目导入模板.xlsx';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  ElMessage.success('模板下载已开始');
 }
 
 function currentDocumentContext() {
@@ -1598,6 +1711,35 @@ function correctAnswerText(question: QuestionPayload) {
 
 .question-operation-audit {
   margin-bottom: 14px;
+}
+
+.template-preview {
+  display: grid;
+  gap: 20px;
+}
+
+.template-description .el-alert {
+  line-height: 1.8;
+}
+
+.template-description ol {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.template-description li {
+  margin: 4px 0;
+}
+
+.template-example h4 {
+  margin: 0 0 12px;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.template-example .el-table {
+  font-size: 13px;
 }
 
 .question-operation-audit-content {

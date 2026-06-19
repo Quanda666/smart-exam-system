@@ -55,6 +55,15 @@ export function importQuestionDocument(file: File, payload: QuestionDocumentPayl
   return postForm<AiGeneratedQuestion[]>('/api/ai/questions/import-document', form);
 }
 
+export function importQuestionExcel(file: File, payload: QuestionDocumentPayload) {
+  const form = contextForm(file, payload);
+  return postForm<AiGeneratedQuestion[]>('/api/question-template/import', form);
+}
+
+export function downloadQuestionTemplate() {
+  return '/api/question-template/download';
+}
+
 export function generateQuestionsFromMaterial(file: File, payload: MaterialQuestionPayload) {
   const form = contextForm(file, payload);
   form.set('requirements', payload.requirements || '');

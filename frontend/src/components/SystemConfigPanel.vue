@@ -34,17 +34,17 @@
     </div>
 
     <div class="mp-table-card">
-      <el-table v-loading="loading" :data="configs" border>
-        <el-table-column prop="configKey" label="配置项" min-width="220" />
-        <el-table-column label="分类" width="110">
+      <el-table v-loading="loading" :data="configs" border style="width: 100%">
+        <el-table-column prop="configKey" label="配置项" min-width="180" />
+        <el-table-column label="分类" min-width="95">
           <template #default="scope">
             <el-tag type="info">{{ categoryText(scope.row.category) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="类型" width="100">
+        <el-table-column label="类型" min-width="85">
           <template #default="scope">{{ typeText(scope.row.valueType) }}</template>
         </el-table-column>
-        <el-table-column label="当前值" min-width="180">
+        <el-table-column label="当前值" min-width="140">
           <template #default="scope">
             <el-tag v-if="scope.row.valueType === 'BOOLEAN'" :type="scope.row.configValue === 'true' ? 'success' : 'info'">
               {{ scope.row.configValue === 'true' ? '开启' : '关闭' }}
@@ -52,11 +52,11 @@
             <span v-else>{{ scope.row.configValue }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="说明" min-width="260" show-overflow-tooltip />
-        <el-table-column label="更新时间" width="180">
+        <el-table-column prop="description" label="说明" min-width="220" show-overflow-tooltip />
+        <el-table-column label="更新时间" min-width="155">
           <template #default="scope">{{ formatDateTime(scope.row.updatedAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="110" fixed="right">
+        <el-table-column label="操作" width="95" fixed="right">
           <template #default="scope">
             <el-button link type="primary" :disabled="scope.row.editable !== 1" @click="openEdit(scope.row as SystemConfigItem)">
               编辑
