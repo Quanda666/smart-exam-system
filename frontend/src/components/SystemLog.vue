@@ -37,7 +37,7 @@
           </div>
 
           <el-table v-loading="loading" :data="loginLogs" border max-height="620">
-            <el-table-column label="日志 ID" width="140">
+            <el-table-column label="日志 ID" min-width="125">
               <template #default="scope">
                 <div class="login-log-id-cell">
                   <span>#{{ scope.row.id }}</span>
@@ -60,22 +60,22 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="时间" width="180">
+            <el-table-column label="时间" min-width="155">
               <template #default="scope">{{ formatDateTime(scope.row.createdAt) }}</template>
             </el-table-column>
-            <el-table-column label="结果" width="100">
+            <el-table-column label="结果" min-width="85">
               <template #default="scope">
                 <el-tag size="small" :type="loginSuccess(scope.row.success) ? 'success' : 'danger'">
                   {{ loginSuccess(scope.row.success) ? '成功' : '失败' }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="账号/用户" width="160">
+            <el-table-column label="账号/用户" min-width="140">
               <template #default="scope">{{ scope.row.operatorName || scope.row.operatorId || '-' }}</template>
             </el-table-column>
-            <el-table-column prop="action" label="动作" width="160" />
-            <el-table-column prop="detail" label="详情" min-width="260" show-overflow-tooltip />
-            <el-table-column prop="ip" label="IP" width="150" />
+            <el-table-column prop="action" label="动作" min-width="140" />
+            <el-table-column prop="detail" label="详情" min-width="220" show-overflow-tooltip />
+            <el-table-column prop="ip" label="IP" min-width="130" />
             <template #empty>
               <el-empty description="暂无登录审计日志" />
             </template>
@@ -104,7 +104,7 @@
           </div>
 
           <el-table v-loading="loading" :data="operationLogs" border max-height="620">
-            <el-table-column label="日志 ID" width="140">
+            <el-table-column label="日志 ID" min-width="125">
               <template #default="scope">
                 <div class="operation-log-id-cell">
                   <span>#{{ scope.row.id }}</span>
@@ -127,22 +127,22 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column prop="created_at" label="时间" width="180" />
-            <el-table-column label="操作人" width="130">
+            <el-table-column prop="created_at" label="时间" min-width="155" />
+            <el-table-column label="操作人" min-width="110">
               <template #default="scope">{{ scope.row.operator_name || '-' }}</template>
             </el-table-column>
-            <el-table-column label="动作" width="150">
+            <el-table-column label="动作" min-width="130">
               <template #default="scope">
                 <el-tag size="small" type="info">{{ scope.row.action || '-' }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="对象" width="160">
+            <el-table-column label="对象" min-width="140">
               <template #default="scope">{{ scope.row.target || '-' }}</template>
             </el-table-column>
-            <el-table-column label="详情" min-width="260" show-overflow-tooltip>
+            <el-table-column label="详情" min-width="220" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.detail || '-' }}</template>
             </el-table-column>
-            <el-table-column label="IP" width="150">
+            <el-table-column label="IP" min-width="130">
               <template #default="scope">{{ scope.row.ip || '-' }}</template>
             </el-table-column>
             <template #empty>
@@ -178,29 +178,29 @@
           </div>
 
           <el-table v-loading="loading" :data="aiLogs" border max-height="620">
-            <el-table-column prop="createdAt" label="时间" width="180" />
-            <el-table-column label="用户" width="130">
+            <el-table-column prop="createdAt" label="时间" min-width="155" />
+            <el-table-column label="用户" min-width="110">
               <template #default="scope">{{ scope.row.userName || scope.row.userId || '-' }}</template>
             </el-table-column>
-            <el-table-column label="场景" width="160">
+            <el-table-column label="场景" min-width="140">
               <template #default="scope">
                 <el-tag size="small">{{ sceneText(scope.row.scene) }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="结果" width="90">
+            <el-table-column label="结果" min-width="80">
               <template #default="scope">
                 <el-tag size="small" :type="isSuccess(scope.row.success) ? 'success' : 'danger'">
                   {{ isSuccess(scope.row.success) ? '成功' : '失败' }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="提示词" min-width="260" show-overflow-tooltip>
+            <el-table-column label="提示词" min-width="220" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.prompt || '-' }}</template>
             </el-table-column>
-            <el-table-column label="响应" min-width="260" show-overflow-tooltip>
+            <el-table-column label="响应" min-width="220" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.response || '-' }}</template>
             </el-table-column>
-            <el-table-column label="错误" min-width="180" show-overflow-tooltip>
+            <el-table-column label="错误" min-width="160" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.errorMessage || '-' }}</template>
             </el-table-column>
             <template #empty>
@@ -243,7 +243,7 @@
           </div>
 
           <el-table v-loading="loading" :data="approvalReminderLogs" border max-height="620">
-            <el-table-column label="日志 ID" width="150">
+            <el-table-column label="日志 ID" min-width="135">
               <template #default="scope">
                 <div class="approval-reminder-id-cell">
                   <span>#{{ scope.row.id }}</span>
@@ -266,32 +266,32 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="时间" width="180">
+            <el-table-column label="时间" min-width="155">
               <template #default="scope">{{ formatDateTime(scope.row.createdAt) }}</template>
             </el-table-column>
-            <el-table-column label="状态" width="150">
+            <el-table-column label="状态" min-width="130">
               <template #default="scope">
                 <el-tag size="small" :type="approvalReminderStatusTag(scope.row.status)">
                   {{ approvalReminderStatusText(scope.row.status) }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="来源" width="110">
+            <el-table-column label="来源" min-width="95">
               <template #default="scope">{{ approvalReminderSourceText(scope.row.triggerSource) }}</template>
             </el-table-column>
-            <el-table-column label="触发人" width="150">
+            <el-table-column label="触发人" min-width="130">
               <template #default="scope">{{ scope.row.triggeredByName || scope.row.triggeredBy || '-' }}</template>
             </el-table-column>
-            <el-table-column label="超期 / 接收人" width="160">
+            <el-table-column label="超期 / 接收人" min-width="140">
               <template #default="scope">{{ scope.row.overdueExamCount || 0 }} / {{ scope.row.recipientCount || 0 }}</template>
             </el-table-column>
-            <el-table-column label="阈值" width="140">
+            <el-table-column label="阈值" min-width="120">
               <template #default="scope">{{ scope.row.overdueHours }}h / {{ scope.row.cooldownHours }}h</template>
             </el-table-column>
-            <el-table-column label="节点 / 耗时" min-width="170" show-overflow-tooltip>
+            <el-table-column label="节点 / 耗时" min-width="150" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.nodeId || '-' }} / {{ durationText(scope.row.durationMs) }}</template>
             </el-table-column>
-            <el-table-column prop="message" label="消息" min-width="220" show-overflow-tooltip>
+            <el-table-column prop="message" label="消息" min-width="180" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.message || '-' }}</template>
             </el-table-column>
             <template #empty>
@@ -328,7 +328,7 @@
           </div>
 
           <el-table v-loading="loading" :data="examApprovalLogs" border max-height="620">
-            <el-table-column label="日志 ID" width="150">
+            <el-table-column label="日志 ID" min-width="135">
               <template #default="scope">
                 <div class="exam-approval-id-cell">
                   <span>#{{ scope.row.id }}</span>
@@ -351,32 +351,32 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="时间" width="180">
+            <el-table-column label="时间" min-width="155">
               <template #default="scope">{{ formatDateTime(scope.row.createdAt) }}</template>
             </el-table-column>
-            <el-table-column label="动作" width="130">
+            <el-table-column label="动作" min-width="110">
               <template #default="scope">
                 <el-tag size="small" :type="examApprovalActionTag(scope.row.action)">
                   {{ examApprovalActionText(scope.row.action) }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="examName" label="考试" min-width="180" show-overflow-tooltip />
-            <el-table-column prop="paperName" label="试卷" min-width="160" show-overflow-tooltip />
-            <el-table-column label="状态" width="160">
+            <el-table-column prop="examName" label="考试" min-width="150" show-overflow-tooltip />
+            <el-table-column prop="paperName" label="试卷" min-width="140" show-overflow-tooltip />
+            <el-table-column label="状态" min-width="140">
               <template #default="scope">
                 {{ examApprovalStatusText(scope.row.statusFrom) }} -> {{ examApprovalStatusText(scope.row.statusTo) }}
               </template>
             </el-table-column>
-            <el-table-column label="操作人" width="130">
+            <el-table-column label="操作人" min-width="110">
               <template #default="scope">{{ scope.row.actorName || scope.row.actorId || '-' }}</template>
             </el-table-column>
-            <el-table-column label="发布影响" width="220">
+            <el-table-column label="发布影响" min-width="190">
               <template #default="scope">
                 {{ scope.row.candidateCount || 0 }} 名考生 / {{ scope.row.notifiedStudentCount || 0 }} 名学生 / {{ scope.row.notifiedAttemptCount || 0 }} 次答卷
               </template>
             </el-table-column>
-            <el-table-column prop="note" label="备注" min-width="220" show-overflow-tooltip>
+            <el-table-column prop="note" label="备注" min-width="180" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.note || '-' }}</template>
             </el-table-column>
             <template #empty>
@@ -410,7 +410,7 @@
           </div>
 
           <el-table v-loading="loading" :data="scoreReleaseLogs" border max-height="620">
-            <el-table-column label="日志 ID" width="150">
+            <el-table-column label="日志 ID" min-width="135">
               <template #default="scope">
                 <div class="score-release-id-cell">
                   <span>#{{ scope.row.id }}</span>
@@ -433,33 +433,33 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="时间" width="180">
+            <el-table-column label="时间" min-width="155">
               <template #default="scope">{{ formatDateTime(scope.row.createdAt) }}</template>
             </el-table-column>
-            <el-table-column label="动作" width="100">
+            <el-table-column label="动作" min-width="85">
               <template #default="scope">
                 <el-tag size="small" :type="scope.row.action === 'REVOKE' ? 'warning' : 'success'">
                   {{ scoreReleaseActionText(scope.row.action) }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="examName" label="考试" min-width="180" show-overflow-tooltip />
-            <el-table-column prop="paperName" label="试卷" min-width="160" show-overflow-tooltip />
-            <el-table-column label="状态流转" width="150">
+            <el-table-column prop="examName" label="考试" min-width="150" show-overflow-tooltip />
+            <el-table-column prop="paperName" label="试卷" min-width="140" show-overflow-tooltip />
+            <el-table-column label="状态流转" min-width="130">
               <template #default="scope">
                 {{ scoreReleaseStatusText(scope.row.statusFrom) }} -> {{ scoreReleaseStatusText(scope.row.statusTo) }}
               </template>
             </el-table-column>
-            <el-table-column label="处理人" width="130">
+            <el-table-column label="处理人" min-width="110">
               <template #default="scope">{{ scope.row.actorName || scope.row.actorId || '-' }}</template>
             </el-table-column>
-            <el-table-column label="影响答卷" width="110">
+            <el-table-column label="影响答卷" min-width="95">
               <template #default="scope">{{ scope.row.visibleAttemptCount || 0 }}</template>
             </el-table-column>
-            <el-table-column label="通知" width="130">
+            <el-table-column label="通知" min-width="115">
               <template #default="scope">{{ scope.row.notifiedStudentCount || 0 }} 人 / {{ scope.row.notifiedAttemptCount || 0 }} 份</template>
             </el-table-column>
-            <el-table-column prop="note" label="说明/原因" min-width="220" show-overflow-tooltip>
+            <el-table-column prop="note" label="说明/原因" min-width="180" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.note || '-' }}</template>
             </el-table-column>
             <template #empty>
@@ -500,7 +500,7 @@
           </div>
 
           <el-table v-loading="loading" :data="scoreAppealLogs" border max-height="620">
-            <el-table-column label="日志 ID" width="150">
+            <el-table-column label="日志 ID" min-width="135">
               <template #default="scope">
                 <div class="score-appeal-id-cell">
                   <span>#{{ scope.row.id }}</span>
@@ -523,35 +523,35 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="时间" width="180">
+            <el-table-column label="时间" min-width="155">
               <template #default="scope">{{ formatDateTime(scope.row.createdAt) }}</template>
             </el-table-column>
-            <el-table-column label="动作" width="110">
+            <el-table-column label="动作" min-width="95">
               <template #default="scope">
                 <el-tag size="small" :type="scoreAppealActionTag(scope.row.action)">
                   {{ scoreAppealActionText(scope.row.action) }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="examName" label="考试" min-width="170" show-overflow-tooltip />
-            <el-table-column label="学生" width="130">
+            <el-table-column prop="examName" label="考试" min-width="150" show-overflow-tooltip />
+            <el-table-column label="学生" min-width="110">
               <template #default="scope">{{ scope.row.studentName || scope.row.userId || '-' }}</template>
             </el-table-column>
-            <el-table-column label="申诉对象" min-width="170" show-overflow-tooltip>
+            <el-table-column label="申诉对象" min-width="150" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.questionStem || '整张试卷' }}</template>
             </el-table-column>
-            <el-table-column label="状态流转" width="130">
+            <el-table-column label="状态流转" min-width="115">
               <template #default="scope">
                 {{ scoreAppealStatusText(scope.row.statusFrom) }} -> {{ scoreAppealStatusText(scope.row.statusTo) }}
               </template>
             </el-table-column>
-            <el-table-column label="处理结果" width="120">
+            <el-table-column label="处理结果" min-width="105">
               <template #default="scope">{{ scoreAppealHandlingResultText(scope.row.handlingResult) }}</template>
             </el-table-column>
-            <el-table-column label="操作人" width="130">
+            <el-table-column label="操作人" min-width="110">
               <template #default="scope">{{ scope.row.actorName || scope.row.actorId || '-' }}</template>
             </el-table-column>
-            <el-table-column prop="note" label="说明" min-width="220" show-overflow-tooltip>
+            <el-table-column prop="note" label="说明" min-width="180" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.note || '-' }}</template>
             </el-table-column>
             <template #empty>
@@ -582,7 +582,7 @@
           </div>
 
           <el-table v-loading="loading" :data="reviewScoreLogs" border max-height="620">
-            <el-table-column label="日志 ID" width="150">
+            <el-table-column label="日志 ID" min-width="135">
               <template #default="scope">
                 <div class="review-score-id-cell">
                   <span>#{{ scope.row.id }}</span>
@@ -605,27 +605,27 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="时间" width="180">
+            <el-table-column label="时间" min-width="155">
               <template #default="scope">{{ formatDateTime(scope.row.createdAt) }}</template>
             </el-table-column>
-            <el-table-column prop="examName" label="考试" min-width="170" show-overflow-tooltip />
-            <el-table-column label="学生" width="140">
+            <el-table-column prop="examName" label="考试" min-width="150" show-overflow-tooltip />
+            <el-table-column label="学生" min-width="120">
               <template #default="scope">{{ scope.row.studentName || scope.row.userId || '-' }}</template>
             </el-table-column>
-            <el-table-column prop="studentNo" label="学号" width="120" />
-            <el-table-column label="分数" width="150">
+            <el-table-column prop="studentNo" label="学号" min-width="105" />
+            <el-table-column label="分数" min-width="130">
               <template #default="scope">
                 {{ scope.row.oldScore ?? 0 }} -> {{ scope.row.newScore }} / {{ scope.row.maxScore }}
               </template>
             </el-table-column>
-            <el-table-column label="阅卷人" width="140">
+            <el-table-column label="阅卷人" min-width="120">
               <template #default="scope">{{ scope.row.reviewerName || scope.row.reviewerId || '-' }}</template>
             </el-table-column>
-            <el-table-column prop="questionStem" label="题目" min-width="220" show-overflow-tooltip />
-            <el-table-column prop="comment" label="评语" min-width="180" show-overflow-tooltip>
+            <el-table-column prop="questionStem" label="题目" min-width="180" show-overflow-tooltip />
+            <el-table-column prop="comment" label="评语" min-width="160" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.comment || '-' }}</template>
             </el-table-column>
-            <el-table-column label="ID" width="170">
+            <el-table-column label="ID" min-width="150">
               <template #default="scope">
                 A{{ scope.row.attemptId }} / R{{ scope.row.answerRecordId }} / Q{{ scope.row.questionId }}
               </template>
@@ -665,7 +665,7 @@
           </div>
 
           <el-table v-loading="loading" :data="questionReviewLogs" border max-height="620">
-            <el-table-column label="日志 ID" width="150">
+            <el-table-column label="日志 ID" min-width="135">
               <template #default="scope">
                 <div class="question-review-id-cell">
                   <span>#{{ scope.row.id }}</span>
@@ -688,38 +688,38 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="时间" width="180">
+            <el-table-column label="时间" min-width="155">
               <template #default="scope">{{ formatDateTime(scope.row.operatedAt) }}</template>
             </el-table-column>
-            <el-table-column label="动作" width="140">
+            <el-table-column label="动作" min-width="120">
               <template #default="scope">
                 <el-tag size="small" :type="questionReviewActionTag(scope.row.actionType)">
                   {{ questionReviewActionText(scope.row.actionType) }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="questionStem" label="题目" min-width="240" show-overflow-tooltip>
+            <el-table-column prop="questionStem" label="题目" min-width="200" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.questionStem || `题目 #${scope.row.questionId}` }}</template>
             </el-table-column>
-            <el-table-column prop="subjectName" label="学科" min-width="130" show-overflow-tooltip />
-            <el-table-column label="审核" width="180">
+            <el-table-column prop="subjectName" label="学科" min-width="110" show-overflow-tooltip />
+            <el-table-column label="审核" min-width="155">
               <template #default="scope">
                 {{ questionReviewStatusText(scope.row.fromReviewStatus) }} -> {{ questionReviewStatusText(scope.row.toReviewStatus) }}
               </template>
             </el-table-column>
-            <el-table-column label="题目状态" width="130">
+            <el-table-column label="题目状态" min-width="115">
               <template #default="scope">{{ questionPublishStatusText(scope.row.fromStatus) }} -> {{ questionPublishStatusText(scope.row.toStatus) }}</template>
             </el-table-column>
-            <el-table-column label="操作人" width="150">
+            <el-table-column label="操作人" min-width="130">
               <template #default="scope">{{ scope.row.operatorName || scope.row.operatorUsername || scope.row.operatedBy || '-' }}</template>
             </el-table-column>
-            <el-table-column label="创建人" width="140">
+            <el-table-column label="创建人" min-width="120">
               <template #default="scope">{{ scope.row.creatorName || scope.row.creatorUsername || scope.row.createdBy || '-' }}</template>
             </el-table-column>
-            <el-table-column label="ID" width="140">
+            <el-table-column label="ID" min-width="120">
               <template #default="scope">Q{{ scope.row.questionId }} / v{{ scope.row.versionNo }}</template>
             </el-table-column>
-            <el-table-column prop="comment" label="评语" min-width="220" show-overflow-tooltip>
+            <el-table-column prop="comment" label="评语" min-width="180" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.comment || '-' }}</template>
             </el-table-column>
             <template #empty>
@@ -753,7 +753,7 @@
           </div>
 
           <el-table v-loading="loading" :data="systemConfigLogs" border max-height="620">
-            <el-table-column label="日志 ID" width="150">
+            <el-table-column label="日志 ID" min-width="135">
               <template #default="scope">
                 <div class="system-config-id-cell">
                   <span>#{{ scope.row.id }}</span>
@@ -776,21 +776,21 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="时间" width="180">
+            <el-table-column label="时间" min-width="155">
               <template #default="scope">{{ formatDateTime(scope.row.createdAt) }}</template>
             </el-table-column>
-            <el-table-column prop="configKey" label="配置键" min-width="220" show-overflow-tooltip />
-            <el-table-column label="类别" width="120">
+            <el-table-column prop="configKey" label="配置键" min-width="180" show-overflow-tooltip />
+            <el-table-column label="类别" min-width="105">
               <template #default="scope">
                 <el-tag size="small" type="info">{{ scope.row.category || '-' }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="valueType" label="类型" width="100" />
-            <el-table-column prop="oldValue" label="旧值" min-width="160" show-overflow-tooltip>
+            <el-table-column prop="valueType" label="类型" min-width="85" />
+            <el-table-column prop="oldValue" label="旧值" min-width="140" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.oldValue ?? '-' }}</template>
             </el-table-column>
-            <el-table-column prop="newValue" label="新值" min-width="160" show-overflow-tooltip />
-            <el-table-column label="操作人" width="150">
+            <el-table-column prop="newValue" label="新值" min-width="140" show-overflow-tooltip />
+            <el-table-column label="操作人" min-width="130">
               <template #default="scope">{{ scope.row.actorName || scope.row.actorUsername || scope.row.actorId || '-' }}</template>
             </el-table-column>
             <template #empty>
@@ -832,7 +832,7 @@
           </div>
 
           <el-table v-loading="loading" :data="notificationLogs" border max-height="620">
-            <el-table-column label="ID" width="150">
+            <el-table-column label="ID" min-width="135">
               <template #default="scope">
                 <div class="notification-id-cell">
                   <span>#{{ scope.row.id }}</span>
@@ -855,27 +855,27 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="时间" width="180">
+            <el-table-column label="时间" min-width="155">
               <template #default="scope">{{ formatDateTime(scope.row.createdAt) }}</template>
             </el-table-column>
-            <el-table-column label="接收人" width="150">
+            <el-table-column label="接收人" min-width="130">
               <template #default="scope">{{ scope.row.realName || scope.row.username || scope.row.userId || '-' }}</template>
             </el-table-column>
-            <el-table-column label="类型" width="150">
+            <el-table-column label="类型" min-width="130">
               <template #default="scope">
                 <el-tag size="small" type="info">{{ scope.row.type || '-' }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="title" label="标题" min-width="180" show-overflow-tooltip />
-            <el-table-column prop="content" label="内容" min-width="240" show-overflow-tooltip />
-            <el-table-column label="已读" width="90">
+            <el-table-column prop="title" label="标题" min-width="160" show-overflow-tooltip />
+            <el-table-column prop="content" label="内容" min-width="200" show-overflow-tooltip />
+            <el-table-column label="已读" min-width="80">
               <template #default="scope">
                 <el-tag size="small" :type="notificationReadTag(scope.row.isRead)">
                   {{ notificationReadText(scope.row.isRead) }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="关联" min-width="180">
+            <el-table-column label="关联" min-width="160">
               <template #default="scope">
                 <div class="notification-related-cell">
                   <span>{{ scope.row.relatedType || '-' }} / {{ scope.row.relatedId || '-' }}</span>

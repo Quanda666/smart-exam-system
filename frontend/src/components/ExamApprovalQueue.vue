@@ -76,7 +76,7 @@
 
     <div class="mp-table-card">
       <el-table v-loading="loading" :data="approvals" row-key="id" :row-class-name="approvalRowClassName">
-        <el-table-column label="考试" min-width="240">
+        <el-table-column label="考试" min-width="200">
           <template #default="scope">
             <div class="approval-exam-cell">
               <strong>{{ scope.row.examName }}</strong>
@@ -84,28 +84,28 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="教师" width="140">
+        <el-table-column label="教师" min-width="100">
           <template #default="scope">{{ scope.row.creatorName || '-' }}</template>
         </el-table-column>
-        <el-table-column label="开考时间" width="170">
+        <el-table-column label="开考时间" min-width="155">
           <template #default="scope">{{ formatDateTime(scope.row.startTime) }}</template>
         </el-table-column>
-        <el-table-column label="范围/题目" width="110">
+        <el-table-column label="范围/题目" min-width="90">
           <template #default="scope">
             {{ scope.row.targetCount || 0 }} / {{ scope.row.questionCount || 0 }}
           </template>
         </el-table-column>
-        <el-table-column label="分数" width="110">
+        <el-table-column label="分数" min-width="90">
           <template #default="scope">
             {{ scoreText(scope.row.passScore) }} / {{ scoreText(scope.row.totalScore) }}
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="100">
+        <el-table-column label="状态" min-width="85">
           <template #default="scope">
             <el-tag :type="statusType(scope.row.status)">{{ statusText(scope.row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="风险" min-width="190">
+        <el-table-column label="风险" min-width="160">
           <template #default="scope">
             <div class="risk-tags">
               <el-tag v-for="risk in riskList(scope.row.riskFlags)" :key="risk" type="danger" effect="plain">
@@ -115,10 +115,10 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="最近意见" min-width="180" show-overflow-tooltip>
+        <el-table-column label="最近意见" min-width="150" show-overflow-tooltip>
           <template #default="scope">{{ scope.row.latestApprovalNote || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="230" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="scope">
             <el-button v-if="scope.row.status === 0" link type="success" :icon="Check" @click="approve(scope.row as ExamApprovalQueueItem)">批准</el-button>
             <el-button v-if="scope.row.status === 0" link type="warning" :icon="Close" @click="reject(scope.row as ExamApprovalQueueItem)">驳回</el-button>
