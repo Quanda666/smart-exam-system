@@ -1115,6 +1115,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
 }
 
 /* 页头：标题 + 描述 + 右侧操作区 */
@@ -1167,6 +1168,12 @@ button {
   border-radius: var(--mp-radius-md);
   box-shadow: var(--mp-shadow-card);
   padding: 12px;
+  /* 关键：作为 flex 子项时默认 min-width:auto 会继承内部表格的内联宽度，
+     导致侧边栏展开（容器变窄）时表格卡片无法收缩而溢出屏幕。
+     min-width:0 允许卡片随容器收缩；overflow-x:auto 作为兜底，保证永不溢出页面。*/
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 /* 表格卡内的表格：去掉外边框，表头浅灰、字重提升，行悬浮高亮更柔和 */
