@@ -607,7 +607,7 @@ public class ExamService {
                 }
             }
         }
-        return where.toString();
+        return where.toString() + " ";
     }
 
     public List<Map<String, Object>> listStudentExams(AuthUser user) {
