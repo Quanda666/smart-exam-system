@@ -1312,7 +1312,7 @@ public class MonitorService {
                 SELECT l.id, l.operator_id, l.operator_name, l.action, l.target, l.detail, l.ip, l.created_at
                 FROM operation_log l 
                 """
-                + where +
+                + where + " " +
                 """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT ? OFFSET ?
@@ -1330,7 +1330,7 @@ public class MonitorService {
                 SELECT l.id, l.operator_id, l.operator_name, l.action, l.target, l.detail, l.ip, l.created_at
                 FROM operation_log l 
                 """
-                + where +
+                + where + " " +
                 """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT 5000
