@@ -295,6 +295,7 @@ class SmartExamApplicationTests {
         String token = registerTeacherAndExtractToken();
         Long firstQuestionId = createPublishedQuestion(token, "阶段5手动组卷单选题", "SINGLE_CHOICE");
         Long secondQuestionId = createPublishedQuestion(token, "阶段5规则组卷单选题", "SINGLE_CHOICE");
+        Long thirdQuestionId = createPublishedQuestion(token, "阶段5规则组卷备用单选题", "SINGLE_CHOICE");
 
         MvcResult createPaperResult = mockMvc.perform(post("/api/papers")
                         .header("Authorization", "Bearer " + token)
