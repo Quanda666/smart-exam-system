@@ -753,6 +753,11 @@ function scoreText(value?: number | null) {
 .exam-approval-page {
   display: grid;
   gap: 14px;
+  overflow-x: auto;
+}
+
+.exam-approval-page :deep(.el-table) {
+  max-width: 100%;
 }
 
 .approval-header {

@@ -2666,14 +2666,15 @@ function scoreAppealHandlingResultText(value?: string | null) {
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background: #fff;
+  overflow-x: auto;
 }
 
 .log-tabs :deep(.el-tabs__header) {
   margin-bottom: 16px;
 }
 
-.log-tabs :deep(.el-tab-pane) {
-  overflow-x: auto;
+.log-tabs :deep(.el-table) {
+  max-width: 100%;
 }
 
 .score-release-id-cell,
