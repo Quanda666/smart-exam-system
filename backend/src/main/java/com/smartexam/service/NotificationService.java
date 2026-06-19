@@ -210,7 +210,7 @@ public class NotificationService {
         int offset = (safePage - 1) * safeSize;
         List<Object> params = new ArrayList<>();
         String where = buildMyNotificationWhere(userId, type, relatedType, relatedId, params);
-        Long total = jt.queryForObject("SELECT COUNT(*) FROM notification" + where,
+        Long total = jt.queryForObject("SELECT COUNT(*) FROM notification " + where,
                 Long.class, params.toArray());
         List<Object> listParams = new ArrayList<>(params);
         listParams.add(safeSize);

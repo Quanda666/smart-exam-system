@@ -1302,7 +1302,7 @@ public class MonitorService {
         StringBuilder where = new StringBuilder(" WHERE 1 = 1");
         appendOperationLogFilters(where, params, logId, keyword, action, target, startFrom, startTo);
 
-        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM operation_log l" + where,
+        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM operation_log l " + where,
                 Long.class, params.toArray());
 
         List<Object> listParams = new ArrayList<>(params);
@@ -1406,7 +1406,7 @@ public class MonitorService {
         StringBuilder where = new StringBuilder(" WHERE (l.target IN ('认证', '璁よ瘉'))");
         appendLoginAuditFilters(where, params, logId, keyword, action, operatorId, success, startFrom, startTo);
 
-        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM operation_log l" + where,
+        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM operation_log l " + where,
                 Long.class, params.toArray());
 
         List<Object> listParams = new ArrayList<>(params);

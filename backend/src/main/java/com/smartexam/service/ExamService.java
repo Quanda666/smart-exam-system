@@ -298,7 +298,7 @@ public class ExamService {
             whereSql = " WHERE l.id = ?";
             params.add(logId);
         }
-        Long total = jt.queryForObject("SELECT COUNT(*) FROM exam_approval_reminder_log l" + whereSql,
+        Long total = jt.queryForObject("SELECT COUNT(*) FROM exam_approval_reminder_log l " + whereSql,
                 Long.class, params.toArray());
         List<Object> listParams = new ArrayList<>(params);
         listParams.add(safeSize);
