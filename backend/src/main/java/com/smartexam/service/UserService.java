@@ -1,5 +1,6 @@
 package com.smartexam.service;
 
+import com.smartexam.auth.TokenStore;
 import com.smartexam.common.PageResult;
 import com.smartexam.dto.system.CreateUserRequest;
 import com.smartexam.dto.system.UpdateUserRequest;
@@ -27,31 +28,40 @@ public class UserService {
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
     private final NotificationService notificationService;
     private final TeachingScopeService teachingScopeService;
+    private final TokenStore tokenStore;
 
     public UserService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
                        NotificationService notificationService,
-                       TeachingScopeService teachingScopeService) {
+                       TeachingScopeService teachingScopeService,
+                       TokenStore tokenStore) {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
         this.notificationService = notificationService;
         this.teachingScopeService = teachingScopeService;
+        this.tokenStore = tokenStore;
     }
 
-    public PageResult<Map<String, Object>> listUsers(String keyword, String role, Integer status, int page, int size) {
+    public PageResult<Map<String, Object>> listUsers(String keyword, String role, Integer status,
+                                                     Integer teacherStatus, Long userId, int page, int size) {
         JdbcTemplate jt = requireJdbcTemplate();
         String kw = blankToNull(keyword);
         String roleCode = blankToNull(role);
+        Integer safeTeacherStatus = normalizeTeacherReviewStatus(teacherStatus);
         Long total = jt.queryForObject("""
                 SELECT COUNT(*)
                 FROM sys_user u
+                LEFT JOIN teacher_profile tp ON tp.user_id = u.id AND tp.deleted = 0
                 WHERE u.deleted = 0
+                  AND (? IS NULL OR u.id = ?)
                   AND (? IS NULL OR u.username LIKE CONCAT('%', ?, '%') OR u.real_name LIKE CONCAT('%', ?, '%'))
                   AND (? IS NULL OR u.status = ?)
+                  AND (? IS NULL OR tp.status = ?)
                   AND (? IS NULL OR EXISTS (
                         SELECT 1
                         FROM sys_user_role ur2
                         JOIN sys_role r2 ON r2.id = ur2.role_id
                         WHERE ur2.user_id = u.id AND r2.role_code = ?))
-                """, Long.class, kw, kw, kw, status, status, roleCode, roleCode);
+                """, Long.class, userId, userId, kw, kw, kw, status, status,
+                safeTeacherStatus, safeTeacherStatus, roleCode, roleCode);
         int safeSize = size <= 0 ? 10 : Math.min(size, 200);
         int safePage = Math.max(1, page);
         int offset = (safePage - 1) * safeSize;
@@ -69,6 +79,7 @@ public class UserService {
                         JOIN edu_class ec ON ec.id = scm.class_id AND ec.deleted = 0
                         WHERE scm.student_user_id = u.id AND scm.deleted = 0 AND scm.status = 1) AS classMemberships,
                        tp.teacher_no AS teacherNo, tp.hire_date AS hireDate, tp.title AS teacherTitle,
+                       tp.status AS teacherStatus,
                        tp.college AS teacherCollege, tp.introduction,
                        (SELECT GROUP_CONCAT(CONCAT(cc.id, ':', ec.class_name, '/', co.course_name, ':', tcc.teacher_role) ORDER BY cc.id SEPARATOR ',')
                         FROM teacher_class_course tcc
@@ -81,8 +92,10 @@ public class UserService {
                 LEFT JOIN edu_class c ON c.id = COALESCE(sp.primary_class_id, sp.class_id) AND c.deleted = 0
                 LEFT JOIN teacher_profile tp ON tp.user_id = u.id AND tp.deleted = 0
                 WHERE u.deleted = 0
+                  AND (? IS NULL OR u.id = ?)
                   AND (? IS NULL OR u.username LIKE CONCAT('%', ?, '%') OR u.real_name LIKE CONCAT('%', ?, '%'))
                   AND (? IS NULL OR u.status = ?)
+                  AND (? IS NULL OR tp.status = ?)
                   AND (? IS NULL OR EXISTS (
                         SELECT 1
                         FROM sys_user_role ur2
@@ -90,7 +103,8 @@ public class UserService {
                         WHERE ur2.user_id = u.id AND r2.role_code = ?))
                 ORDER BY u.id DESC
                 LIMIT ? OFFSET ?
-                """, kw, kw, kw, status, status, roleCode, roleCode, safeSize, offset);
+                """, userId, userId, kw, kw, kw, status, status,
+                safeTeacherStatus, safeTeacherStatus, roleCode, roleCode, safeSize, offset);
         return PageResult.of(list, total == null ? 0 : total, safePage, safeSize);
     }
 
@@ -99,7 +113,25 @@ public class UserService {
         return jt.queryForMap("""
                 SELECT COUNT(*) AS total,
                        COALESCE(SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END), 0) AS active,
-                       COALESCE(SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END), 0) AS disabled
+                       COALESCE(SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END), 0) AS disabled,
+                       (SELECT COUNT(*)
+                        FROM sys_user tu
+                        JOIN sys_user_role tur ON tur.user_id = tu.id
+                        JOIN sys_role tr ON tr.id = tur.role_id
+                        JOIN teacher_profile tp ON tp.user_id = tu.id AND tp.deleted = 0
+                        WHERE tu.deleted = 0
+                          AND tu.status = 0
+                          AND tr.role_code = 'TEACHER'
+                          AND tp.status = 0) AS pendingTeacherReviews,
+                       (SELECT COUNT(*)
+                        FROM sys_user tu
+                        JOIN sys_user_role tur ON tur.user_id = tu.id
+                        JOIN sys_role tr ON tr.id = tur.role_id
+                        JOIN teacher_profile tp ON tp.user_id = tu.id AND tp.deleted = 0
+                        WHERE tu.deleted = 0
+                          AND tu.status = 0
+                          AND tr.role_code = 'TEACHER'
+                          AND tp.status = 2) AS rejectedTeacherReviews
                 FROM sys_user
                 WHERE deleted = 0
                 """);
@@ -119,7 +151,7 @@ public class UserService {
                 """);
     }
 
-    public void updateStatus(Long id, Integer status, Long currentUserId) {
+    public UserStatusUpdateResult updateStatus(Long id, Integer status, Long currentUserId) {
         if (status == null || (status != 0 && status != 1)) {
             throw new IllegalArgumentException("User status must be 0 or 1");
         }
@@ -131,9 +163,51 @@ public class UserService {
         if (rows == 0) {
             throw new IllegalArgumentException("User not found");
         }
+        boolean teacherReviewApproved = false;
         if (status == 1) {
-            notificationService.send(id, "Account enabled", "Your account has been enabled.", "APPROVAL", null);
+            teacherReviewApproved = approvePendingTeacherProfile(jt, id) > 0;
+            notificationService.send(id, "Account enabled", "Your account has been enabled.",
+                    "ACCOUNT_ENABLED", accountProfileLink(), "USER", id);
+        } else {
+            tokenStore.revokeUserTokens(id);
         }
+        return new UserStatusUpdateResult(status, teacherReviewApproved);
+    }
+
+    private int approvePendingTeacherProfile(JdbcTemplate jt, Long userId) {
+        return jt.update("""
+                UPDATE teacher_profile tp
+                SET tp.status = 1, tp.deleted = 0
+                WHERE tp.user_id = ?
+                  AND tp.deleted = 0
+                  AND tp.status IN (0, 2)
+                """, userId);
+    }
+
+    public record UserStatusUpdateResult(Integer status, boolean teacherReviewApproved) {
+    }
+
+    @Transactional
+    public void rejectTeacherReview(Long id, String reason) {
+        JdbcTemplate jt = requireJdbcTemplate();
+        int rows = jt.update("""
+                UPDATE teacher_profile tp
+                JOIN sys_user u ON u.id = tp.user_id AND u.deleted = 0
+                JOIN sys_user_role ur ON ur.user_id = u.id
+                JOIN sys_role r ON r.id = ur.role_id AND r.role_code = 'TEACHER'
+                SET tp.status = 2,
+                    u.status = 0
+                WHERE tp.user_id = ?
+                  AND tp.deleted = 0
+                  AND tp.status = 0
+                """, id);
+        if (rows == 0) {
+            throw new IllegalArgumentException("Pending teacher review not found");
+        }
+        tokenStore.revokeUserTokens(id);
+        notificationService.send(id, "Teacher registration rejected",
+                "Your teacher registration was rejected. Reason: " + trim(reason),
+                "ACCOUNT_REJECTED", accountProfileLink(), "USER", id);
     }
 
     public void resetPassword(Long id, String newPassword) {
@@ -143,6 +217,9 @@ public class UserService {
         if (rows == 0) {
             throw new IllegalArgumentException("User not found");
         }
+        notificationService.send(id, "Password reset", "Your account password has been reset by an administrator.",
+                "ACCOUNT_PASSWORD_RESET", accountSecurityLink(), "USER", id);
+        tokenStore.revokeUserTokens(id);
     }
 
     @Transactional
@@ -155,6 +232,7 @@ public class UserService {
         if (rows == 0) {
             throw new IllegalArgumentException("User not found");
         }
+        tokenStore.revokeUserTokens(id);
         teachingScopeService.clearStudentScope(id);
         jt.update("UPDATE teacher_class_course SET deleted = 1, status = 0 WHERE teacher_user_id = ? AND deleted = 0", id);
         jt.update("DELETE FROM sys_user_role WHERE user_id = ?", id);
@@ -276,7 +354,7 @@ public class UserService {
         int rows = jt.update("""
                 UPDATE teacher_profile
                 SET teacher_no = ?, hire_date = ?, title = ?, college = ?, introduction = ?,
-                    status = 1, deleted = 0
+                    deleted = 0
                 WHERE user_id = ?
                 """, trim(teacherNo), sqlHireDate, trim(title), trim(college), trim(introduction), userId);
         if (rows == 0) {
@@ -354,6 +432,7 @@ public class UserService {
                         JOIN edu_class ec ON ec.id = scm.class_id AND ec.deleted = 0
                         WHERE scm.student_user_id = u.id AND scm.deleted = 0 AND scm.status = 1) AS classMemberships,
                        tp.teacher_no AS teacherNo, tp.hire_date AS hireDate, tp.title AS teacherTitle,
+                       tp.status AS teacherStatus,
                        tp.college AS teacherCollege, tp.introduction,
                        (SELECT GROUP_CONCAT(CONCAT(cc.id, ':', ec.class_name, '/', co.course_name, ':', tcc.teacher_role) ORDER BY cc.id SEPARATOR ',')
                         FROM teacher_class_course tcc
@@ -391,6 +470,13 @@ public class UserService {
         return exists != null && exists > 0;
     }
 
+    private Integer normalizeTeacherReviewStatus(Integer status) {
+        if (status == null || (status != 0 && status != 1 && status != 2)) {
+            return null;
+        }
+        return status;
+    }
+
     private JdbcTemplate requireJdbcTemplate() {
         JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
         if (jdbcTemplate == null) {
@@ -409,5 +495,13 @@ public class UserService {
 
     private String trim(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private String accountProfileLink() {
+        return "/account/profile";
+    }
+
+    private String accountSecurityLink() {
+        return "/account/profile?panel=security";
     }
 }

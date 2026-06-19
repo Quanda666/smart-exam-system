@@ -5,6 +5,7 @@ import java.util.Map;
 
 public class WrongQuestionInfo {
     private Long questionId;
+    private Long examId;
     private String stem;
     private String questionType;
     private String correctAnswer;
@@ -14,8 +15,9 @@ public class WrongQuestionInfo {
     private List<Map<String, Object>> options;
 
 
-    public WrongQuestionInfo(Long questionId, String stem, String questionType, String correctAnswer, String analysis, int wrongCount, String lastWrongTime, List<Map<String,Object>> options) {
+    public WrongQuestionInfo(Long questionId, Long examId, String stem, String questionType, String correctAnswer, String analysis, int wrongCount, String lastWrongTime, List<Map<String,Object>> options) {
         this.questionId = questionId;
+        this.examId = examId;
         this.stem = stem;
         this.questionType = questionType;
         this.correctAnswer = correctAnswer;
@@ -39,6 +41,14 @@ public class WrongQuestionInfo {
 
     public void setQuestionId(Long questionId) {
         this.questionId = questionId;
+    }
+
+    public Long getExamId() {
+        return examId;
+    }
+
+    public void setExamId(Long examId) {
+        this.examId = examId;
     }
 
     public String getStem() {

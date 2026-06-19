@@ -11,6 +11,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -51,15 +52,17 @@ public class PaperService {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         int ownerScope = ownerScope(user);
         Long ownerId = ownerId(user);
-        return jdbcTemplate.queryForList("""
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
                 SELECT p.id, p.subject_id AS subjectId, s.subject_name AS subjectName, p.paper_name AS paperName,
                        p.description, p.total_score AS totalScore, p.status, p.created_by AS createdBy,
                        u.real_name AS creatorName, p.created_at AS createdAt, p.updated_at AS updatedAt,
-                       COUNT(pq.id) AS questionCount
+                       COUNT(DISTINCT pq.id) AS questionCount,
+                       COUNT(DISTINCT e.id) AS examCount
                 FROM paper p
                 JOIN edu_subject s ON s.id = p.subject_id
                 LEFT JOIN sys_user u ON u.id = p.created_by
                 LEFT JOIN paper_question pq ON pq.paper_id = p.id
+                LEFT JOIN exam e ON e.paper_id = p.id AND e.deleted = 0
                 WHERE p.deleted = 0
                   AND (? = 1 OR p.created_by = ? OR p.status = 1)
                   AND (? IS NULL OR p.subject_id = ?)
@@ -69,6 +72,8 @@ public class PaperService {
                          p.created_by, u.real_name, p.created_at, p.updated_at
                 ORDER BY p.id DESC
                 """, ownerScope, ownerId, subjectId, subjectId, status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword));
+        rows.forEach(row -> enrichPaperState(row, user));
+        return rows;
     }
 
     public PageResult<Map<String, Object>> listPapers(String keyword, Long subjectId, Integer status,
@@ -95,11 +100,13 @@ public class PaperService {
                 SELECT p.id, p.subject_id AS subjectId, s.subject_name AS subjectName, p.paper_name AS paperName,
                        p.description, p.total_score AS totalScore, p.status, p.created_by AS createdBy,
                        u.real_name AS creatorName, p.created_at AS createdAt, p.updated_at AS updatedAt,
-                       COUNT(pq.id) AS questionCount
+                       COUNT(DISTINCT pq.id) AS questionCount,
+                       COUNT(DISTINCT e.id) AS examCount
                 FROM paper p
                 JOIN edu_subject s ON s.id = p.subject_id
                 LEFT JOIN sys_user u ON u.id = p.created_by
                 LEFT JOIN paper_question pq ON pq.paper_id = p.id
+                LEFT JOIN exam e ON e.paper_id = p.id AND e.deleted = 0
                 WHERE p.deleted = 0
                   AND (? = 1 OR p.created_by = ? OR p.status = 1)
                   AND (? IS NULL OR p.subject_id = ?)
@@ -111,26 +118,33 @@ public class PaperService {
                 LIMIT ? OFFSET ?
                 """, ownerScope, ownerId, subjectId, subjectId, status, status, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), blankToNull(keyword),
                 safeSize, offset);
+        list.forEach(row -> enrichPaperState(row, user));
         return PageResult.of(list, total == null ? 0 : total, safePage, safeSize);
     }
 
-    public Map<String, Object> getPaper(Long id) {
-        return getPaperById(id);
+    public Map<String, Object> getPaper(Long id, AuthUser user) {
+        return getPaperById(id, user);
     }
 
+    @Transactional
     public Map<String, Object> createPaper(PaperRequest request, AuthUser creator) {
         validatePaperRequest(request);
         BigDecimal totalScore = totalScore(request.getQuestions());
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        int desiredStatus = normalizedPaperStatus(request.getStatus());
         try {
             jdbcTemplate.update("""
                     INSERT INTO paper (subject_id, paper_name, description, total_score, status, created_by)
                     VALUES (?, ?, ?, ?, ?, ?)
-                    """, request.getSubjectId(), trim(request.getPaperName()), trim(request.getDescription()), totalScore, request.getStatus(), creator.getId());
+                    """, request.getSubjectId(), trim(request.getPaperName()), trim(request.getDescription()), totalScore, 0, creator.getId());
             Long id = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
             replacePaperQuestionsInDatabase(id, request.getSubjectId(), request.getQuestions());
             refreshTotalScoreInDatabase(id);
-            return getPaperById(id);
+            if (desiredStatus == 1) {
+                validatePaperPublishable(jdbcTemplate, id);
+                jdbcTemplate.update("UPDATE paper SET status = 1 WHERE id = ? AND deleted = 0", id);
+            }
+            return getPaperById(id, creator);
         } catch (DuplicateKeyException ex) {
             throw new IllegalArgumentException("试卷名称已存在");
         }
@@ -151,44 +165,165 @@ public class PaperService {
         }
     }
 
+    private void enrichPaperState(Map<String, Object> row, AuthUser user) {
+        int status = intValue(row.getOrDefault("status", 0));
+        int examCount = intValue(row.getOrDefault("examCount", 0));
+        int questionCount = intValue(row.getOrDefault("questionCount", 0));
+        boolean owner = canManagePaper(row, user);
+        boolean published = status == 1;
+        boolean referenced = examCount > 0;
+        boolean locked = published || referenced;
+        String lockReason = "";
+        if (referenced) {
+            lockReason = "Referenced by " + examCount + " exam(s)";
+        } else if (published) {
+            lockReason = "Published paper cannot be edited directly";
+        }
+        row.put("examCount", examCount);
+        row.put("locked", locked);
+        row.put("lockReason", lockReason);
+        row.put("canEdit", owner && !locked);
+        row.put("canDelete", owner && !locked);
+        row.put("canPublish", owner && status == 0 && !referenced && questionCount > 0);
+        row.put("canRevoke", owner && status == 1 && !referenced);
+        row.put("canCopy", owner);
+    }
+
+    private boolean canManagePaper(Map<String, Object> row, AuthUser user) {
+        if (user == null || user.hasRole("ADMIN")) {
+            return true;
+        }
+        Object createdBy = row.get("createdBy");
+        return createdBy != null && String.valueOf(user.getId()).equals(String.valueOf(createdBy));
+    }
+
+    private int normalizedPaperStatus(Integer status) {
+        if (status == null) {
+            return 0;
+        }
+        if (status != 0 && status != 1) {
+            throw new IllegalArgumentException("Paper status must be 0 or 1");
+        }
+        return status;
+    }
+
+    private void ensurePaperStructurallyEditable(JdbcTemplate jdbcTemplate, Long id) {
+        List<Integer> statuses = jdbcTemplate.queryForList(
+                "SELECT status FROM paper WHERE id = ? AND deleted = 0", Integer.class, id);
+        if (statuses.isEmpty()) {
+            throw new IllegalArgumentException("Paper does not exist");
+        }
+        if (Objects.equals(statuses.get(0), 1)) {
+            throw new IllegalStateException("Published paper cannot be edited or deleted directly");
+        }
+        ensurePaperNotReferenced(jdbcTemplate, id, "Paper is referenced by exams and cannot be changed");
+    }
+
+    private void ensurePaperNotReferenced(JdbcTemplate jdbcTemplate, Long id, String message) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM exam WHERE paper_id = ? AND deleted = 0", Integer.class, id);
+        if (count != null && count > 0) {
+            throw new IllegalStateException(message);
+        }
+    }
+
+    private int currentPaperStatus(JdbcTemplate jdbcTemplate, Long id) {
+        List<Integer> statuses = jdbcTemplate.queryForList(
+                "SELECT status FROM paper WHERE id = ? AND deleted = 0", Integer.class, id);
+        if (statuses.isEmpty()) {
+            throw new IllegalArgumentException("Paper does not exist");
+        }
+        return statuses.get(0) == null ? 0 : statuses.get(0);
+    }
+
+    private void validatePaperPublishable(JdbcTemplate jdbcTemplate, Long id) {
+        Integer paperCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM paper WHERE id = ? AND deleted = 0", Integer.class, id);
+        if (paperCount == null || paperCount == 0) {
+            throw new IllegalArgumentException("Paper does not exist");
+        }
+        Integer questionCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM paper_question WHERE paper_id = ?", Integer.class, id);
+        if (questionCount == null || questionCount == 0) {
+            throw new IllegalStateException("Paper must contain at least one question before publishing");
+        }
+        Integer invalidQuestions = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM paper_question pq
+                LEFT JOIN question q ON q.id = pq.question_id
+                WHERE pq.paper_id = ?
+                  AND (q.id IS NULL OR q.deleted = 1 OR q.status <> 1 OR q.review_status <> 'APPROVED')
+                """, Integer.class, id);
+        if (invalidQuestions != null && invalidQuestions > 0) {
+            throw new IllegalStateException("Paper contains unavailable or unapproved questions");
+        }
+        Integer missingSnapshots = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM paper_question pq
+                LEFT JOIN question_version qv ON qv.id = pq.question_version_id
+                WHERE pq.paper_id = ? AND (pq.question_version_id IS NULL OR qv.id IS NULL)
+                """, Integer.class, id);
+        if (missingSnapshots != null && missingSnapshots > 0) {
+            throw new IllegalStateException("Paper question version snapshots are incomplete");
+        }
+    }
+
+    @Transactional
     public Map<String, Object> updatePaper(Long id, PaperRequest request, AuthUser updater) {
         validatePaperRequest(request);
         BigDecimal totalScore = totalScore(request.getQuestions());
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         requirePaperOwner(jdbcTemplate, id, updater);
+        ensurePaperStructurallyEditable(jdbcTemplate, id);
+        int desiredStatus = normalizedPaperStatus(request.getStatus());
         try {
             int rows = jdbcTemplate.update("""
                     UPDATE paper
                     SET subject_id = ?, paper_name = ?, description = ?, total_score = ?, status = ?
                     WHERE id = ? AND deleted = 0
-                    """, request.getSubjectId(), trim(request.getPaperName()), trim(request.getDescription()), totalScore, request.getStatus(), id);
+                    """, request.getSubjectId(), trim(request.getPaperName()), trim(request.getDescription()), totalScore, 0, id);
             if (rows == 0) {
                 throw new IllegalArgumentException("试卷不存在");
             }
             replacePaperQuestionsInDatabase(id, request.getSubjectId(), request.getQuestions());
             refreshTotalScoreInDatabase(id);
-            return getPaperById(id);
+            if (desiredStatus == 1) {
+                validatePaperPublishable(jdbcTemplate, id);
+                jdbcTemplate.update("UPDATE paper SET status = 1 WHERE id = ? AND deleted = 0", id);
+            }
+            return getPaperById(id, updater);
         } catch (DuplicateKeyException ex) {
             throw new IllegalArgumentException("试卷名称已存在");
         }
     }
 
+    @Transactional
     public Map<String, Object> updateStatus(Long id, Integer status, AuthUser user) {
-        if (status == null || (status != 0 && status != 1)) {
-            throw new IllegalArgumentException("试卷状态只能为0或1");
-        }
+        int nextStatus = normalizedPaperStatus(status);
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         requirePaperOwner(jdbcTemplate, id, user);
-        int rows = jdbcTemplate.update("UPDATE paper SET status = ? WHERE id = ? AND deleted = 0", status, id);
+        int currentStatus = currentPaperStatus(jdbcTemplate, id);
+        if (currentStatus == nextStatus) {
+            return getPaperById(id, user);
+        }
+        if (nextStatus == 1) {
+            ensurePaperNotReferenced(jdbcTemplate, id, "Paper is referenced by exams and cannot be published");
+            validatePaperPublishable(jdbcTemplate, id);
+        } else {
+            ensurePaperNotReferenced(jdbcTemplate, id, "Paper is referenced by exams and cannot be revoked");
+        }
+        int rows = jdbcTemplate.update("UPDATE paper SET status = ? WHERE id = ? AND deleted = 0", nextStatus, id);
         if (rows == 0) {
             throw new IllegalArgumentException("试卷不存在");
         }
-        return getPaperById(id);
+        return getPaperById(id, user);
     }
 
+    @Transactional
     public Map<String, Object> deletePaper(Long id, AuthUser user) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         requirePaperOwner(jdbcTemplate, id, user);
+        ensurePaperStructurallyEditable(jdbcTemplate, id);
         int rows = jdbcTemplate.update("UPDATE paper SET deleted = 1 WHERE id = ? AND deleted = 0", id);
         if (rows == 0) {
             throw new IllegalArgumentException("试卷不存在");
@@ -196,6 +331,59 @@ public class PaperService {
         return Map.of("deleted", true, "id", id);
     }
 
+    @Transactional
+    public Map<String, Object> copyPaper(Long sourceId, AuthUser copier) {
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        requirePaperOwner(jdbcTemplate, sourceId, copier);
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
+                SELECT subject_id AS subjectId, paper_name AS paperName, description
+                FROM paper
+                WHERE id = ? AND deleted = 0
+                """, sourceId);
+        if (rows.isEmpty()) {
+            throw new IllegalArgumentException("Paper does not exist");
+        }
+        List<Map<String, Object>> questions = listPaperQuestionsFromDatabase(sourceId);
+        if (questions.isEmpty()) {
+            throw new IllegalStateException("Source paper has no questions to copy");
+        }
+        Map<String, Object> source = rows.get(0);
+        Long subjectId = longValue(source.get("subjectId"));
+        PaperRequest request = new PaperRequest();
+        request.setSubjectId(subjectId);
+        request.setPaperName(nextCopyPaperName(jdbcTemplate, String.valueOf(source.get("paperName"))));
+        request.setDescription(trim((String) source.get("description")));
+        request.setStatus(0);
+        List<PaperQuestionRequest> copiedQuestions = new ArrayList<>();
+        int sort = 1;
+        for (Map<String, Object> questionRow : questions) {
+            PaperQuestionRequest question = new PaperQuestionRequest();
+            question.setQuestionId(longValue(questionRow.get("questionId")));
+            question.setScore(bigDecimalValue(questionRow.get("score")));
+            question.setSortOrder(intValue(questionRow.getOrDefault("sortOrder", sort)));
+            copiedQuestions.add(question);
+            sort++;
+        }
+        request.setQuestions(copiedQuestions);
+        return createPaper(request, copier);
+    }
+
+    private String nextCopyPaperName(JdbcTemplate jdbcTemplate, String sourceName) {
+        String normalized = trim(sourceName);
+        String base = normalized == null || normalized.isBlank() ? "Paper Copy" : normalized + " Copy";
+        base = truncate(base, 112);
+        for (int index = 1; index <= 999; index++) {
+            String candidate = index == 1 ? base : truncate(base, 112) + " " + index;
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM paper WHERE paper_name = ?", Integer.class, candidate);
+            if (count == null || count == 0) {
+                return candidate;
+            }
+        }
+        return truncate(base, 100) + " " + System.currentTimeMillis();
+    }
+
+    @Transactional
     public Map<String, Object> generatePaper(GeneratePaperRequest request, AuthUser creator) {
         PaperRequest paperRequest = new PaperRequest();
         paperRequest.setSubjectId(request.getSubjectId());
@@ -223,6 +411,7 @@ public class PaperService {
             List<Map<String, Object>> candidates = new ArrayList<>(questionBankService
                     .listQuestions(null, request.getSubjectId(), rule.getKnowledgePointId(), type, difficulty, 1, null)
                     .stream()
+                    .filter(row -> "APPROVED".equals(String.valueOf(row.get("reviewStatus"))))
                     .filter(row -> !selectedIds.contains(longValue(row.get("id"))))
                     .toList());
             Collections.shuffle(candidates);
@@ -268,7 +457,8 @@ public class PaperService {
         if (!Objects.equals(longValue(question.get("subjectId")), subjectId)) {
             throw new IllegalArgumentException("题目不属于当前试卷科目");
         }
-        if (!Objects.equals(intValue(question.get("status")), 1)) {
+        if (!Objects.equals(intValue(question.get("status")), 1)
+                || !"APPROVED".equals(String.valueOf(question.get("reviewStatus")))) {
             throw new IllegalArgumentException("草稿题目不可组卷");
         }
     }
@@ -288,12 +478,13 @@ public class PaperService {
         }
     }
 
-    private Map<String, Object> getPaperById(Long id) {
+    private Map<String, Object> getPaperById(Long id, AuthUser user) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
                 SELECT p.id, p.subject_id AS subjectId, s.subject_name AS subjectName, p.paper_name AS paperName,
                        p.description, p.total_score AS totalScore, p.status, p.created_by AS createdBy,
-                       u.real_name AS creatorName, p.created_at AS createdAt, p.updated_at AS updatedAt
+                       u.real_name AS creatorName, p.created_at AS createdAt, p.updated_at AS updatedAt,
+                       (SELECT COUNT(*) FROM exam e WHERE e.paper_id = p.id AND e.deleted = 0) AS examCount
                 FROM paper p
                 JOIN edu_subject s ON s.id = p.subject_id
                 LEFT JOIN sys_user u ON u.id = p.created_by
@@ -305,18 +496,25 @@ public class PaperService {
         Map<String, Object> row = rows.get(0);
         row.put("questions", listPaperQuestionsFromDatabase(id));
         row.put("questionCount", ((List<?>) row.get("questions")).size());
+        enrichPaperState(row, user);
         return row;
     }
 
     private List<Map<String, Object>> listPaperQuestionsFromDatabase(Long paperId) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         return jdbcTemplate.queryForList("""
-                SELECT pq.id, pq.paper_id AS paperId, pq.question_id AS questionId, pq.score, pq.sort_order AS sortOrder,
-                       q.question_type AS questionType, q.difficulty, q.stem, q.analysis,
+                SELECT pq.id, pq.paper_id AS paperId, pq.question_id AS questionId,
+                       pq.question_version_id AS questionVersionId, COALESCE(qv.version_no, q.version_no) AS versionNo,
+                       pq.score, pq.sort_order AS sortOrder,
+                       COALESCE(qv.question_type, q.question_type) AS questionType,
+                       COALESCE(qv.difficulty, q.difficulty) AS difficulty,
+                       COALESCE(qv.stem, q.stem) AS stem,
+                       COALESCE(qv.analysis, q.analysis) AS analysis,
                        q.subject_id AS subjectId, s.subject_name AS subjectName,
                        q.knowledge_point_id AS knowledgePointId, kp.point_name AS knowledgePointName
                 FROM paper_question pq
                 JOIN question q ON q.id = pq.question_id
+                LEFT JOIN question_version qv ON qv.id = pq.question_version_id
                 JOIN edu_subject s ON s.id = q.subject_id
                 LEFT JOIN edu_knowledge_point kp ON kp.id = q.knowledge_point_id
                 WHERE pq.paper_id = ? AND q.deleted = 0
@@ -330,10 +528,21 @@ public class PaperService {
         for (PaperQuestionRequest question : questions) {
             validateQuestionUsable(subjectId, question.getQuestionId());
             jdbcTemplate.update("""
-                    INSERT INTO paper_question (paper_id, question_id, score, sort_order)
-                    VALUES (?, ?, ?, ?)
-                    """, paperId, question.getQuestionId(), question.getScore(), question.getSortOrder());
+                    INSERT INTO paper_question (paper_id, question_id, question_version_id, score, sort_order)
+                    VALUES (?, ?, ?, ?, ?)
+                    """, paperId, question.getQuestionId(), currentQuestionVersionId(jdbcTemplate, question.getQuestionId()),
+                    question.getScore(), question.getSortOrder());
         }
+    }
+
+    private Long currentQuestionVersionId(JdbcTemplate jdbcTemplate, Long questionId) {
+        List<Long> ids = jdbcTemplate.queryForList("""
+                SELECT qv.id
+                FROM question q
+                JOIN question_version qv ON qv.question_id = q.id AND qv.version_no = q.version_no
+                WHERE q.id = ?
+                """, Long.class, questionId);
+        return ids.isEmpty() ? null : ids.get(0);
     }
 
     private void refreshTotalScoreInDatabase(Long paperId) {
@@ -381,6 +590,13 @@ public class PaperService {
         return value == null ? null : value.trim();
     }
 
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
+    }
+
     private Long longValue(Object value) {
         if (value instanceof Number number) {
             return number.longValue();
@@ -399,5 +615,18 @@ public class PaperService {
             return null;
         }
         return Integer.parseInt(String.valueOf(value));
+    }
+
+    private BigDecimal bigDecimalValue(Object value) {
+        if (value instanceof BigDecimal decimal) {
+            return decimal;
+        }
+        if (value instanceof Number number) {
+            return BigDecimal.valueOf(number.doubleValue());
+        }
+        if (value == null) {
+            return BigDecimal.ZERO;
+        }
+        return new BigDecimal(String.valueOf(value));
     }
 }

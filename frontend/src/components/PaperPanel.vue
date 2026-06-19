@@ -25,6 +25,23 @@
       </div>
     </div>
 
+    <el-alert
+      v-if="lastPaperOperationAudit"
+      class="paper-operation-audit"
+      type="success"
+      :closable="true"
+      show-icon
+      @close="lastPaperOperationAudit = null"
+    >
+      <template #title>
+        <div class="paper-operation-audit-content">
+          <span>{{ lastPaperOperationAudit.action }} audit recorded: {{ paperOperationAuditText(lastPaperOperationAudit.operationLogIds) }}</span>
+          <el-button link type="primary" :icon="CopyDocument" @click="copyLatestPaperOperationAuditId">Copy audit ID</el-button>
+          <el-button link type="primary" :icon="CopyDocument" @click="copyLatestPaperOperationAuditLink">Copy audit link</el-button>
+        </div>
+      </template>
+    </el-alert>
+
     <div v-if="canManagePapers" class="paper-builder-grid">
       <section class="paper-card builder-card">
         <div class="paper-card-header">
@@ -249,7 +266,7 @@
       </div>
 
       <el-table ref="tableRef" :data="papers" border @selection-change="onSelectionChange">
-        <el-table-column v-if="canManagePapers" type="selection" width="46" />
+        <el-table-column v-if="canManagePapers" type="selection" width="46" :selectable="canSelectPaper" />
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column label="试卷" min-width="260" show-overflow-tooltip>
           <template #default="scope">
@@ -266,15 +283,25 @@
             <el-tag :type="scope.row.status === 1 ? 'success' : 'info'">{{ statusText(scope.row.status) }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="锁定" width="150">
+          <template #default="scope">
+            <div class="paper-lock-cell">
+              <el-tag v-if="scope.row.locked" size="small" type="warning">已锁定</el-tag>
+              <el-tag v-else size="small" type="success">可编辑</el-tag>
+              <span v-if="Number(scope.row.examCount || 0) > 0">{{ scope.row.examCount }} 场考试</span>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column prop="creatorName" label="创建人" width="120" />
-        <el-table-column v-if="canManagePapers" label="操作" width="280" fixed="right">
+        <el-table-column v-if="canManagePapers" label="操作" width="340" fixed="right">
           <template #default="scope">
             <el-button link type="primary" :icon="View" @click="previewPaper(Number(scope.row.id))">预览</el-button>
-            <el-button link type="primary" :icon="EditPen" @click="editPaper(Number(scope.row.id))">编辑</el-button>
-            <el-button link type="warning" @click="togglePaperStatus(scope.row as PaperInfo)">
+            <el-button link type="primary" :icon="CopyDocument" :disabled="!canCopyPaper(scope.row as PaperInfo)" @click="duplicatePaper(scope.row as PaperInfo)">复制</el-button>
+            <el-button link type="primary" :icon="EditPen" :disabled="!canEditPaper(scope.row as PaperInfo)" @click="editPaper(Number(scope.row.id))">编辑</el-button>
+            <el-button link type="warning" :disabled="!canTogglePaperStatus(scope.row as PaperInfo)" @click="togglePaperStatus(scope.row as PaperInfo)">
               {{ scope.row.status === 1 ? '撤回' : '发布' }}
             </el-button>
-            <el-button link type="danger" :icon="Delete" @click="removePaper(Number(scope.row.id))">删除</el-button>
+            <el-button link type="danger" :icon="Delete" :disabled="!canDeletePaper(scope.row as PaperInfo)" @click="removePaper(scope.row as PaperInfo)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -320,6 +347,7 @@ import {
   ArrowUp,
   Check,
   Close,
+  CopyDocument,
   Delete,
   Download,
   EditPen,
@@ -330,9 +358,14 @@ import {
   View
 } from '@element-plus/icons-vue';
 import { exportToCsv } from '../utils/exportCsv';
+import {
+  copyOperationLogIdToClipboard,
+  copyOperationLogLinkToClipboard
+} from '../utils/clipboard';
 import { listKnowledgePoints, listSubjects, type KnowledgePointInfo, type SubjectInfo } from '../api/basic';
 import { listQuestions, type Difficulty, type QuestionInfo, type QuestionType } from '../api/question';
 import {
+  copyPaper,
   createPaper,
   deletePaper,
   fetchPaperSummary,
@@ -384,6 +417,7 @@ const creationMode = ref<'manual' | 'auto'>('manual');
 const tableRef = ref<{ clearSelection: () => void }>();
 const selectedPapers = ref<PaperInfo[]>([]);
 const exporting = ref(false);
+const lastPaperOperationAudit = ref<{ action: string; operationLogIds: Array<number | string> } | null>(null);
 
 const query = reactive<{ keyword: string; subjectId: number | null; status: number | null }>({
   keyword: '',
@@ -537,6 +571,38 @@ async function loadSummary() {
   }
 }
 
+function rememberPaperOperationAudit(action: string, ids: Array<number | string | null | undefined>) {
+  const operationLogIds = ids.filter((id): id is number | string => id !== null && id !== undefined && id !== '');
+  if (operationLogIds.length === 0) return;
+  lastPaperOperationAudit.value = { action, operationLogIds };
+}
+
+function paperOperationAuditText(ids: Array<number | string>) {
+  return ids.map((id) => `#${id}`).join(', ');
+}
+
+async function copyLatestPaperOperationAuditId() {
+  const ids = lastPaperOperationAudit.value?.operationLogIds;
+  if (!ids?.length) return;
+  try {
+    await copyOperationLogIdToClipboard(ids.join(','));
+    ElMessage.success('Audit ID copied');
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : 'Audit ID copy failed');
+  }
+}
+
+async function copyLatestPaperOperationAuditLink() {
+  const id = lastPaperOperationAudit.value?.operationLogIds[0];
+  if (!id) return;
+  try {
+    await copyOperationLogLinkToClipboard(id);
+    ElMessage.success('Audit link copied');
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : 'Audit link copy failed');
+  }
+}
+
 async function loadAvailableQuestions() {
   if (!paperForm.subjectId) {
     availableQuestions.value = [];
@@ -660,10 +726,14 @@ async function savePaper() {
   try {
     let savedPaper: PaperInfo;
     if (editingPaperId.value) {
-      savedPaper = (await updatePaper(editingPaperId.value, payload)).data;
+      const response = await updatePaper(editingPaperId.value, payload);
+      savedPaper = response.data;
+      rememberPaperOperationAudit('Update paper', [response.data.operationLogId]);
       ElMessage.success('试卷已更新');
     } else {
-      savedPaper = (await createPaper(payload)).data;
+      const response = await createPaper(payload);
+      savedPaper = response.data;
+      rememberPaperOperationAudit('Create paper', [response.data.operationLogId]);
       ElMessage.success('试卷已创建');
     }
     preview.value = savedPaper;
@@ -701,10 +771,36 @@ function buildPaperPayload(): PaperPayload | null {
   };
 }
 
+function canEditPaper(row: PaperInfo) {
+  return row.canEdit ?? (row.status === 0 && !row.locked);
+}
+
+function canDeletePaper(row: PaperInfo) {
+  return row.canDelete ?? (row.status === 0 && !row.locked);
+}
+
+function canTogglePaperStatus(row: PaperInfo) {
+  return row.status === 1
+    ? (row.canRevoke ?? !row.locked)
+    : (row.canPublish ?? !row.locked);
+}
+
+function canCopyPaper(row: PaperInfo) {
+  return row.canCopy ?? true;
+}
+
+function canSelectPaper(row: PaperInfo) {
+  return canDeletePaper(row) || canTogglePaperStatus(row);
+}
+
 async function editPaper(id: number) {
   try {
     const response = await getPaper(id);
     const paper = response.data;
+    if (!canEditPaper(paper)) {
+      ElMessage.warning(paper.lockReason || '该试卷已锁定，不能直接编辑');
+      return;
+    }
     creationMode.value = 'manual';
     editingPaperId.value = paper.id;
     paperForm.subjectId = paper.subjectId;
@@ -730,10 +826,40 @@ async function previewPaper(id: number) {
   }
 }
 
+async function duplicatePaper(row: PaperInfo) {
+  if (!canCopyPaper(row)) {
+    ElMessage.warning('当前账号不能复制该试卷');
+    return;
+  }
+  try {
+    const response = await copyPaper(row.id);
+    const paper = response.data;
+    rememberPaperOperationAudit('Copy paper', [response.data.operationLogId]);
+    creationMode.value = 'manual';
+    editingPaperId.value = paper.id;
+    paperForm.subjectId = paper.subjectId;
+    paperForm.paperName = paper.paperName;
+    paperForm.description = paper.description || '';
+    paperForm.status = 0;
+    await loadAvailableQuestions();
+    selectedQuestions.value = (paper.questions || []).map((item, index) => ({ ...item, sortOrder: item.sortOrder || index + 1 }));
+    normalizeSelectedQuestionOrder();
+    ElMessage.success('已复制为新草稿，可继续编辑');
+    await loadPapers();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '试卷复制失败');
+  }
+}
+
 async function togglePaperStatus(row: PaperInfo) {
   const nextStatus = row.status === 1 ? 0 : 1;
+  if (!canTogglePaperStatus(row)) {
+    ElMessage.warning(row.lockReason || '当前试卷状态不允许该操作');
+    return;
+  }
   try {
-    await updatePaperStatus(row.id, nextStatus);
+    const response = await updatePaperStatus(row.id, nextStatus);
+    rememberPaperOperationAudit(nextStatus === 1 ? 'Publish paper' : 'Revoke paper', [response.data.operationLogId]);
     ElMessage.success(nextStatus === 1 ? '试卷已发布' : '试卷已撤回');
     await loadPapers();
   } catch (error) {
@@ -741,7 +867,11 @@ async function togglePaperStatus(row: PaperInfo) {
   }
 }
 
-async function removePaper(id: number) {
+async function removePaper(row: PaperInfo) {
+  if (!canDeletePaper(row)) {
+    ElMessage.warning(row.lockReason || '该试卷已锁定，不能删除');
+    return;
+  }
   try {
     await ElMessageBox.confirm('确认删除该试卷吗？', '删除确认', {
       type: 'warning',
@@ -752,7 +882,8 @@ async function removePaper(id: number) {
     return;
   }
   try {
-    await deletePaper(id);
+    const response = await deletePaper(row.id);
+    rememberPaperOperationAudit('Delete paper', [response.data.operationLogId]);
     ElMessage.success('试卷已删除');
     await loadPapers();
   } catch (error) {
@@ -769,7 +900,7 @@ function clearSelection() {
 }
 
 async function batchSetStatus(next: number) {
-  const rows = selectedPapers.value;
+  const rows = selectedPapers.value.filter((row) => next === 1 ? (row.canPublish ?? !row.locked) : (row.canRevoke ?? !row.locked));
   if (rows.length === 0) return;
   try {
     await ElMessageBox.confirm(`确认${next === 1 ? '发布' : '撤回'}选中的 ${rows.length} 份试卷吗？`, '批量操作', { type: 'warning' });
@@ -777,7 +908,8 @@ async function batchSetStatus(next: number) {
     return;
   }
   try {
-    await Promise.all(rows.map((row) => updatePaperStatus(row.id, next)));
+    const responses = await Promise.all(rows.map((row) => updatePaperStatus(row.id, next)));
+    rememberPaperOperationAudit(next === 1 ? 'Batch publish papers' : 'Batch revoke papers', responses.map((response) => response.data.operationLogId));
     ElMessage.success(`已${next === 1 ? '发布' : '撤回'} ${rows.length} 份试卷`);
     clearSelection();
     await loadPapers();
@@ -787,7 +919,7 @@ async function batchSetStatus(next: number) {
 }
 
 async function batchDelete() {
-  const rows = selectedPapers.value;
+  const rows = selectedPapers.value.filter((row) => canDeletePaper(row));
   if (rows.length === 0) return;
   try {
     await ElMessageBox.confirm(`确认删除选中的 ${rows.length} 份试卷吗？`, '批量删除', {
@@ -799,7 +931,8 @@ async function batchDelete() {
     return;
   }
   try {
-    await Promise.all(rows.map((row) => deletePaper(row.id)));
+    const responses = await Promise.all(rows.map((row) => deletePaper(row.id)));
+    rememberPaperOperationAudit('Batch delete papers', responses.map((response) => response.data.operationLogId));
     ElMessage.success(`已删除 ${rows.length} 份试卷`);
     clearSelection();
     await loadPapers();
@@ -922,6 +1055,7 @@ async function submitGeneratePaper() {
       rules
     });
     ElMessage.success('规则组卷成功');
+    rememberPaperOperationAudit('Generate paper', [response.data.operationLogId]);
     preview.value = response.data;
     previewVisible.value = true;
     resetGenerateForm();
@@ -968,6 +1102,17 @@ function statusText(status: number) {
   grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
   gap: 16px;
   align-items: stretch;
+}
+
+.paper-operation-audit {
+  margin-bottom: 14px;
+}
+
+.paper-operation-audit-content {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .paper-card {
@@ -1278,6 +1423,18 @@ function statusText(status: number) {
 .paper-name-cell span {
   color: #64748b;
   font-size: 12px;
+}
+
+.paper-lock-cell {
+  display: grid;
+  gap: 4px;
+  align-items: center;
+}
+
+.paper-lock-cell span {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.2;
 }
 
 .preview-title {

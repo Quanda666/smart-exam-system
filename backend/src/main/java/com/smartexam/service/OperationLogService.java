@@ -3,9 +3,14 @@ package com.smartexam.service;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+
+import java.sql.PreparedStatement;
+import java.sql.Statement;
 
 /**
  * 操作日志记录服务。
@@ -22,17 +27,31 @@ public class OperationLogService {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
     }
 
-    public void record(Long operatorId, String operatorName, String action, String target, String detail) {
+    public Long record(Long operatorId, String operatorName, String action, String target, String detail) {
         try {
             JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
             if (jdbcTemplate == null) {
-                return;
+                return null;
             }
-            jdbcTemplate.update(
-                    "INSERT INTO operation_log (operator_id, operator_name, action, target, detail, ip) VALUES (?, ?, ?, ?, ?, ?)",
-                    operatorId, operatorName, action, target, detail, currentIp());
+            KeyHolder keyHolder = new GeneratedKeyHolder();
+            String ip = currentIp();
+            jdbcTemplate.update(connection -> {
+                PreparedStatement statement = connection.prepareStatement(
+                        "INSERT INTO operation_log (operator_id, operator_name, action, target, detail, ip) VALUES (?, ?, ?, ?, ?, ?)",
+                        Statement.RETURN_GENERATED_KEYS);
+                statement.setObject(1, operatorId);
+                statement.setString(2, operatorName);
+                statement.setString(3, action);
+                statement.setString(4, target);
+                statement.setString(5, detail);
+                statement.setString(6, ip);
+                return statement;
+            }, keyHolder);
+            Number key = keyHolder.getKey();
+            return key == null ? null : key.longValue();
         } catch (Exception ignored) {
             // 操作日志属于辅助能力，记录失败时静默忽略，不影响主流程。
+            return null;
         }
     }
 

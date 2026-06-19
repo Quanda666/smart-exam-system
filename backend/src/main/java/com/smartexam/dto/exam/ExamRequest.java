@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -14,6 +15,7 @@ import java.util.List;
 public class ExamRequest {
 
     @NotNull(message = "Paper id is required")
+    @Positive(message = "paperId must be positive")
     private Long paperId;
 
     @NotBlank(message = "Exam name is required")
@@ -40,11 +42,11 @@ public class ExamRequest {
     @DecimalMin(value = "0.0", message = "Pass score must be greater than or equal to 0")
     private BigDecimal passScore;
 
-    private List<Long> classIds = new ArrayList<>();
+    private List<@Positive(message = "classId must be positive") Long> classIds = new ArrayList<>();
 
-    private List<Long> classCourseIds = new ArrayList<>();
+    private List<@Positive(message = "classCourseId must be positive") Long> classCourseIds = new ArrayList<>();
 
-    private List<Long> studentUserIds = new ArrayList<>();
+    private List<@Positive(message = "studentUserId must be positive") Long> studentUserIds = new ArrayList<>();
 
     public Long getPaperId() {
         return paperId;

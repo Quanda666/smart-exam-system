@@ -36,17 +36,17 @@ public class HealthController {
         JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
         if (jdbcTemplate == null) {
             database.put("connected", false);
-            database.put("message", "JdbcTemplate 未初始化");
+            database.put("message", "JdbcTemplate is not initialized");
             return database;
         }
 
         try {
             Integer result = jdbcTemplate.queryForObject("SELECT 1", Integer.class);
             database.put("connected", result != null && result == 1);
-            database.put("message", "数据库连接正常");
+            database.put("message", "Database connection is healthy");
         } catch (Exception ex) {
             database.put("connected", false);
-            database.put("message", "数据库未连接或不可用：" + ex.getClass().getSimpleName());
+            database.put("message", "Database is unavailable: " + ex.getClass().getSimpleName());
         }
         return database;
     }

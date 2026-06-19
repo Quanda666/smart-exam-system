@@ -1,5 +1,5 @@
 import { postForm, postJson } from './request';
-import type { Difficulty, QuestionInfo, QuestionOption, QuestionPayload, QuestionType } from './question';
+import type { Difficulty, QuestionInfo, QuestionPayload, QuestionType } from './question';
 
 export interface SuggestReviewPayload {
   question: string;
@@ -37,18 +37,13 @@ export interface MaterialQuestionPayload extends QuestionDocumentPayload {
 
 export interface SaveGeneratedQuestionsResult {
   savedCount: number;
+  questionReviewLogIds?: Array<number | string>;
   questions: QuestionInfo[];
 }
 
 export interface WrongQuestionExplainPayload {
-  questionId?: number;
-  stem: string;
-  questionType?: string;
-  studentAnswer?: string;
-  correctAnswer?: string;
-  analysis?: string;
-  wrongCount?: number;
-  options?: QuestionOption[];
+  questionId: number;
+  examId: number;
 }
 
 export function generateQuestionDrafts(payload: GenerateQuestionBatchPayload) {

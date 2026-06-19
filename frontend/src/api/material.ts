@@ -1,4 +1,4 @@
-import { getJson, postForm, postJson } from './request';
+import { deleteJson, getJson, postForm, postJson } from './request';
 import type { AiGeneratedQuestion } from './ai';
 import type { Difficulty, QuestionType } from './question';
 
@@ -43,6 +43,24 @@ export interface CourseMaterialDetail extends CourseMaterial {
   chunks: MaterialChunk[];
 }
 
+export interface MaterialOperationAudit {
+  operationLogId?: number | string | null;
+}
+
+export type CourseMaterialUploadResult = CourseMaterialDetail & MaterialOperationAudit;
+
+export interface MaterialQuestionGenerateResult extends MaterialOperationAudit {
+  generatedCount: number;
+  questions: AiGeneratedQuestion[];
+}
+
+export interface MaterialDeleteResult extends MaterialOperationAudit {
+  deleted: boolean;
+  id: number;
+  title?: string;
+  fileName?: string;
+}
+
 export interface MaterialQuestionGeneratePayload {
   knowledgePointId?: number | null;
   knowledgePointName?: string | null;
@@ -57,7 +75,7 @@ export function uploadCourseMaterial(file: File, subjectId: number, title?: stri
   form.set('file', file);
   form.set('subjectId', String(subjectId));
   if (title) form.set('title', title);
-  return postForm<CourseMaterialDetail>('/api/materials', form);
+  return postForm<CourseMaterialUploadResult>('/api/materials', form);
 }
 
 export function listCourseMaterials(query: { keyword?: string; subjectId?: number | null } = {}) {
@@ -73,5 +91,9 @@ export function fetchCourseMaterial(id: number) {
 }
 
 export function generateQuestionsFromLibraryMaterial(id: number, payload: MaterialQuestionGeneratePayload) {
-  return postJson<AiGeneratedQuestion[], MaterialQuestionGeneratePayload>(`/api/materials/${id}/questions/generate`, payload);
+  return postJson<MaterialQuestionGenerateResult, MaterialQuestionGeneratePayload>(`/api/materials/${id}/questions/generate`, payload);
+}
+
+export function deleteCourseMaterial(id: number) {
+  return deleteJson<MaterialDeleteResult>(`/api/materials/${id}`);
 }

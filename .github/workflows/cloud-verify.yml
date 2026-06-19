@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  verify:
+  quality-gates:
     runs-on: ubuntu-latest
 
     services:
@@ -17,14 +17,37 @@ jobs:
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: smart_exam_system
+          MYSQL_USER: smartexam
+          MYSQL_PASSWORD: smartexam123
           TZ: Asia/Shanghai
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -usmartexam -psmartexam123"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      MYSQL_URL: jdbc:mysql://127.0.0.1:3306/smart_exam_system?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      MYSQL_USERNAME: smartexam
+      MYSQL_PASSWORD: smartexam123
+      DB_INIT_MODE: always
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+      REDIS_HEALTH_ENABLED: true
+      EXAM_DRAFT_REDIS_ENABLED: true
+      AI_MOCK_ENABLED: true
+      PROMETHEUS_METRICS_ENABLED: true
 
     steps:
       - name: Checkout
@@ -44,85 +67,64 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install MySQL client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mysql-client
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
 
-      - name: Initialize database
+      - name: Validate PowerShell scripts
+        shell: pwsh
         run: |
-          # 使用自包含初始化脚本（含 CREATE DATABASE + USE + 建表 + 初始数据），
-          # 与老师本地验收用的 docs/init.sql 为同一份，CI 顺带验证其可用性。
-          mysql -h 127.0.0.1 -P 3306 -uroot -proot < docs/init.sql
+          $files = @(
+            'scripts/backup-compose-data.ps1',
+            'scripts/restore-mysql-backup.ps1',
+            'scripts/run-exam-load-smoke.ps1',
+            'scripts/check-deploy-config.ps1',
+            'scripts/check-ops-health.ps1',
+            'scripts/verify-attempt-resilience.ps1',
+            'scripts/prepare-attempt-resilience-fixture.ps1',
+            'scripts/run-attempt-resilience-acceptance.ps1',
+            'scripts/cleanup-attempt-resilience-fixtures.ps1'
+          )
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              Write-Host $file
+              $errors | ForEach-Object { Write-Host $_.Message }
+              exit 1
+            }
+          }
+
+      - name: Validate deployment config
+        shell: pwsh
+        run: ./scripts/check-deploy-config.ps1 -UseExample
 
       - name: Backend tests
         working-directory: backend
-        env:
-          MYSQL_URL: jdbc:mysql://127.0.0.1:3306/smart_exam_system?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-          MYSQL_USERNAME: root
-          MYSQL_PASSWORD: root
-          AI_MOCK_ENABLED: true
         run: mvn -B test
 
-      - name: Start backend and verify APIs
+      - name: Frontend build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Start backend and verify health
         working-directory: backend
-        env:
-          MYSQL_URL: jdbc:mysql://127.0.0.1:3306/smart_exam_system?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-          MYSQL_USERNAME: root
-          MYSQL_PASSWORD: root
-          AI_MOCK_ENABLED: true
         run: |
           nohup mvn -B spring-boot:run > backend.log 2>&1 &
-          for i in {1..40}; do
-            if curl -fsS http://127.0.0.1:8080/api/health; then
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:8080/api/health > /tmp/health.json; then
               break
             fi
             sleep 3
           done
-          HEALTH_JSON=$(curl -fsS http://127.0.0.1:8080/api/health)
-          echo "$HEALTH_JSON"
-          echo "$HEALTH_JSON" | grep '"connected":true'
-          curl -fsS http://127.0.0.1:8080/api/ai/status | grep '"mode":"MOCK"'
-          curl -fsS http://127.0.0.1:8080/api/auth/register-options | grep '"value":"STUDENT"'
-          REG_JSON=$(curl -fsS -X POST http://127.0.0.1:8080/api/auth/register -H 'Content-Type: application/json' -d '{"username":"ci_student","password":"student123","realName":"CI学生","roleType":"STUDENT","studentNo":"CI2026001","classId":1}')
-          echo "$REG_JSON" | grep '"primaryRole":"STUDENT"'
-          STU_TOKEN=$(echo "$REG_JSON" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
-          LOGIN_JSON=$(curl -fsS -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin123"}')
-          echo "$LOGIN_JSON" | grep '"primaryRole":"ADMIN"'
-          TOKEN=$(echo "$LOGIN_JSON" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
-          # 教师账号注册后需管理员审核启用，故由管理员直接创建已启用的教师账号，再登录获取 token
-          curl -fsS -X POST http://127.0.0.1:8080/api/system/users -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"username":"ci_teacher","password":"teacher123","realName":"CI教师","roleType":"TEACHER","teacherNo":"CI-T-001","title":"讲师"}' | grep '"success":true'
-          TCH_LOGIN_JSON=$(curl -fsS -X POST http://127.0.0.1:8080/api/auth/login -H 'Content-Type: application/json' -d '{"username":"ci_teacher","password":"teacher123"}')
-          echo "$TCH_LOGIN_JSON" | grep '"primaryRole":"TEACHER"'
-          TCH_TOKEN=$(echo "$TCH_LOGIN_JSON" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
-          test -n "$TOKEN" && test -n "$TCH_TOKEN" && test -n "$STU_TOKEN"
-          curl -fsS http://127.0.0.1:8080/api/auth/me -H "Authorization: Bearer $TOKEN" | grep '"username":"admin"'
-          curl -fsS http://127.0.0.1:8080/api/overview/admin -H "Authorization: Bearer $TOKEN" | grep '"totalStudents"'
-          curl -fsS http://127.0.0.1:8080/api/overview/teacher -H "Authorization: Bearer $TCH_TOKEN" | grep '"myExams"'
-          curl -fsS http://127.0.0.1:8080/api/overview/student -H "Authorization: Bearer $STU_TOKEN" | grep '"upcomingExams"'
-          curl -fsS http://127.0.0.1:8080/api/basic/summary -H "Authorization: Bearer $TOKEN" | grep '"subjects"'
-          curl -fsS http://127.0.0.1:8080/api/basic/classes -H "Authorization: Bearer $TOKEN" | grep '23本科计科1班'
-          curl -fsS -X POST http://127.0.0.1:8080/api/basic/notices -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"title":"Actions阶段3公告","content":"云端验证阶段3基础资料接口","status":1}' | grep 'Actions阶段3公告'
-          curl -fsS http://127.0.0.1:8080/api/questions/summary -H "Authorization: Bearer $TOKEN" | grep '"total"'
-          curl -fsS -X POST http://127.0.0.1:8080/api/questions -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"subjectId":1,"knowledgePointId":1,"questionType":"SINGLE_CHOICE","difficulty":"EASY","stem":"Actions阶段4题库验证题","correctAnswer":"B","analysis":"用于云端验证题库新增接口。","defaultScore":5,"status":1,"options":[{"optionLabel":"A","optionContent":"错误项","correct":false},{"optionLabel":"B","optionContent":"正确项","correct":true}]}' | grep 'Actions阶段4题库验证题'
-          # 阶段5-10接口
-          curl -fsS http://127.0.0.1:8080/api/papers/summary -H "Authorization: Bearer $TCH_TOKEN" | grep '"total"'
-          curl -fsS http://127.0.0.1:8080/api/exams/teacher -H "Authorization: Bearer $TCH_TOKEN"
-          curl -fsS http://127.0.0.1:8080/api/exams/student -H "Authorization: Bearer $STU_TOKEN"
-          curl -fsS http://127.0.0.1:8080/api/reviews/pending -H "Authorization: Bearer $TCH_TOKEN"
-          curl -fsS http://127.0.0.1:8080/api/student/grades -H "Authorization: Bearer $STU_TOKEN"
-          curl -fsS http://127.0.0.1:8080/api/student/wrong-questions -H "Authorization: Bearer $STU_TOKEN"
-          curl -fsS http://127.0.0.1:8080/api/student/mastery -H "Authorization: Bearer $STU_TOKEN"
-          curl -fsS http://127.0.0.1:8080/api/monitor/logs -H "Authorization: Bearer $TOKEN"
-          curl -fsS http://127.0.0.1:8080/api/system/users -H "Authorization: Bearer $TOKEN" | grep '"username"'
-          curl -fsS http://127.0.0.1:8080/api/auth/menus -H "Authorization: Bearer $TOKEN" | grep '"title"'
-          curl -fsS http://127.0.0.1:8080/api/notifications/unread-count -H "Authorization: Bearer $TOKEN"
-          curl -fsS -X POST http://127.0.0.1:8080/api/ai/generate-question -H "Authorization: Bearer $TCH_TOKEN" -H 'Content-Type: application/json' -d '{"subject":"Java","questionType":"SINGLE_CHOICE","difficulty":"EASY","count":1}'
-          curl -fsS -X POST http://127.0.0.1:8080/api/ai/explain -H "Authorization: Bearer $STU_TOKEN" -H 'Content-Type: application/json' -d '{"text":"HashMap"}'
-          curl -fsS -X POST http://127.0.0.1:8080/api/ai/suggest-review -H "Authorization: Bearer $TCH_TOKEN" -H 'Content-Type: application/json' -d '{"question":"什么是Java？","studentAnswer":"Java是一种编程语言。","correctAnswer":"Java是一种面向对象的编程语言，具有跨平台特性。"}'
+          cat /tmp/health.json
+          grep '"success":true' /tmp/health.json
+          curl -fsS http://127.0.0.1:8080/actuator/health/liveness | grep '"status":"UP"'
+          curl -fsS http://127.0.0.1:8080/actuator/health/readiness | grep '"status":"UP"'
+          curl -fsS http://127.0.0.1:8080/actuator/prometheus > /tmp/prometheus.txt
+          grep -E '# HELP|# TYPE' /tmp/prometheus.txt
 
-      - name: Frontend build
-        working-directory: frontend
-        run: |
-          npm ci
-          npm run build
+      - name: Ops health script smoke
+        shell: pwsh
+        run: ./scripts/check-ops-health.ps1 -BaseUrl http://127.0.0.1:8080 -ExpectPrometheus

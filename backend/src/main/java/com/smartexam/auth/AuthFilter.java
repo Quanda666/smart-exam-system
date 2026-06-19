@@ -2,6 +2,7 @@ package com.smartexam.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartexam.common.ApiResponse;
+import com.smartexam.common.ErrorCode;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -81,6 +82,7 @@ public class AuthFilter extends OncePerRequestFilter {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.getWriter().write(objectMapper.writeValueAsString(ApiResponse.fail("UNAUTHORIZED", "请先登录后再访问该接口")));
+        response.getWriter().write(objectMapper.writeValueAsString(
+                ApiResponse.fail(ErrorCode.UNAUTHORIZED, "请先登录后再访问该接口")));
     }
 }

@@ -12,6 +12,23 @@
       </div>
     </div>
 
+    <el-alert
+      v-if="lastQuestionOperationAudit"
+      class="question-operation-audit"
+      type="success"
+      :closable="true"
+      show-icon
+      @close="lastQuestionOperationAudit = null"
+    >
+      <template #title>
+        <div class="question-operation-audit-content">
+          <span>{{ lastQuestionOperationAudit.action }} audit recorded: {{ questionOperationAuditText(lastQuestionOperationAudit.questionReviewLogIds) }}</span>
+          <el-button link type="primary" :icon="DocumentCopy" @click="copyLatestQuestionOperationAuditId">Copy audit ID</el-button>
+          <el-button link type="primary" :icon="DocumentCopy" @click="copyLatestQuestionOperationAuditLink">Copy audit link</el-button>
+        </div>
+      </template>
+    </el-alert>
+
     <el-card shadow="never" class="question-workbench">
       <template #header>
         <div class="card-header">
@@ -33,11 +50,18 @@
         <el-select v-model="query.difficulty" placeholder="难度" clearable>
           <el-option v-for="item in difficulties" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
-        <el-select v-model="query.status" placeholder="状态" clearable>
-          <el-option label="已发布" :value="1" />
-          <el-option label="草稿" :value="0" />
+        <el-select v-model="query.status" placeholder="可用状态" clearable>
+          <el-option label="可组卷" :value="1" />
+          <el-option label="不可用" :value="0" />
+        </el-select>
+        <el-select v-model="query.reviewStatus" placeholder="审核状态" clearable>
+          <el-option label="草稿" value="DRAFT" />
+          <el-option label="待审核" value="PENDING" />
+          <el-option label="已通过" value="APPROVED" />
+          <el-option label="已驳回" value="REJECTED" />
         </el-select>
         <el-button type="primary" @click="loadQuestions">查询</el-button>
+        <el-button type="warning" plain @click="showReviewQueue">待审队列</el-button>
         <el-button @click="resetQuery">重置</el-button>
       </div>
     </el-card>
@@ -53,7 +77,7 @@
       <div class="ai-generator-strip">
         <div class="ai-generator-main">
           <span class="ai-generator-title">AI 出题台</span>
-          <el-input-number v-model="aiSettings.count" :min="1" :max="10" controls-position="right" />
+          <el-input-number v-model="aiSettings.count" :min="1" :max="AI_BATCH_QUESTION_COUNT" controls-position="right" />
           <el-input
             v-model="aiSettings.requirements"
             clearable
@@ -75,14 +99,17 @@
         <div class="ai-material-counts">
           <label v-for="item in questionTypes" :key="item.value" class="ai-count-item">
             <span>{{ item.label }}</span>
-            <el-input-number v-model="materialCounts[item.value]" :min="0" :max="20" controls-position="right" />
+            <el-input-number v-model="materialCounts[item.value]" :min="0" :max="AI_MATERIAL_TYPE_COUNT" controls-position="right" />
           </label>
         </div>
-        <el-button type="primary" :icon="Upload" :loading="aiMaterialGenerating" @click="pickMaterialDocument">上传材料生成</el-button>
+        <div class="ai-material-total" :class="{ 'is-danger': materialQuestionTotalExceeded }">
+          {{ materialQuestionTotalValue }} / {{ AI_MATERIAL_TOTAL_COUNT }}
+        </div>
+        <el-button type="primary" :icon="Upload" :loading="aiMaterialGenerating" :disabled="materialQuestionTotalInvalid" @click="pickMaterialDocument">上传材料生成</el-button>
       </div>
 
-      <input ref="questionDocInputRef" class="hidden-file-input" type="file" accept=".txt,.text,.md,.doc,.docx,.ppt,.pptx,.pdf" @change="handleQuestionDocumentSelected" />
-      <input ref="materialDocInputRef" class="hidden-file-input" type="file" accept=".txt,.text,.md,.doc,.docx,.ppt,.pptx,.pdf" @change="handleMaterialDocumentSelected" />
+      <input ref="questionDocInputRef" class="hidden-file-input" type="file" :accept="AI_DOCUMENT_ACCEPT" @change="handleQuestionDocumentSelected" />
+      <input ref="materialDocInputRef" class="hidden-file-input" type="file" :accept="AI_DOCUMENT_ACCEPT" @change="handleMaterialDocumentSelected" />
 
       <el-form class="question-form" :model="questionForm" label-position="top">
         <el-form-item label="所属科目">
@@ -108,11 +135,8 @@
         <el-form-item label="默认分值">
           <el-input-number v-model="questionForm.defaultScore" :min="0.5" :step="0.5" :precision="1" />
         </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="questionForm.status">
-            <el-option label="草稿" :value="0" />
-            <el-option label="发布" :value="1" />
-          </el-select>
+        <el-form-item label="审核状态">
+          <el-tag type="info">保存后进入草稿，提交审核通过后才能组卷</el-tag>
         </el-form-item>
         <el-form-item class="question-stem" label="题干">
           <el-input v-model="questionForm.stem" type="textarea" :rows="3" placeholder="请输入题干内容" />
@@ -158,8 +182,8 @@
       <div v-if="canManageQuestions && selectedQuestions.length > 0" class="mp-batch-bar">
         已选择 <span class="mp-batch-count">{{ selectedQuestions.length }}</span> 题
         <span class="mp-batch-bar-spacer"></span>
-        <el-button size="small" type="success" plain @click="batchSetStatus(1)">批量发布</el-button>
-        <el-button size="small" type="warning" plain @click="batchSetStatus(0)">批量撤回</el-button>
+        <el-button size="small" type="success" plain @click="batchSubmitReview">批量提交审核</el-button>
+        <el-button size="small" type="warning" plain @click="batchSetStatus(0)">批量下架</el-button>
         <el-button size="small" type="danger" plain @click="batchDelete">批量删除</el-button>
         <el-button size="small" text @click="clearSelection">取消选择</el-button>
       </div>
@@ -201,6 +225,15 @@
             <el-tag :type="scope.row.status === 1 ? 'success' : 'info'">{{ statusText(scope.row.status) }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="审核" width="150">
+          <template #default="scope">
+            <div class="review-cell">
+              <el-tag :type="reviewStatusTag(scope.row.reviewStatus)">{{ reviewStatusText(scope.row.reviewStatus) }}</el-tag>
+              <small>v{{ scope.row.versionNo || 1 }}</small>
+              <small v-if="scope.row.reviewComment" :title="scope.row.reviewComment">{{ scope.row.reviewComment }}</small>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column prop="creatorName" label="创建人" width="120" />
         <el-table-column label="来源" width="190">
           <template #default="scope">
@@ -216,13 +249,15 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column v-if="canManageQuestions" label="操作" width="230" fixed="right">
+        <el-table-column v-if="canManageQuestions" label="操作" width="310" fixed="right">
           <template #default="scope">
-            <el-button link type="primary" @click="editQuestion(scope.row as QuestionInfo)">编辑</el-button>
-            <el-button link type="warning" @click="toggleQuestionStatus(scope.row as QuestionInfo)">
-              {{ scope.row.status === 1 ? '撤回' : '发布' }}
-            </el-button>
-            <el-button link type="danger" @click="removeQuestion(Number(scope.row.id))">删除</el-button>
+            <el-button v-if="scope.row.canEdit !== false" link type="primary" @click="editQuestion(scope.row as QuestionInfo)">编辑</el-button>
+            <el-button v-if="canSubmitReview(scope.row as QuestionInfo)" link type="success" @click="submitReview(scope.row as QuestionInfo)">提交审核</el-button>
+            <el-button v-if="canReviewQuestion(scope.row as QuestionInfo)" link type="success" @click="approveReview(scope.row as QuestionInfo)">通过</el-button>
+            <el-button v-if="canReviewQuestion(scope.row as QuestionInfo)" link type="warning" @click="rejectReview(scope.row as QuestionInfo)">驳回</el-button>
+            <el-button v-if="scope.row.canTakeOffline" link type="warning" @click="toggleQuestionStatus(scope.row as QuestionInfo)">下架</el-button>
+            <el-button link type="info" @click="openReviewLogs(scope.row as QuestionInfo)">日志</el-button>
+            <el-button v-if="scope.row.canDelete !== false" link type="danger" @click="removeQuestion(Number(scope.row.id))">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -282,13 +317,55 @@
         </article>
       </div>
     </el-dialog>
+
+    <el-drawer v-model="logDrawerVisible" title="题目审核日志" size="520px">
+      <div v-if="activeLogQuestion" class="log-drawer-head">
+        <strong>{{ activeLogQuestion.stem }}</strong>
+        <el-tag>{{ reviewStatusText(activeLogQuestion.reviewStatus) }} · v{{ activeLogQuestion.versionNo || 1 }}</el-tag>
+      </div>
+      <el-timeline v-loading="logLoading">
+        <el-timeline-item
+          v-for="log in reviewLogs"
+          :key="log.id"
+          :timestamp="log.operatedAt"
+          placement="top"
+        >
+          <div class="review-log-item">
+            <div class="question-review-log-id-cell">
+              <strong>{{ actionText(log.actionType) }}</strong>
+              <span>#{{ log.id }}</span>
+              <el-button
+                link
+                type="primary"
+                :icon="DocumentCopy"
+                title="Copy question review audit ID"
+                aria-label="Copy question review audit ID"
+                @click="copyQuestionReviewAuditId(log.id)"
+              />
+              <el-button
+                link
+                type="primary"
+                :icon="DocumentCopy"
+                title="Copy question review audit link"
+                aria-label="Copy question review audit link"
+                @click="copyQuestionReviewAuditLink(log.id)"
+              />
+            </div>
+            <span>{{ log.operatorName || '系统' }}</span>
+            <small>v{{ log.versionNo }} · {{ reviewStatusText(log.fromReviewStatus || undefined) }} -> {{ reviewStatusText(log.toReviewStatus || undefined) }}</small>
+            <p v-if="log.comment">{{ log.comment }}</p>
+          </div>
+        </el-timeline-item>
+      </el-timeline>
+      <el-empty v-if="!logLoading && reviewLogs.length === 0" description="暂无日志" />
+    </el-drawer>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Check, DocumentAdd, DocumentChecked, Download, MagicStick, Upload } from '@element-plus/icons-vue';
+import { Check, DocumentAdd, DocumentChecked, DocumentCopy, Download, MagicStick, Upload } from '@element-plus/icons-vue';
 import { exportToCsv } from '../utils/exportCsv';
 import { listKnowledgePoints, listSubjects, type KnowledgePointInfo, type SubjectInfo } from '../api/basic';
 import {
@@ -296,12 +373,19 @@ import {
   deleteQuestion,
   fetchQuestionSummary,
   listQuestions,
+  listQuestionReviewLogs,
+  approveQuestionReview,
+  rejectQuestionReview,
+  submitQuestionReview,
   updateQuestion,
   updateQuestionStatus,
   type Difficulty,
   type QuestionInfo,
   type QuestionOption,
   type QuestionPayload,
+  type QuestionReviewLog,
+  type QuestionReviewStatus,
+  type QuestionSummary,
   type QuestionType
 } from '../api/question';
 import {
@@ -311,6 +395,10 @@ import {
   saveGeneratedQuestions,
   type AiGeneratedQuestion
 } from '../api/ai';
+import {
+  copyQuestionReviewAuditIdToClipboard,
+  copyQuestionReviewAuditLinkToClipboard
+} from '../utils/clipboard';
 import type { RoleCode } from '../api/auth';
 
 const props = defineProps<{
@@ -331,13 +419,33 @@ const difficulties: Array<{ label: string; value: Difficulty }> = [
   { label: '困难', value: 'HARD' }
 ];
 
+const AI_BATCH_QUESTION_COUNT = 10;
+const AI_MATERIAL_TYPE_COUNT = 30;
+const AI_MATERIAL_TOTAL_COUNT = 30;
+const AI_DOCUMENT_MAX_FILE_BYTES = 25 * 1024 * 1024;
+const AI_SOURCE_DETAIL_MAX_LENGTH = 255;
+const AI_DOCUMENT_SUPPORTED_EXTENSIONS = ['txt', 'text', 'md', 'doc', 'docx', 'ppt', 'pptx', 'pdf'];
+const AI_DOCUMENT_ACCEPT = AI_DOCUMENT_SUPPORTED_EXTENSIONS.map((extension) => `.${extension}`).join(',');
+const QUESTION_DOCUMENT_SOURCE_LABEL = 'Question document import';
+const MATERIAL_GENERATION_SOURCE_LABEL = 'Course material generation';
+
 const subjects = ref<SubjectInfo[]>([]);
 const knowledgePoints = ref<KnowledgePointInfo[]>([]);
 const questions = ref<QuestionInfo[]>([]);
 const currentPage = ref(1);
 const pageSize = ref(10);
 const totalQuestions = ref(0);
-const summary = ref({ total: 0, published: 0, draft: 0, types: {}, difficulties: {} });
+const emptySummary: QuestionSummary = {
+  total: 0,
+  published: 0,
+  draft: 0,
+  pendingReview: 0,
+  approvedReview: 0,
+  rejectedReview: 0,
+  types: {},
+  difficulties: {}
+};
+const summary = ref<QuestionSummary>({ ...emptySummary });
 const editingQuestionId = ref<number | null>(null);
 
 const tableRef = ref<{ clearSelection: () => void }>();
@@ -352,6 +460,11 @@ const aiSaving = ref(false);
 const aiDialogVisible = ref(false);
 const aiDialogTitle = ref('AI题目草稿');
 const aiDrafts = ref<AiGeneratedQuestion[]>([]);
+const logDrawerVisible = ref(false);
+const logLoading = ref(false);
+const activeLogQuestion = ref<QuestionInfo | null>(null);
+const reviewLogs = ref<QuestionReviewLog[]>([]);
+const lastQuestionOperationAudit = ref<{ action: string; questionReviewLogIds: Array<number | string> } | null>(null);
 const aiSettings = reactive({
   count: 3,
   requirements: ''
@@ -363,6 +476,9 @@ const materialCounts = reactive<Record<QuestionType, number>>({
   FILL_BLANK: 1,
   SUBJECTIVE: 0
 });
+const materialQuestionTotalValue = computed(() => materialQuestionTotal());
+const materialQuestionTotalExceeded = computed(() => materialQuestionTotalValue.value > AI_MATERIAL_TOTAL_COUNT);
+const materialQuestionTotalInvalid = computed(() => materialQuestionTotalValue.value <= 0 || materialQuestionTotalExceeded.value);
 
 const query = reactive<{
   keyword: string;
@@ -371,13 +487,15 @@ const query = reactive<{
   questionType: QuestionType | null;
   difficulty: Difficulty | null;
   status: number | null;
+  reviewStatus: QuestionReviewStatus | null;
 }>({
   keyword: '',
   subjectId: null,
   knowledgePointId: null,
   questionType: null,
   difficulty: null,
-  status: null
+  status: null,
+  reviewStatus: null
 });
 
 const questionForm = reactive<QuestionPayload>({
@@ -405,9 +523,9 @@ const canManageQuestions = computed(() => props.role === 'ADMIN' || props.role =
 
 const summaryCards = computed(() => [
   { label: '题目总数', value: summary.value.total || 0, remark: '题库累计题目' },
-  { label: '已发布', value: summary.value.published || 0, remark: '可供后续组卷引用' },
-  { label: '草稿', value: summary.value.draft || 0, remark: '待教师确认完善' },
-  { label: '题型覆盖', value: Object.keys(summary.value.types || {}).length, remark: '支持五类核心题型' }
+  { label: '可组卷', value: summary.value.published || 0, remark: '已审核通过并可引用' },
+  { label: '待审核', value: summary.value.pendingReview || 0, remark: '等待审核处理' },
+  { label: '已驳回', value: summary.value.rejectedReview || 0, remark: '需修改后重新提交' }
 ]);
 
 const queryKnowledgePoints = computed(() => {
@@ -452,7 +570,7 @@ async function loadQuestions() {
 async function loadSummary() {
   try {
     const response = await fetchQuestionSummary();
-    summary.value = response.data;
+    summary.value = { ...emptySummary, ...response.data };
   } catch (error) {
     ElMessage.warning(error instanceof Error ? error.message : '题库统计加载失败');
   }
@@ -465,6 +583,14 @@ function resetQuery() {
   query.questionType = null;
   query.difficulty = null;
   query.status = null;
+  query.reviewStatus = null;
+  currentPage.value = 1;
+  loadQuestions();
+}
+
+function showReviewQueue() {
+  query.status = 0;
+  query.reviewStatus = 'PENDING';
   currentPage.value = 1;
   loadQuestions();
 }
@@ -520,16 +646,51 @@ async function saveQuestion() {
   if (!payload) return;
   try {
     if (editingQuestionId.value) {
-      await updateQuestion(editingQuestionId.value, payload);
+      const response = await updateQuestion(editingQuestionId.value, payload);
+      rememberQuestionOperationAudit('Update question', [response.data.questionReviewLogId]);
       ElMessage.success('题目已更新');
     } else {
-      await createQuestion(payload);
+      const response = await createQuestion(payload);
+      rememberQuestionOperationAudit('Create question', [response.data.questionReviewLogId]);
       ElMessage.success('题目已新增');
     }
     resetQuestionForm();
     await loadQuestions();
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '题目保存失败');
+  }
+}
+
+function rememberQuestionOperationAudit(action: string, ids: Array<number | string | null | undefined>) {
+  const questionReviewLogIds = ids.filter((id): id is number | string => id !== null && id !== undefined && id !== '');
+  if (questionReviewLogIds.length === 0) return;
+  lastQuestionOperationAudit.value = { action, questionReviewLogIds };
+}
+
+function questionOperationAuditText(ids: Array<number | string>) {
+  if (ids.length === 1) return `#${ids[0]}`;
+  return `${ids.length} logs, latest #${ids[0]}`;
+}
+
+async function copyLatestQuestionOperationAuditId() {
+  const ids = lastQuestionOperationAudit.value?.questionReviewLogIds;
+  if (!ids || ids.length === 0) return;
+  try {
+    await copyQuestionReviewAuditIdToClipboard(ids.join(','));
+    ElMessage.success('Audit ID copied');
+  } catch {
+    ElMessage.error('Failed to copy audit ID');
+  }
+}
+
+async function copyLatestQuestionOperationAuditLink() {
+  const id = lastQuestionOperationAudit.value?.questionReviewLogIds[0];
+  if (!id) return;
+  try {
+    await copyQuestionReviewAuditLinkToClipboard(id);
+    ElMessage.success('Audit link copied');
+  } catch {
+    ElMessage.error('Failed to copy audit link');
   }
 }
 
@@ -609,11 +770,96 @@ function editQuestion(row: QuestionInfo) {
 async function toggleQuestionStatus(row: QuestionInfo) {
   const nextStatus = row.status === 1 ? 0 : 1;
   try {
-    await updateQuestionStatus(row.id, nextStatus);
-    ElMessage.success(nextStatus === 1 ? '题目已发布' : '题目已撤回');
+    const response = await updateQuestionStatus(row.id, nextStatus);
+    rememberQuestionOperationAudit(nextStatus === 1 ? 'Online question' : 'Offline question', [response.data.questionReviewLogId]);
+    ElMessage.success(nextStatus === 1 ? '题目已设为可用' : '题目已下架');
     await loadQuestions();
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '状态更新失败');
+  }
+}
+
+function canSubmitReview(row: QuestionInfo) {
+  return row.canSubmitReview === true;
+}
+
+function canReviewQuestion(row: QuestionInfo) {
+  return row.canReview === true;
+}
+
+async function submitReview(row: QuestionInfo) {
+  try {
+    const response = await submitQuestionReview(row.id);
+    rememberQuestionOperationAudit('Submit question review', [response.data.questionReviewLogId]);
+    ElMessage.success('题目已提交审核');
+    await loadQuestions();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '提交审核失败');
+  }
+}
+
+async function approveReview(row: QuestionInfo) {
+  try {
+    const response = await approveQuestionReview(row.id);
+    rememberQuestionOperationAudit('Approve question review', [response.data.questionReviewLogId]);
+    ElMessage.success('题目已审核通过，可用于组卷');
+    await loadQuestions();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '审核通过失败');
+  }
+}
+
+async function rejectReview(row: QuestionInfo) {
+  try {
+    const result = await ElMessageBox.prompt('请输入驳回原因，便于创建人修改后重新提交。', '驳回题目', {
+      inputType: 'textarea',
+      inputValidator: (value) => Boolean(value && value.trim()),
+      inputErrorMessage: '请填写驳回原因',
+      confirmButtonText: '驳回',
+      cancelButtonText: '取消'
+    });
+    const response = await rejectQuestionReview(row.id, result.value.trim());
+    rememberQuestionOperationAudit('Reject question review', [response.data.questionReviewLogId]);
+    ElMessage.success('题目已驳回');
+    await loadQuestions();
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return;
+    ElMessage.error(error instanceof Error ? error.message : '驳回失败');
+  }
+}
+
+async function openReviewLogs(row: QuestionInfo) {
+  activeLogQuestion.value = row;
+  logDrawerVisible.value = true;
+  logLoading.value = true;
+  try {
+    const response = await listQuestionReviewLogs(row.id);
+    reviewLogs.value = response.data;
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '审核日志加载失败');
+    reviewLogs.value = [];
+  } finally {
+    logLoading.value = false;
+  }
+}
+
+async function copyQuestionReviewAuditId(logId?: number | string | null) {
+  try {
+    const value = await copyQuestionReviewAuditIdToClipboard(logId);
+    if (!value) return;
+    ElMessage.success(`Question review audit ID copied: ${value}`);
+  } catch {
+    ElMessage.error('Failed to copy question review audit ID');
+  }
+}
+
+async function copyQuestionReviewAuditLink(logId?: number | string | null) {
+  try {
+    const link = await copyQuestionReviewAuditLinkToClipboard(logId);
+    if (!link) return;
+    ElMessage.success('Question review audit link copied');
+  } catch {
+    ElMessage.error('Failed to copy question review audit link');
   }
 }
 
@@ -624,7 +870,8 @@ async function removeQuestion(id: number) {
     cancelButtonText: '取消'
   });
   try {
-    await deleteQuestion(id);
+    const response = await deleteQuestion(id);
+    rememberQuestionOperationAudit('Delete question', [response.data.questionReviewLogId]);
     ElMessage.success('题目已删除');
     await loadQuestions();
   } catch (error) {
@@ -640,17 +887,40 @@ function clearSelection() {
   tableRef.value?.clearSelection();
 }
 
-async function batchSetStatus(next: number) {
-  const rows = selectedQuestions.value;
-  if (rows.length === 0) return;
+async function batchSubmitReview() {
+  const rows = selectedQuestions.value.filter(canSubmitReview);
+  if (rows.length === 0) {
+    ElMessage.warning('请选择草稿或已驳回的未上架题目');
+    return;
+  }
   try {
-    await ElMessageBox.confirm(`确认${next === 1 ? '发布' : '撤回'}选中的 ${rows.length} 道题目吗？`, '批量操作', { type: 'warning' });
+    await ElMessageBox.confirm(`确认提交 ${rows.length} 道题目进入审核吗？`, '批量提交审核', { type: 'warning' });
   } catch {
     return;
   }
   try {
-    await Promise.all(rows.map((r) => updateQuestionStatus(r.id, next)));
-    ElMessage.success(`已${next === 1 ? '发布' : '撤回'} ${rows.length} 道题目`);
+    const responses = await Promise.all(rows.map((r) => submitQuestionReview(r.id)));
+    rememberQuestionOperationAudit('Batch submit question review', responses.map((response) => response.data.questionReviewLogId));
+    ElMessage.success(`已提交 ${rows.length} 道题目审核`);
+    clearSelection();
+    await loadQuestions();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '批量提交审核失败');
+  }
+}
+
+async function batchSetStatus(next: number) {
+  const rows = next === 0 ? selectedQuestions.value.filter((row) => row.canTakeOffline) : selectedQuestions.value;
+  if (rows.length === 0) return;
+  try {
+    await ElMessageBox.confirm(`确认${next === 1 ? '设为可用' : '下架'}选中的 ${rows.length} 道题目吗？`, '批量操作', { type: 'warning' });
+  } catch {
+    return;
+  }
+  try {
+    const responses = await Promise.all(rows.map((r) => updateQuestionStatus(r.id, next)));
+    rememberQuestionOperationAudit(next === 1 ? 'Batch online questions' : 'Batch offline questions', responses.map((response) => response.data.questionReviewLogId));
+    ElMessage.success(`已${next === 1 ? '设为可用' : '下架'} ${rows.length} 道题目`);
     clearSelection();
     await loadQuestions();
   } catch (error) {
@@ -669,7 +939,8 @@ async function batchDelete() {
     return;
   }
   try {
-    await Promise.all(rows.map((r) => deleteQuestion(r.id)));
+    const responses = await Promise.all(rows.map((r) => deleteQuestion(r.id)));
+    rememberQuestionOperationAudit('Batch delete questions', responses.map((response) => response.data.questionReviewLogId));
     ElMessage.success(`已删除 ${rows.length} 道题目`);
     clearSelection();
     await loadQuestions();
@@ -690,10 +961,13 @@ async function exportQuestions() {
       type: typeText(q.questionType),
       difficulty: difficultyText(q.difficulty),
       score: q.defaultScore,
+      version: q.versionNo || 1,
       answer: isObjectiveType(q.questionType)
         ? (q.options || []).filter((o) => isCorrectOption(o.correct)).map((o) => o.optionLabel).join('')
         : (q.correctAnswer || ''),
       status: statusText(q.status),
+      reviewStatus: reviewStatusText(q.reviewStatus),
+      reviewComment: q.reviewComment || '',
       creator: q.creatorName || '',
       source: sourceText(q.sourceType),
       sourceDetail: q.sourceDetail || '',
@@ -710,8 +984,11 @@ async function exportQuestions() {
       { key: 'type', label: '题型' },
       { key: 'difficulty', label: '难度' },
       { key: 'score', label: '分值' },
+      { key: 'version', label: '版本' },
       { key: 'answer', label: '答案' },
       { key: 'status', label: '状态' },
+      { key: 'reviewStatus', label: '审核状态' },
+      { key: 'reviewComment', label: '审核意见' },
       { key: 'creator', label: '创建人' },
       { key: 'source', label: '来源' },
       { key: 'sourceDetail', label: '来源说明' },
@@ -792,7 +1069,38 @@ function sourceTag(sourceType?: string) {
 }
 
 function statusText(status: number) {
-  return status === 1 ? '已发布' : '草稿';
+  return status === 1 ? '可组卷' : '不可用';
+}
+
+function reviewStatusText(status?: QuestionReviewStatus) {
+  const map: Record<QuestionReviewStatus, string> = {
+    DRAFT: '草稿',
+    PENDING: '待审核',
+    APPROVED: '已通过',
+    REJECTED: '已驳回'
+  };
+  return map[status || 'DRAFT'];
+}
+
+function reviewStatusTag(status?: QuestionReviewStatus) {
+  if (status === 'APPROVED') return 'success';
+  if (status === 'PENDING') return 'warning';
+  if (status === 'REJECTED') return 'danger';
+  return 'info';
+}
+
+function actionText(action: string) {
+  const map: Record<string, string> = {
+    CREATE: '创建题目',
+    EDIT: '编辑题目',
+    DELETE: '删除题目',
+    SUBMIT_REVIEW: '提交审核',
+    APPROVE: '审核通过',
+    REJECT: '审核驳回',
+    ONLINE: '设为可用',
+    OFFLINE: '下架题目'
+  };
+  return map[action] || action;
 }
 
 async function aiGenerateQuestion() {
@@ -831,16 +1139,14 @@ function pickQuestionDocument() {
 
 function pickMaterialDocument() {
   if (!currentDocumentContext()) return;
-  if (materialQuestionTotal() <= 0) {
-    ElMessage.warning('请至少设置一种题型数量');
-    return;
-  }
+  if (!validateMaterialQuestionCounts()) return;
   materialDocInputRef.value?.click();
 }
 
 async function handleQuestionDocumentSelected(event: Event) {
   const file = selectedFile(event);
   if (!file) return;
+  if (!validateDocumentUploadFile(file, QUESTION_DOCUMENT_SOURCE_LABEL)) return;
   const context = currentDocumentContext();
   if (!context) return;
   aiImporting.value = true;
@@ -858,12 +1164,10 @@ async function handleQuestionDocumentSelected(event: Event) {
 async function handleMaterialDocumentSelected(event: Event) {
   const file = selectedFile(event);
   if (!file) return;
+  if (!validateDocumentUploadFile(file, MATERIAL_GENERATION_SOURCE_LABEL)) return;
   const context = currentDocumentContext();
   if (!context) return;
-  if (materialQuestionTotal() <= 0) {
-    ElMessage.warning('请至少设置一种题型数量');
-    return;
-  }
+  if (!validateMaterialQuestionCounts()) return;
   aiMaterialGenerating.value = true;
   try {
     const response = await generateQuestionsFromMaterial(file, {
@@ -910,8 +1214,44 @@ function selectedFile(event: Event) {
   return file;
 }
 
+function validateDocumentUploadFile(file: File, sourceLabel: string) {
+  if (file.size > AI_DOCUMENT_MAX_FILE_BYTES) {
+    ElMessage.warning('文档不能超过 25MB');
+    return false;
+  }
+  const filename = file.name.trim();
+  const maxFilenameLength = AI_SOURCE_DETAIL_MAX_LENGTH - sourceLabel.length - 2;
+  if (filename.length > maxFilenameLength) {
+    ElMessage.warning(`文件名不能超过 ${maxFilenameLength} 个字符`);
+    return false;
+  }
+  if (!AI_DOCUMENT_SUPPORTED_EXTENSIONS.includes(documentExtension(filename))) {
+    ElMessage.warning('仅支持 txt、Word、PPT、PDF 文档');
+    return false;
+  }
+  return true;
+}
+
+function documentExtension(filename: string) {
+  const dot = filename.lastIndexOf('.');
+  return dot < 0 ? '' : filename.slice(dot + 1).toLowerCase();
+}
+
 function materialQuestionTotal() {
   return Object.values(materialCounts).reduce((sum, value) => sum + Number(value || 0), 0);
+}
+
+function validateMaterialQuestionCounts() {
+  const total = materialQuestionTotalValue.value;
+  if (total <= 0) {
+    ElMessage.warning('请至少设置一种题型数量');
+    return false;
+  }
+  if (total > AI_MATERIAL_TOTAL_COUNT) {
+    ElMessage.warning(`单次最多生成 ${AI_MATERIAL_TOTAL_COUNT} 道题`);
+    return false;
+  }
+  return true;
 }
 
 async function saveAiDrafts() {
@@ -929,6 +1269,7 @@ async function saveAiDrafts() {
   try {
     const response = await saveGeneratedQuestions(aiDrafts.value.map((draft) => ({ ...draft, status: 0 })));
     ElMessage.success(`已保存 ${response.data.savedCount} 道AI题目草稿`);
+    rememberQuestionOperationAudit('Save AI generated questions', response.data.questionReviewLogIds || response.data.questions.map((question) => question.questionReviewLogId));
     aiDialogVisible.value = false;
     aiDrafts.value = [];
     await loadQuestions();
@@ -1046,7 +1387,7 @@ function correctAnswerText(question: QuestionPayload) {
 
 .ai-material-strip {
   display: grid;
-  grid-template-columns: minmax(160px, 220px) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(160px, 220px) minmax(0, 1fr) minmax(64px, auto) auto;
   gap: 12px;
   align-items: center;
   padding: 12px;
@@ -1086,6 +1427,18 @@ function correctAnswerText(question: QuestionPayload) {
 
 .ai-count-item :deep(.el-input-number) {
   width: 100%;
+}
+
+.ai-material-total {
+  min-width: 64px;
+  text-align: center;
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ai-material-total.is-danger {
+  color: #dc2626;
 }
 
 .hidden-file-input {
@@ -1184,10 +1537,74 @@ function correctAnswerText(question: QuestionPayload) {
   white-space: nowrap;
 }
 
+.review-cell {
+  display: grid;
+  gap: 4px;
+}
+
+.review-cell small {
+  overflow: hidden;
+  color: #6b7280;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-drawer-head {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.review-log-item {
+  display: grid;
+  gap: 4px;
+  color: #374151;
+}
+
+.review-log-item span,
+.review-log-item small {
+  color: #6b7280;
+}
+
+.review-log-item p {
+  margin: 4px 0 0;
+  line-height: 1.6;
+}
+
+.question-review-log-id-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.question-review-log-id-cell span {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  color: #111827;
+}
+
+.question-review-log-id-cell .el-button {
+  padding: 0;
+}
+
 .question-pagination {
   margin-top: 16px;
   display: flex;
   justify-content: flex-end;
+}
+
+.question-operation-audit {
+  margin-bottom: 14px;
+}
+
+.question-operation-audit-content {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 @media (max-width: 900px) {

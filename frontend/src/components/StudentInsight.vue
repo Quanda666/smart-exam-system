@@ -103,6 +103,9 @@
               </el-tag>
             </template>
           </el-table-column>
+          <el-table-column label="Answer stats" min-width="180">
+            <template #default="s">{{ answerStatsText(s.row as StudentExamRecord) }}</template>
+          </el-table-column>
           <el-table-column label="交卷时间" width="180">
             <template #default="s">{{ formatDateTime(s.row.submitTime) }}</template>
           </el-table-column>
@@ -122,6 +125,7 @@ import {
   getStudentInsight,
   listClassStudents,
   type ClassStudent,
+  type StudentExamRecord,
   type StudentInsightData
 } from '../api/insight';
 import { useChartAutoResize } from '../composables/useChartAutoResize';
@@ -204,6 +208,10 @@ function exportScores() {
     score: e.score,
     totalScore: e.totalScore,
     rate: scoreRate(e.score, e.totalScore),
+    answerStats: answerStatsText(e),
+    questionCount: e.questionCount ?? '',
+    answeredCount: e.answeredCount ?? '',
+    unansweredCount: e.unansweredCount ?? '',
     submitTime: e.submitTime || ''
   }));
   exportToCsv(`${current.value.student.realName}_成绩单_${new Date().toISOString().slice(0, 10)}`, [
@@ -212,6 +220,10 @@ function exportScores() {
     { key: 'score', label: '得分' },
     { key: 'totalScore', label: '满分' },
     { key: 'rate', label: '得分率' },
+    { key: 'answerStats', label: 'Answer stats' },
+    { key: 'questionCount', label: 'Question Count' },
+    { key: 'answeredCount', label: 'Answered Count' },
+    { key: 'unansweredCount', label: 'Unanswered Count' },
     { key: 'submitTime', label: '交卷时间' }
   ], rows);
   ElMessage.success(`已导出 ${rows.length} 场考试成绩`);
@@ -222,6 +234,17 @@ function scoreRate(score: number | null | undefined, total: number | null | unde
   const t = Number(total ?? 100);
   if (t === 0) return '0%';
   return `${Math.round((s / t) * 1000) / 10}%`;
+}
+
+function answerStatsText(record?: StudentExamRecord | null) {
+  if (!record) return '-';
+  const questionTotal = Number(record.questionCount);
+  const answered = Number(record.answeredCount);
+  const unanswered = Number(record.unansweredCount);
+  if (!Number.isFinite(questionTotal) || !Number.isFinite(answered) || !Number.isFinite(unanswered)) {
+    return '-';
+  }
+  return `${answered}/${questionTotal} answered, ${unanswered} unanswered`;
 }
 
 function rateType(score: number | null | undefined, total: number | null | undefined): 'success' | 'warning' | 'danger' | undefined {

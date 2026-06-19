@@ -15,7 +15,7 @@
     <artifactId>smart-exam-backend</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <name>smart-exam-backend</name>
-    <description>第七组智慧在线考试与学习反馈系统后端</description>
+    <description>Smart Exam System backend</description>
 
     <properties>
         <java.version>17</java.version>
@@ -42,6 +42,21 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
         <dependency>

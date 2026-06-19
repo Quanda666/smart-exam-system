@@ -25,10 +25,33 @@ public class AnalysisService {
         data.put("paperCount", count(jt, "SELECT COUNT(*) FROM paper WHERE deleted = 0"));
         data.put("examCount", count(jt, "SELECT COUNT(*) FROM exam WHERE deleted = 0"));
         data.put("attemptCount", count(jt, "SELECT COUNT(*) FROM exam_attempt"));
-        data.put("completedCount", count(jt, "SELECT COUNT(*) FROM exam_attempt WHERE status = 5"));
+        data.put("completedCount", count(jt, """
+                SELECT COUNT(*)
+                FROM exam_attempt ea
+                JOIN exam e ON e.id = ea.exam_id AND e.deleted = 0
+                JOIN score_release sr ON sr.exam_id = e.id AND sr.status = 1
+                WHERE ea.status = 5 AND ea.score IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM score_appeal sa
+                    WHERE sa.attempt_id = ea.id
+                      AND sa.status = 1
+                      AND sa.handling_result = 'RECHECK_REQUIRED'
+                  )
+                """));
 
-        Double avg = jt.queryForObject(
-                "SELECT COALESCE(AVG(score), 0) FROM exam_attempt WHERE status = 5 AND score IS NOT NULL", Double.class);
+        Double avg = jt.queryForObject("""
+                SELECT COALESCE(AVG(ea.score), 0)
+                FROM exam_attempt ea
+                JOIN exam e ON e.id = ea.exam_id AND e.deleted = 0
+                JOIN score_release sr ON sr.exam_id = e.id AND sr.status = 1
+                WHERE ea.status = 5 AND ea.score IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM score_appeal sa
+                    WHERE sa.attempt_id = ea.id
+                      AND sa.status = 1
+                      AND sa.handling_result = 'RECHECK_REQUIRED'
+                  )
+                """, Double.class);
         data.put("averageScore", avg == null ? 0d : Math.round(avg * 100.0) / 100.0);
 
         data.put("roleDistribution", jt.queryForList("""
@@ -49,19 +72,35 @@ public class AnalysisService {
                 FROM edu_subject s
                 LEFT JOIN paper p ON p.subject_id = s.id AND p.deleted = 0
                 LEFT JOIN exam e ON e.paper_id = p.id AND e.deleted = 0
-                LEFT JOIN exam_attempt ea ON ea.exam_id = e.id AND ea.status = 5
+                LEFT JOIN score_release sr ON sr.exam_id = e.id AND sr.status = 1
+                LEFT JOIN exam_attempt ea ON ea.exam_id = e.id AND ea.status = 5 AND ea.score IS NOT NULL AND sr.exam_id IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM score_appeal sa
+                    WHERE sa.attempt_id = ea.id
+                      AND sa.status = 1
+                      AND sa.handling_result = 'RECHECK_REQUIRED'
+                  )
                 WHERE s.deleted = 0
                 GROUP BY s.id, s.subject_name
                 ORDER BY s.id
                 """));
 
         data.put("scoreDistribution", jt.queryForMap("""
-                SELECT COALESCE(SUM(CASE WHEN score < 60 THEN 1 ELSE 0 END), 0) AS belowSixty,
-                       COALESCE(SUM(CASE WHEN score >= 60 AND score < 70 THEN 1 ELSE 0 END), 0) AS sixtyToSeventy,
-                       COALESCE(SUM(CASE WHEN score >= 70 AND score < 80 THEN 1 ELSE 0 END), 0) AS seventyToEighty,
-                       COALESCE(SUM(CASE WHEN score >= 80 AND score < 90 THEN 1 ELSE 0 END), 0) AS eightyToNinety,
-                       COALESCE(SUM(CASE WHEN score >= 90 THEN 1 ELSE 0 END), 0) AS ninetyToHundred
-                FROM exam_attempt WHERE status = 5 AND score IS NOT NULL
+                SELECT COALESCE(SUM(CASE WHEN ea.score < 60 THEN 1 ELSE 0 END), 0) AS belowSixty,
+                       COALESCE(SUM(CASE WHEN ea.score >= 60 AND ea.score < 70 THEN 1 ELSE 0 END), 0) AS sixtyToSeventy,
+                       COALESCE(SUM(CASE WHEN ea.score >= 70 AND ea.score < 80 THEN 1 ELSE 0 END), 0) AS seventyToEighty,
+                       COALESCE(SUM(CASE WHEN ea.score >= 80 AND ea.score < 90 THEN 1 ELSE 0 END), 0) AS eightyToNinety,
+                       COALESCE(SUM(CASE WHEN ea.score >= 90 THEN 1 ELSE 0 END), 0) AS ninetyToHundred
+                FROM exam_attempt ea
+                JOIN exam e ON e.id = ea.exam_id AND e.deleted = 0
+                JOIN score_release sr ON sr.exam_id = e.id AND sr.status = 1
+                WHERE ea.status = 5 AND ea.score IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM score_appeal sa
+                    WHERE sa.attempt_id = ea.id
+                      AND sa.status = 1
+                      AND sa.handling_result = 'RECHECK_REQUIRED'
+                  )
                 """));
 
         return data;
@@ -79,13 +118,33 @@ public class AnalysisService {
         data.put("attemptCount", longValue(jt.queryForObject(
                 "SELECT COUNT(*) FROM exam_attempt ea JOIN exam e ON e.id = ea.exam_id WHERE e.created_by = ? AND e.deleted = 0",
                 Long.class, teacherId)));
-        data.put("completedCount", longValue(jt.queryForObject(
-                "SELECT COUNT(*) FROM exam_attempt ea JOIN exam e ON e.id = ea.exam_id WHERE e.created_by = ? AND e.deleted = 0 AND ea.status = 5",
-                Long.class, teacherId)));
+        data.put("completedCount", count(jt, """
+                SELECT COUNT(*)
+                FROM exam_attempt ea
+                JOIN exam e ON e.id = ea.exam_id
+                JOIN score_release sr ON sr.exam_id = e.id AND sr.status = 1
+                WHERE e.created_by = ? AND e.deleted = 0 AND ea.status = 5 AND ea.score IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM score_appeal sa
+                    WHERE sa.attempt_id = ea.id
+                      AND sa.status = 1
+                      AND sa.handling_result = 'RECHECK_REQUIRED'
+                  )
+                """, teacherId));
 
-        Double avg = jt.queryForObject(
-                "SELECT COALESCE(AVG(ea.score), 0) FROM exam_attempt ea JOIN exam e ON e.id = ea.exam_id WHERE e.created_by = ? AND e.deleted = 0 AND ea.status = 5 AND ea.score IS NOT NULL",
-                Double.class, teacherId);
+        Double avg = jt.queryForObject("""
+                SELECT COALESCE(AVG(ea.score), 0)
+                FROM exam_attempt ea
+                JOIN exam e ON e.id = ea.exam_id
+                JOIN score_release sr ON sr.exam_id = e.id AND sr.status = 1
+                WHERE e.created_by = ? AND e.deleted = 0 AND ea.status = 5 AND ea.score IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM score_appeal sa
+                    WHERE sa.attempt_id = ea.id
+                      AND sa.status = 1
+                      AND sa.handling_result = 'RECHECK_REQUIRED'
+                  )
+                """, Double.class, teacherId);
         data.put("averageScore", avg == null ? 0d : Math.round(avg * 100.0) / 100.0);
 
         data.put("subjectStats", jt.queryForList("""
@@ -94,7 +153,14 @@ public class AnalysisService {
                 FROM exam e
                 JOIN paper p ON p.id = e.paper_id
                 JOIN edu_subject s ON s.id = p.subject_id
-                LEFT JOIN exam_attempt ea ON ea.exam_id = e.id AND ea.status = 5
+                LEFT JOIN score_release sr ON sr.exam_id = e.id AND sr.status = 1
+                LEFT JOIN exam_attempt ea ON ea.exam_id = e.id AND ea.status = 5 AND ea.score IS NOT NULL AND sr.exam_id IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM score_appeal sa
+                    WHERE sa.attempt_id = ea.id
+                      AND sa.status = 1
+                      AND sa.handling_result = 'RECHECK_REQUIRED'
+                  )
                 WHERE e.created_by = ? AND e.deleted = 0
                 GROUP BY s.id, s.subject_name
                 ORDER BY s.id
@@ -106,8 +172,16 @@ public class AnalysisService {
                        COALESCE(SUM(CASE WHEN ea.score >= 70 AND ea.score < 80 THEN 1 ELSE 0 END), 0) AS seventyToEighty,
                        COALESCE(SUM(CASE WHEN ea.score >= 80 AND ea.score < 90 THEN 1 ELSE 0 END), 0) AS eightyToNinety,
                        COALESCE(SUM(CASE WHEN ea.score >= 90 THEN 1 ELSE 0 END), 0) AS ninetyToHundred
-                FROM exam_attempt ea JOIN exam e ON e.id = ea.exam_id
+                FROM exam_attempt ea
+                JOIN exam e ON e.id = ea.exam_id
+                JOIN score_release sr ON sr.exam_id = e.id AND sr.status = 1
                 WHERE e.created_by = ? AND e.deleted = 0 AND ea.status = 5 AND ea.score IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM score_appeal sa
+                    WHERE sa.attempt_id = ea.id
+                      AND sa.status = 1
+                      AND sa.handling_result = 'RECHECK_REQUIRED'
+                  )
                 """, teacherId));
 
         return data;
@@ -117,8 +191,8 @@ public class AnalysisService {
         return value == null ? 0L : value;
     }
 
-    private long count(JdbcTemplate jt, String sql) {
-        Long value = jt.queryForObject(sql, Long.class);
+    private long count(JdbcTemplate jt, String sql, Object... args) {
+        Long value = jt.queryForObject(sql, Long.class, args);
         return value == null ? 0L : value;
     }
 

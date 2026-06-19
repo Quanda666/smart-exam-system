@@ -1,12 +1,14 @@
 package com.smartexam.controller;
 
+import com.smartexam.auth.AuthContext;
+import com.smartexam.auth.RequireRoles;
 import com.smartexam.common.ApiResponse;
 import com.smartexam.common.PageResult;
 import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.dto.paper.GeneratePaperRequest;
 import com.smartexam.dto.paper.PaperRequest;
+import com.smartexam.service.OperationLogService;
 import com.smartexam.service.PaperService;
-import com.smartexam.service.RoleAccessService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,23 +20,25 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/papers")
+@RequireRoles({"ADMIN", "TEACHER"})
 public class PaperController {
 
     private final PaperService paperService;
-    private final RoleAccessService roleAccessService;
+    private final OperationLogService operationLogService;
 
-    public PaperController(PaperService paperService, RoleAccessService roleAccessService) {
+    public PaperController(PaperService paperService, OperationLogService operationLogService) {
         this.paperService = paperService;
-        this.roleAccessService = roleAccessService;
+        this.operationLogService = operationLogService;
     }
 
     @GetMapping("/summary")
     public ApiResponse<Map<String, Object>> summary() {
-        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        AuthUser user = currentUser();
         return ApiResponse.ok(paperService.summary(user));
     }
 
@@ -44,43 +48,77 @@ public class PaperController {
                                                                     @RequestParam(required = false) Integer status,
                                                                     @RequestParam(defaultValue = "1") int page,
                                                                     @RequestParam(defaultValue = "10") int size) {
-        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        AuthUser user = currentUser();
         return ApiResponse.ok(paperService.listPapers(keyword, subjectId, status, page, size, user));
     }
 
     @GetMapping("/{id}")
     public ApiResponse<Map<String, Object>> getPaper(@PathVariable Long id) {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok(paperService.getPaper(id));
+        AuthUser user = currentUser();
+        return ApiResponse.ok(paperService.getPaper(id, user));
     }
 
     @PostMapping
     public ApiResponse<Map<String, Object>> createPaper(@Valid @RequestBody PaperRequest request) {
-        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok("试卷创建成功", paperService.createPaper(request, user));
+        AuthUser user = currentUser();
+        Map<String, Object> result = paperService.createPaper(request, user);
+        return ApiResponse.ok("Paper created", withOperationLogId(user, result,
+                "CREATE_PAPER", "PAPER#" + result.get("id"), request.getPaperName()));
     }
 
     @PostMapping("/generate")
     public ApiResponse<Map<String, Object>> generatePaper(@Valid @RequestBody GeneratePaperRequest request) {
-        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok("规则组卷成功", paperService.generatePaper(request, user));
+        AuthUser user = currentUser();
+        Map<String, Object> result = paperService.generatePaper(request, user);
+        return ApiResponse.ok("Paper generated", withOperationLogId(user, result,
+                "GENERATE_PAPER", "PAPER#" + result.get("id"), request.getPaperName()));
+    }
+
+    @PostMapping("/{id}/copy")
+    public ApiResponse<Map<String, Object>> copyPaper(@PathVariable Long id) {
+        AuthUser user = currentUser();
+        Map<String, Object> result = paperService.copyPaper(id, user);
+        return ApiResponse.ok("Paper copied", withOperationLogId(user, result,
+                "COPY_PAPER", "PAPER#" + result.get("id"), "sourcePaperId=" + id));
     }
 
     @PutMapping("/{id}")
     public ApiResponse<Map<String, Object>> updatePaper(@PathVariable Long id, @Valid @RequestBody PaperRequest request) {
-        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok("试卷更新成功", paperService.updatePaper(id, request, user));
+        AuthUser user = currentUser();
+        Map<String, Object> result = paperService.updatePaper(id, request, user);
+        return ApiResponse.ok("Paper updated", withOperationLogId(user, result,
+                "UPDATE_PAPER", "PAPER#" + id, request.getPaperName()));
     }
 
     @PutMapping("/{id}/status")
     public ApiResponse<Map<String, Object>> updateStatus(@PathVariable Long id, @RequestBody Map<String, Integer> request) {
-        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok("试卷状态更新成功", paperService.updateStatus(id, request.get("status"), user));
+        AuthUser user = currentUser();
+        Integer status = request.get("status");
+        Map<String, Object> result = paperService.updateStatus(id, status, user);
+        return ApiResponse.ok("Paper status updated", withOperationLogId(user, result,
+                "UPDATE_PAPER_STATUS", "PAPER#" + id, "status=" + status));
     }
 
     @DeleteMapping("/{id}")
     public ApiResponse<Map<String, Object>> deletePaper(@PathVariable Long id) {
-        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok("试卷删除成功", paperService.deletePaper(id, user));
+        AuthUser user = currentUser();
+        Map<String, Object> result = paperService.deletePaper(id, user);
+        return ApiResponse.ok("Paper deleted", withOperationLogId(user, result,
+                "DELETE_PAPER", "PAPER#" + id, null));
+    }
+
+    private AuthUser currentUser() {
+        return AuthContext.requireSession().getUser();
+    }
+
+    private Map<String, Object> withOperationLogId(AuthUser user,
+                                                   Map<String, Object> values,
+                                                   String action,
+                                                   String target,
+                                                   String detail) {
+        Long operationLogId = operationLogService.record(user.getId(), user.getRealName(), action, target, detail);
+        Map<String, Object> result = new LinkedHashMap<>(values);
+        result.put("operationLogId", operationLogId);
+        return result;
     }
 }

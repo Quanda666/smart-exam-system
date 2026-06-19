@@ -1,7 +1,8 @@
 package com.smartexam.dto.ai;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 import java.util.ArrayList;
@@ -9,9 +10,14 @@ import java.util.List;
 
 public class WrongQuestionExplainRequest {
 
+    @NotNull(message = "questionId is required")
+    @Positive(message = "questionId must be positive")
     private Long questionId;
 
-    @NotBlank(message = "题干不能为空")
+    @NotNull(message = "examId is required")
+    @Positive(message = "examId must be positive")
+    private Long examId;
+
     @Size(max = 4000, message = "题干长度不能超过4000个字符")
     private String stem;
 
@@ -38,6 +44,14 @@ public class WrongQuestionExplainRequest {
 
     public void setQuestionId(Long questionId) {
         this.questionId = questionId;
+    }
+
+    public Long getExamId() {
+        return examId;
+    }
+
+    public void setExamId(Long examId) {
+        this.examId = examId;
     }
 
     public String getStem() {

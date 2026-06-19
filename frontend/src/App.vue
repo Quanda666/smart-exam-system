@@ -143,7 +143,7 @@
           >
             <button
               type="button"
-              :class="['menu-item menu-parent', { active: currentPath === group.path && !group.children?.length }]"
+              :class="['menu-item menu-parent', { active: activeMenuPath === group.path && !group.children?.length }]"
               @click="group.children?.length ? toggleMenuGroup(group) : navigateTo(group.path)"
               :title="sidebarCollapsed ? group.title : ''"
             >
@@ -164,7 +164,7 @@
                 v-for="child in group.children"
                 :key="child.path"
                 type="button"
-                :class="['menu-item menu-child', { active: currentPath === child.path }]"
+                :class="['menu-item menu-child', { active: activeMenuPath === child.path }]"
                 @click="navigateTo(child.path)"
               >
                 <span>{{ child.title }}</span>
@@ -203,7 +203,13 @@
           </div>
           <div class="user-box">
             <NotificationBell />
-            <UserProfile :user="user" @logout="handleLogout" @profile-updated="handleProfileUpdated" @preference-changed="handlePreferenceChanged" />
+            <UserProfile
+              ref="userProfileRef"
+              :user="user"
+              @logout="handleLogout"
+              @profile-updated="handleProfileUpdated"
+              @preference-changed="handlePreferenceChanged"
+            />
           </div>
         </header>
 
@@ -223,9 +229,13 @@
         <ReviewPanel v-else-if="isReviewPath && user" :role="user.primaryRole" />
         <UserManagement v-else-if="isUserPath && user" />
         <RoleManagement v-else-if="isRolePath && user" />
+        <SystemConfigPanel v-else-if="isConfigPath && user" />
         <SystemLog v-else-if="isLogPath && user" />
+        <ExamMonitorPanel v-else-if="isExamMonitorPath && user" />
         <ExamAnalysis v-else-if="isAnalysisPath && user" />
-        <ExamManagement v-else-if="isExamTaskPath && user" />
+        <ExamApprovalQueue v-else-if="isExamApprovalPath && user" />
+        <ExamManagement v-else-if="isExamTaskPath && user" :role="user.primaryRole" />
+        <MaterialLibraryPanel v-else-if="isMaterialLibraryPath && user" />
         <ExamAnalysis v-else-if="isTeacherAnalysisPath && user" scope="teacher" />
         <StudentInsight v-else-if="isTeacherStudentsPath && user" />
         <StudentPanel v-else-if="currentPath === '/student/exams' && user" @start-exam="startStudentExam" />
@@ -245,13 +255,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, reactive, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import {
   Lock, Message, User, Loading,
   DataAnalysis, OfficeBuilding, Management, Connection, Bell, Collection,
   Document, PieChart, Notebook, Files, Calendar, EditPen, TrendCharts,
-  DataLine, House, Clock, Tickets, Reading, ArrowDown, DArrowLeft, DArrowRight
+  DataLine, House, Clock, Tickets, Reading, Setting, ArrowDown, DArrowLeft, DArrowRight
 } from '@element-plus/icons-vue';
 
 // 侧边栏菜单图标映射（后端返回图标名 → Element Plus 组件）
@@ -276,6 +286,7 @@ const iconMap: Record<string, unknown> = {
   Clock,
   Tickets,
   Reading,
+  Setting,
   ArrowDown
 };
 const BasicDataPanel = defineAsyncComponent(() => import('./components/BasicDataPanel.vue'));
@@ -288,9 +299,13 @@ const StudentResultsPanel = defineAsyncComponent(() => import('./components/Stud
 const StudentWrongBook = defineAsyncComponent(() => import('./components/StudentWrongBook.vue'));
 const UserManagement = defineAsyncComponent(() => import('./components/UserManagement.vue'));
 const RoleManagement = defineAsyncComponent(() => import('./components/RoleManagement.vue'));
+const SystemConfigPanel = defineAsyncComponent(() => import('./components/SystemConfigPanel.vue'));
 const SystemLog = defineAsyncComponent(() => import('./components/SystemLog.vue'));
+const ExamMonitorPanel = defineAsyncComponent(() => import('./components/ExamMonitorPanel.vue'));
 const ExamAnalysis = defineAsyncComponent(() => import('./components/ExamAnalysis.vue'));
+const ExamApprovalQueue = defineAsyncComponent(() => import('./components/ExamApprovalQueue.vue'));
 const ExamManagement = defineAsyncComponent(() => import('./components/ExamManagement.vue'));
+const MaterialLibraryPanel = defineAsyncComponent(() => import('./components/MaterialLibraryPanel.vue'));
 const StudentInsight = defineAsyncComponent(() => import('./components/StudentInsight.vue'));
 const AdminDashboard = defineAsyncComponent(() => import('./components/AdminDashboard.vue'));
 const TeacherDashboard = defineAsyncComponent(() => import('./components/TeacherDashboard.vue'));
@@ -312,6 +327,8 @@ import {
   type RoleCode
 } from './api/auth';
 import { clearToken, getToken, setToken } from './api/request';
+import { useRoute, useRouter } from 'vue-router';
+import { isKnownWorkspacePath, resolveMenuAccessPath } from './router';
 
 function handleProfileUpdated(updates: { realName?: string; email?: string; phone?: string; emailVerified?: boolean; profile?: Record<string, unknown> }) {
   if (!user.value) return;
@@ -354,6 +371,9 @@ const codeLoginLoading = ref(false);
 let codeTimer: ReturnType<typeof setInterval> | null = null;
 const ACTIVE_EXAM_ATTEMPT_KEY = 'smart_exam_active_attempt_id';
 const ACTIVE_EXAM_ATTEMPT_FALLBACK_KEY = 'smart_exam_active_attempt_id_fallback';
+const route = useRoute();
+const router = useRouter();
+const ACCOUNT_PROFILE_PATH = '/account/profile';
 
 const takingExam = ref<{ attemptId: number } | null>(null);
 const loginLoading = ref(false);
@@ -368,6 +388,7 @@ const show404 = ref(false);
 const requestedPath404 = ref('');
 const routeBlockedMessage = ref('');
 const availableClasses = ref<Array<{ id: number; className: string }>>([]);
+const userProfileRef = ref<{ openProfileDialog: () => void; openAccountPanel: (panel?: string | null) => void } | null>(null);
 
 // 侧边栏（折叠状态持久化为个人偏好，刷新/重登保持）
 const sidebarCollapsed = ref(localStorage.getItem('pref_sidebar_collapsed') === '1');
@@ -383,7 +404,13 @@ function handlePreferenceChanged(prefs: { sidebarCollapsed: boolean }) {
 
 const groupedMenus = computed(() => normalizeMenus(menus.value));
 const flatMenus = computed(() => flattenMenus(groupedMenus.value));
-const currentMenuTitle = computed(() => flatMenus.value.find((item) => item.path === currentPath.value)?.title || '角色首页');
+const activeMenuPath = computed(() => resolveMenuAccessPath(currentPath.value));
+const currentMenuTitle = computed(() => {
+  if (currentPath.value.startsWith('/basic/') && currentPath.value !== '/basic/data') {
+    return basicPathTitle(currentPath.value);
+  }
+  return flatMenus.value.find((item) => item.path === activeMenuPath.value)?.title || '角色首页';
+});
 
 const isBasicPath = computed(() => currentPath.value.startsWith('/basic/'));
 
@@ -393,9 +420,13 @@ const isPaperPath = computed(() => currentPath.value === '/papers');
 const isReviewPath = computed(() => currentPath.value === '/reviews');
 const isUserPath = computed(() => currentPath.value === '/system/users');
 const isRolePath = computed(() => currentPath.value === '/system/roles');
+const isConfigPath = computed(() => currentPath.value === '/system/config');
 const isLogPath = computed(() => currentPath.value === '/monitor/logs');
+const isExamMonitorPath = computed(() => currentPath.value === '/exam-monitor');
 const isAnalysisPath = computed(() => currentPath.value === '/exam/analysis');
+const isExamApprovalPath = computed(() => currentPath.value === '/exam-approvals');
 const isExamTaskPath = computed(() => currentPath.value === '/exam-tasks');
+const isMaterialLibraryPath = computed(() => currentPath.value === '/materials');
 const isTeacherAnalysisPath = computed(() => currentPath.value === '/teacher/analysis');
 const isTeacherStudentsPath = computed(() => currentPath.value === '/teacher/students');
 
@@ -470,8 +501,7 @@ async function restoreSession() {
     menus.value = response.data.menus;
     const activeAttemptId = readActiveAttemptId();
     if (activeAttemptId && response.data.user.primaryRole === 'STUDENT') {
-      currentPath.value = '/student/exams';
-      window.history.replaceState({}, '', '/student/exams');
+      await router.replace('/student/exams');
       takingExam.value = { attemptId: activeAttemptId };
       return;
     }
@@ -571,7 +601,7 @@ async function handleLogout() {
   user.value = null;
   menus.value = [];
   currentPath.value = '/login';
-  window.history.replaceState({}, '', '/');
+  await router.replace('/');
   ElMessage.success('已退出登录');
 }
 
@@ -630,11 +660,11 @@ function clearActiveAttemptId() {
 }
 
 function resolveLandingPath(defaultPath: string) {
-  const urlPath = window.location.pathname;
-  return flatMenus.value.some((item) => item.path === urlPath) ? urlPath : defaultPath;
+  const urlPath = route.path;
+  return canAccessPath(urlPath) ? route.fullPath : defaultPath;
 }
 
-type NavigateMode = 'push' | 'replace' | 'silent';
+type NavigateMode = 'push' | 'replace';
 
 function navigateTo(path: string, mode: NavigateMode = 'push') {
   routeBlockedMessage.value = '';
@@ -646,23 +676,22 @@ function navigateTo(path: string, mode: NavigateMode = 'push') {
     return;
   }
 
-  const allowed = flatMenus.value.some((item) => item.path === path);
+  const targetUrl = path;
+  const targetPath = path.split(/[?#]/)[0] || path;
+  const allowed = canAccessPath(targetPath);
   if (!allowed) {
     // 显示 404 页面而不是静默回首页
     show404.value = true;
-    requestedPath404.value = path;
-    currentPath.value = path; // 保持 URL 不变
+    requestedPath404.value = targetPath;
+    currentPath.value = targetPath; // 保持 URL 不变
+  } else if (isAccountProfilePath(targetPath)) {
+    openAccountProfileRoute(targetUrl);
   } else {
-    currentPath.value = path;
+    currentPath.value = targetPath;
   }
 
-  // push：用户主动跳转，写入历史以支持浏览器后退；replace：会话恢复/登录落地，不堆叠历史；
-  // silent：由 popstate 触发，URL 已是目标值，不再回写 history，避免循环。
-  if (mode === 'push') {
-    window.history.pushState({}, '', currentPath.value);
-  } else if (mode === 'replace') {
-    window.history.replaceState({}, '', currentPath.value);
-  }
+  const navigation = mode === 'replace' ? router.replace(targetUrl) : router.push(targetUrl);
+  navigation.catch(() => {});
 }
 
 function flattenMenus(items: MenuItem[]): MenuItem[] {
@@ -684,7 +713,7 @@ function menuKey(item: MenuItem) {
 }
 
 function isMenuGroupActive(item: MenuItem) {
-  return item.path === currentPath.value || Boolean(item.children?.some((child) => child.path === currentPath.value));
+  return item.path === activeMenuPath.value || Boolean(item.children?.some((child) => child.path === activeMenuPath.value));
 }
 
 function toggleMenuGroup(item: MenuItem) {
@@ -712,6 +741,91 @@ function syncExpandedMenus() {
   expandedMenuKeys.value = next;
 }
 
+function canAccessPath(path: string) {
+  if (!isKnownWorkspacePath(path)) {
+    return false;
+  }
+  if (isAccountProfilePath(path)) {
+    return true;
+  }
+  const accessPath = resolveMenuAccessPath(path);
+  return flatMenus.value.some((item) => item.path === accessPath);
+}
+
+function isAccountProfilePath(path: string) {
+  return path === ACCOUNT_PROFILE_PATH;
+}
+
+function resolveAccountProfileHostPath() {
+  if (!user.value) {
+    return '/login';
+  }
+  if (currentPath.value !== '/login' && canAccessPath(currentPath.value) && !isAccountProfilePath(currentPath.value)) {
+    return currentPath.value;
+  }
+  if (canAccessPath(user.value.defaultPath)) {
+    return user.value.defaultPath;
+  }
+  return flatMenus.value[0]?.path || user.value.defaultPath;
+}
+
+function accountProfilePanelFromUrl(targetUrl?: string) {
+  if (targetUrl && targetUrl.includes('?')) {
+    return new URLSearchParams(targetUrl.split('?')[1].split('#')[0]).get('panel');
+  }
+  const raw = Array.isArray(route.query.panel) ? route.query.panel[0] : route.query.panel;
+  return raw || null;
+}
+
+function openAccountProfileRoute(targetUrl?: string) {
+  currentPath.value = resolveAccountProfileHostPath();
+  show404.value = false;
+  requestedPath404.value = '';
+  const panel = accountProfilePanelFromUrl(targetUrl);
+  nextTick(() => userProfileRef.value?.openAccountPanel(panel));
+}
+
+function basicPathTitle(path: string) {
+  const titles: Record<string, string> = {
+    '/basic/classes': '班级管理',
+    '/basic/courses': '课程管理',
+    '/basic/class-courses': '课程班管理',
+    '/basic/teaching-assignments': '授课分配',
+    '/basic/subjects': '科目管理',
+    '/basic/knowledge-points': '知识点管理',
+    '/basic/notices': '公告管理'
+  };
+  return titles[path] || '基础数据';
+}
+
+watch(
+  () => route.fullPath,
+  () => {
+    if (!user.value) {
+      currentPath.value = '/login';
+      return;
+    }
+    if (takingExam.value) {
+      return;
+    }
+    const nextPath = route.path === '/' ? user.value.defaultPath : route.path;
+    routeBlockedMessage.value = '';
+    show404.value = false;
+    requestedPath404.value = '';
+    if (isAccountProfilePath(nextPath)) {
+      openAccountProfileRoute();
+      return;
+    }
+    if (canAccessPath(nextPath)) {
+      currentPath.value = nextPath;
+    } else {
+      show404.value = true;
+      requestedPath404.value = nextPath;
+      currentPath.value = nextPath;
+    }
+  }
+);
+
 onMounted(async () => {
   // 先恢复会话（若本地有 token），恢复期间显示加载态而非登录页，避免刷新后闪现登录页。
   try {
@@ -719,15 +833,5 @@ onMounted(async () => {
   } finally {
     initializing.value = false;
   }
-
-  // 响应浏览器前进/后退：URL 已由浏览器更新，按当前 path 切换页面（silent 不再回写 history）
-  window.addEventListener('popstate', () => {
-    if (takingExam.value) {
-      return;
-    }
-    if (user.value) {
-      navigateTo(window.location.pathname, 'silent');
-    }
-  });
 });
 </script>

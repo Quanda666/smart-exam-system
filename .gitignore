@@ -30,6 +30,8 @@ application-local.yaml
 # Logs
 logs/
 *.log
+backups/
+artifacts/
 
 # IDE
 .idea/

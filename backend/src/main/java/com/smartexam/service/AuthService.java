@@ -3,12 +3,12 @@ package com.smartexam.service;
 import com.smartexam.auth.LoginAttemptGuard;
 import com.smartexam.auth.TokenSession;
 import com.smartexam.auth.TokenStore;
-import com.smartexam.exception.DatabaseUnavailableException;
 import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.dto.auth.LoginRequest;
 import com.smartexam.dto.auth.LoginResponse;
 import com.smartexam.dto.auth.MenuItem;
 import com.smartexam.dto.auth.RegisterRequest;
+import com.smartexam.exception.DatabaseUnavailableException;
 import com.smartexam.util.PasswordHashUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,6 +32,10 @@ import java.util.Map;
 public class AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final int CODE_EXPIRE_MINUTES = 5;
+    private static final int DAILY_SEND_LIMIT = 5;
+    private static final int RESEND_SECONDS = 60;
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
     private final TokenStore tokenStore;
@@ -38,16 +43,19 @@ public class AuthService {
     private final LoginAttemptGuard loginAttemptGuard;
     private final EmailServiceV3 emailService;
     private final TeachingScopeService teachingScopeService;
+    private final NotificationService notificationService;
 
     public AuthService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider, TokenStore tokenStore, MenuService menuService,
                        LoginAttemptGuard loginAttemptGuard, EmailServiceV3 emailService,
-                       TeachingScopeService teachingScopeService) {
+                       TeachingScopeService teachingScopeService,
+                       NotificationService notificationService) {
         this.jdbcTemplateProvider = jdbcTemplateProvider;
         this.tokenStore = tokenStore;
         this.menuService = menuService;
         this.loginAttemptGuard = loginAttemptGuard;
         this.emailService = emailService;
         this.teachingScopeService = teachingScopeService;
+        this.notificationService = notificationService;
     }
 
     public LoginResponse login(LoginRequest request) {
@@ -84,7 +92,7 @@ public class AuthService {
         validateRegisterRequest(request, username, realName, roleType);
         ensureUsernameAvailable(jdbcTemplate, username);
         Long roleId = findRoleId(jdbcTemplate, roleType);
-        int initialStatus = "STUDENT".equals(roleType) ? 1 : 0; // 教师账号需管理员审核后启用
+        int initialStatus = "STUDENT".equals(roleType) ? 1 : 0;
 
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
@@ -118,8 +126,9 @@ public class AuthService {
         } else {
             jdbcTemplate.update("""
                     INSERT INTO teacher_profile (user_id, teacher_no, title, introduction, status)
-                    VALUES (?, ?, ?, ?, 1)
+                    VALUES (?, ?, ?, ?, 0)
                     """, userId, trim(request.getTeacherNo()), blankToNull(request.getTitle()), blankToNull(request.getIntroduction()));
+            notifyAdminsTeacherRegistration(jdbcTemplate, userId, realName);
         }
 
         if ("STUDENT".equals(roleType)) {
@@ -128,7 +137,6 @@ public class AuthService {
             loginRequest.setPassword(request.getPassword());
             return login(loginRequest);
         }
-        // 教师账号需管理员审核启用后才能登录，此处不自动登录，返回空响应（token 为 null）
         return new LoginResponse();
     }
 
@@ -171,32 +179,26 @@ public class AuthService {
         }
         jdbcTemplate.update("UPDATE sys_user SET password_hash = ? WHERE id = ?",
                 PasswordHashUtil.encode(newPassword), userId);
+        notificationService.send(userId, "Password changed", "Your account password has been changed.",
+                "ACCOUNT_PASSWORD_CHANGED", accountSecurityLink(), "USER", userId);
+        tokenStore.revokeUserTokens(userId);
     }
 
-    // ===== 邮箱验证码相关 =====
-
-    private static final SecureRandom RANDOM = new SecureRandom();
-    private static final int CODE_EXPIRE_MINUTES = 5;
-    private static final int DAILY_SEND_LIMIT = 5;
-    private static final int RESEND_SECONDS = 60;
-
-    /** 发送登录验证码（无需登录态，但需邮箱已绑定） */
     public void sendLoginCode(String email) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
-        // 检查邮箱是否已绑定
+        String account = trim(email);
+        loginAttemptGuard.assertNotLocked(account);
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM sys_user WHERE email = ? AND email_verified = 1 AND deleted = 0",
-                Integer.class, email);
+                Integer.class, account);
         if (count == null || count == 0) {
             throw new IllegalArgumentException("该邮箱未绑定任何账号");
         }
-        sendCode(jdbcTemplate, email, "LOGIN");
+        sendCode(jdbcTemplate, account, "LOGIN");
     }
 
-    /** 发送绑定邮箱验证码（需登录态） */
     public void sendBindCode(String email, Long currentUserId) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
-        // 检查邮箱是否已被其他人绑定
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM sys_user WHERE email = ? AND email_verified = 1 AND id != ? AND deleted = 0",
                 Integer.class, email, currentUserId);
@@ -207,15 +209,13 @@ public class AuthService {
     }
 
     private void sendCode(JdbcTemplate jdbcTemplate, String email, String purpose) {
-        // 频率限制：60秒内不可重复发送
         Integer recent = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM email_verification WHERE email = ? AND purpose = ? AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND)",
                 Integer.class, email, purpose, RESEND_SECONDS);
         if (recent != null && recent > 0) {
-            throw new IllegalArgumentException("验证码已发送，请" + RESEND_SECONDS + "秒后再试");
+            throw new IllegalArgumentException("验证码已发送，请 " + RESEND_SECONDS + " 秒后再试");
         }
 
-        // 每日上限检查
         Integer todayCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM email_verification WHERE email = ? AND purpose = ? AND created_at > CURDATE()",
                 Integer.class, email, purpose);
@@ -223,59 +223,65 @@ public class AuthService {
             throw new IllegalArgumentException("今日发送次数已达上限（" + DAILY_SEND_LIMIT + "次），请明天再试");
         }
 
-        // 生成6位验证码
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(CODE_EXPIRE_MINUTES);
 
-        // 保存验证码
         jdbcTemplate.update(
                 "INSERT INTO email_verification (email, code, purpose, expires_at) VALUES (?, ?, ?, ?)",
                 email, code, purpose, expiresAt.toString().replace('T', ' ').substring(0, 19));
 
-        // 异步发送邮件（不阻塞 HTTP 请求，避免 SMTP 超时导致 502）
         if (emailService.isConfigured()) {
-            log.info("验证码已存入数据库，准备异步发送邮件至: {}", email);
+            log.info("验证码已入库，准备异步发送邮件至: {}", email);
             emailService.sendVerificationCodeAsync(email, code);
             log.info("异步邮件任务已提交");
         } else {
-            log.warn("邮件服务未配置，验证码已生成但仅记录在数据库: {} -> {}", email, code);
+            log.warn("邮件服务未配置，验证码仅记录在数据库: {} -> {}", email, code);
         }
     }
 
-    /** 验证码登录 */
     public LoginResponse loginByCode(String email, String code) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
-        verifyCode(jdbcTemplate, email, code, "LOGIN");
+        String account = trim(email);
+        loginAttemptGuard.assertNotLocked(account);
+        try {
+            verifyCode(jdbcTemplate, account, code, "LOGIN");
 
-        // 查找用户
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT id, username, password_hash, real_name, status FROM sys_user WHERE email = ? AND email_verified = 1 AND deleted = 0",
-                email);
-        if (rows.isEmpty()) {
-            throw new IllegalArgumentException("邮箱未绑定任何账号");
-        }
-        Map<String, Object> userRow = rows.get(0);
-        if (intValue(userRow.get("status")) == 0) {
-            throw new IllegalArgumentException("账号已被禁用，请联系管理员");
-        }
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    "SELECT id, username, password_hash, real_name, status FROM sys_user WHERE email = ? AND email_verified = 1 AND deleted = 0",
+                    account);
+            if (rows.isEmpty()) {
+                throw new IllegalArgumentException("邮箱未绑定任何账号");
+            }
+            Map<String, Object> userRow = rows.get(0);
+            if (intValue(userRow.get("status")) == 0) {
+                throw new IllegalArgumentException("账号已被禁用，请联系管理员");
+            }
 
-        AuthUser authUser = buildAuthUser(userRow);
-        TokenSession session = tokenStore.create(authUser);
-        List<MenuItem> menus = menuService.menusFor(authUser);
-        return new LoginResponse(session.getToken(), session.getExpiresAt(), authUser, menus, authUser.getDefaultPath());
+            AuthUser authUser = buildAuthUser(userRow);
+            TokenSession session = tokenStore.create(authUser);
+            List<MenuItem> menus = menuService.menusFor(authUser);
+            loginAttemptGuard.recordSuccess(account);
+            return new LoginResponse(session.getToken(), session.getExpiresAt(), authUser, menus, authUser.getDefaultPath());
+        } catch (RuntimeException ex) {
+            loginAttemptGuard.recordFailure(account);
+            throw ex;
+        }
     }
 
-    /** 绑定/更换邮箱 */
     public void bindEmail(Long userId, String email, String code) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         verifyCode(jdbcTemplate, email, code, "BIND");
 
-        jdbcTemplate.update(
+        int rows = jdbcTemplate.update(
                 "UPDATE sys_user SET email = ?, email_verified = 1 WHERE id = ? AND deleted = 0",
                 email, userId);
+        if (rows == 0) {
+            throw new IllegalArgumentException("用户不存在");
+        }
+        notificationService.send(userId, "Email bound", "Your account email has been bound or changed.",
+                "ACCOUNT_EMAIL_BOUND", accountSecurityLink(), "USER", userId);
     }
 
-    /** 更新个人资料 */
     public void updateProfile(Long userId, String realName, String phone) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         jdbcTemplate.update(
@@ -283,19 +289,20 @@ public class AuthService {
                 realName, blankToNull(phone), userId);
     }
 
-    /** 查询当前用户最近的登录记录（密码登录 + 验证码登录，二者 target 均为「认证」） */
     public List<Map<String, Object>> listLoginLogs(Long userId, int limit) {
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
         int safeLimit = limit <= 0 ? 10 : Math.min(limit, 50);
         return jdbcTemplate.queryForList(
                 "SELECT action, ip, detail, created_at FROM operation_log "
-                        + "WHERE operator_id = ? AND target = '认证' ORDER BY created_at DESC LIMIT ?",
+                        + "WHERE operator_id = ? AND target IN ('认证', '璁よ瘉') "
+                        + "AND action IN ('登录系统', '验证码登录', '鐧诲綍绯荤粺', '楠岃瘉鐮佺櫥褰?') "
+                        + "ORDER BY created_at DESC LIMIT ?",
                 userId, safeLimit);
     }
 
     private void verifyCode(JdbcTemplate jdbcTemplate, String email, String code, String purpose) {
         List<Map<String, Object>> codes = jdbcTemplate.queryForList(
-                "SELECT code, used, expires_at FROM email_verification WHERE email = ? AND purpose = ? ORDER BY created_at DESC LIMIT 1",
+                "SELECT id, code, used, expires_at FROM email_verification WHERE email = ? AND purpose = ? ORDER BY created_at DESC LIMIT 1",
                 email, purpose);
         if (codes.isEmpty()) {
             throw new IllegalArgumentException("请先发送验证码");
@@ -308,18 +315,15 @@ public class AuthService {
         if (!storedCode.equals(code)) {
             throw new IllegalArgumentException("验证码不正确");
         }
-        // 检查过期
-        Object expiresAt = row.get("expires_at");
-        if (expiresAt != null) {
-            LocalDateTime expireTime = expiresAt instanceof LocalDateTime ? (LocalDateTime) expiresAt
-                    : LocalDateTime.parse(expiresAt.toString().replace('T', ' ').substring(0, 19));
-            if (LocalDateTime.now().isAfter(expireTime)) {
-                throw new IllegalArgumentException("验证码已过期，请重新发送");
-            }
+        LocalDateTime expireTime = dateTimeValue(row.get("expires_at"));
+        if (expireTime != null && LocalDateTime.now().isAfter(expireTime)) {
+            throw new IllegalArgumentException("验证码已过期，请重新发送");
         }
-        // 标记已使用
-        jdbcTemplate.update("UPDATE email_verification SET used = 1 WHERE email = ? AND code = ? AND purpose = ?",
-                email, code, purpose);
+        Long codeId = longValue(row.get("id"));
+        int rows = jdbcTemplate.update("UPDATE email_verification SET used = 1 WHERE id = ? AND used = 0", codeId);
+        if (rows == 0) {
+            throw new IllegalArgumentException("验证码已使用");
+        }
     }
 
     private AuthUser buildAuthUser(Map<String, Object> userRow) {
@@ -359,7 +363,7 @@ public class AuthService {
                     "UPDATE sys_user SET password_hash = ? WHERE id = ?",
                     PasswordHashUtil.encode(rawPassword), userId);
         } catch (Exception ex) {
-            log.warn("密码哈希自动升级失败，用户ID={}，不影响本次登录：{}", userId, ex.getMessage());
+            log.warn("密码哈希自动升级失败，用户ID={}，不影响本次登录: {}", userId, ex.getMessage());
         }
     }
 
@@ -382,7 +386,6 @@ public class AuthService {
         Map<String, Object> profile = new LinkedHashMap<>();
         JdbcTemplate jdbcTemplate = requireJdbcTemplate();
 
-        // 通用账户信息：邮箱、手机号(avatar 因存 base64 可达几百 KB,频繁 SELECT 会拖垮数据库/内存,改为按需独立接口)
         List<Map<String, Object>> baseRows = jdbcTemplate.queryForList("""
                 SELECT email, email_verified, phone
                 FROM sys_user
@@ -499,6 +502,20 @@ public class AuthService {
         return jdbcTemplate;
     }
 
+    private LocalDateTime dateTimeValue(Object value) {
+        if (value instanceof Timestamp timestamp) {
+            return timestamp.toLocalDateTime();
+        }
+        if (value instanceof LocalDateTime localDateTime) {
+            return localDateTime;
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            String normalized = text.replace('T', ' ');
+            return Timestamp.valueOf(normalized.substring(0, Math.min(19, normalized.length()))).toLocalDateTime();
+        }
+        return null;
+    }
+
     private String normalizeRole(String value) {
         String trimmed = trim(value);
         return trimmed == null ? null : trimmed.toUpperCase();
@@ -511,6 +528,34 @@ public class AuthService {
 
     private String trim(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private String accountSecurityLink() {
+        return "/account/profile?panel=security";
+    }
+
+    private void notifyAdminsTeacherRegistration(JdbcTemplate jdbcTemplate, Long userId, String realName) {
+        List<Long> adminIds = jdbcTemplate.queryForList("""
+                SELECT u.id
+                FROM sys_user u
+                JOIN sys_user_role ur ON ur.user_id = u.id
+                JOIN sys_role r ON r.id = ur.role_id
+                WHERE u.deleted = 0
+                  AND u.status = 1
+                  AND r.deleted = 0
+                  AND r.status = 1
+                  AND r.role_code = 'ADMIN'
+                """, Long.class);
+        if (adminIds.isEmpty()) {
+            return;
+        }
+        notificationService.sendBatch(adminIds, "Teacher account pending review",
+                "Teacher account " + realName + " is waiting for administrator review.",
+                "ACCOUNT_REVIEW", adminUserReviewLink(userId), "USER", userId);
+    }
+
+    private String adminUserReviewLink(Long userId) {
+        return "/system/users?userId=" + userId;
     }
 
     private String stringValue(Object value) {

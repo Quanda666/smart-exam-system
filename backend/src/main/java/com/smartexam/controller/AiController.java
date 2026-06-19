@@ -1,5 +1,7 @@
 package com.smartexam.controller;
 
+import com.smartexam.auth.AuthContext;
+import com.smartexam.auth.RequireRoles;
 import com.smartexam.common.ApiResponse;
 import com.smartexam.dto.ai.AiGeneratedQuestion;
 import com.smartexam.dto.ai.AiGeneratedQuestionOption;
@@ -15,7 +17,6 @@ import com.smartexam.service.AiService;
 import com.smartexam.service.AiStatusService;
 import com.smartexam.service.DocumentTextExtractorService;
 import com.smartexam.service.QuestionBankService;
-import com.smartexam.service.RoleAccessService;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,22 +37,21 @@ import java.util.Map;
 @RequestMapping("/api/ai")
 public class AiController {
 
+    private static final int MAX_SOURCE_DETAIL_LENGTH = 255;
+
     private final AiStatusService aiStatusService;
     private final AiService aiService;
     private final DocumentTextExtractorService documentTextExtractorService;
     private final QuestionBankService questionBankService;
-    private final RoleAccessService roleAccessService;
 
     public AiController(AiStatusService aiStatusService,
                         AiService aiService,
                         DocumentTextExtractorService documentTextExtractorService,
-                        QuestionBankService questionBankService,
-                        RoleAccessService roleAccessService) {
+                        QuestionBankService questionBankService) {
         this.aiStatusService = aiStatusService;
         this.aiService = aiService;
         this.documentTextExtractorService = documentTextExtractorService;
         this.questionBankService = questionBankService;
-        this.roleAccessService = roleAccessService;
     }
 
     @GetMapping("/status")
@@ -60,12 +60,13 @@ public class AiController {
     }
 
     @PostMapping("/questions/generate")
+    @RequireRoles({"ADMIN", "TEACHER"})
     public ApiResponse<List<AiGeneratedQuestion>> generateQuestionDrafts(@Valid @RequestBody GenerateQuestionBatchRequest request) {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
-        return ApiResponse.ok(withSource(aiService.generateQuestionDrafts(request), "AI_GENERATED", "AI 出题台"));
+        return ApiResponse.ok(withSource(aiService.generateQuestionDrafts(request), "AI_GENERATED", "AI generator"));
     }
 
     @PostMapping(value = "/questions/import-document", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @RequireRoles({"ADMIN", "TEACHER"})
     public ApiResponse<List<AiGeneratedQuestion>> importQuestionDocument(@RequestPart("file") MultipartFile file,
                                                                          @RequestParam Long subjectId,
                                                                          @RequestParam String subjectName,
@@ -73,7 +74,6 @@ public class AiController {
                                                                          @RequestParam(required = false) String knowledgePointName,
                                                                          @RequestParam(defaultValue = "MEDIUM") String difficulty,
                                                                          @RequestParam(defaultValue = "5") BigDecimal defaultScore) {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
         GenerateQuestionBatchRequest defaults = new GenerateQuestionBatchRequest();
         defaults.setSubjectId(subjectId);
         defaults.setSubjectName(subjectName);
@@ -83,10 +83,12 @@ public class AiController {
         defaults.setDifficulty(difficulty);
         defaults.setDefaultScore(defaultScore);
         String text = documentTextExtractorService.extract(file);
-        return ApiResponse.ok(withSource(aiService.importQuestionsFromDocument(text, defaults), "AI_IMPORTED", sourceDetail(file, "题目文档识别")));
+        return ApiResponse.ok(withSource(aiService.importQuestionsFromDocument(text, defaults),
+                "AI_IMPORTED", sourceDetail(file, "Question document import")));
     }
 
     @PostMapping(value = "/questions/generate-from-material", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @RequireRoles({"ADMIN", "TEACHER"})
     public ApiResponse<List<AiGeneratedQuestion>> generateFromMaterial(@RequestPart("file") MultipartFile file,
                                                                        @RequestParam Long subjectId,
                                                                        @RequestParam String subjectName,
@@ -100,7 +102,6 @@ public class AiController {
                                                                        @RequestParam(defaultValue = "0") Integer trueFalseCount,
                                                                        @RequestParam(defaultValue = "0") Integer fillBlankCount,
                                                                        @RequestParam(defaultValue = "0") Integer subjectiveCount) {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
         MaterialQuestionGenerationRequest request = new MaterialQuestionGenerationRequest();
         request.setSubjectId(subjectId);
         request.setSubjectName(subjectName);
@@ -111,32 +112,43 @@ public class AiController {
         request.setRequirements(requirements);
         request.setTypeCounts(typeCounts(singleChoiceCount, multipleChoiceCount, trueFalseCount, fillBlankCount, subjectiveCount));
         String text = documentTextExtractorService.extract(file);
-        return ApiResponse.ok(withSource(aiService.generateQuestionDraftsFromMaterial(text, request), "AI_MATERIAL", sourceDetail(file, "课程材料生成")));
+        return ApiResponse.ok(withSource(aiService.generateQuestionDraftsFromMaterial(text, request),
+                "AI_MATERIAL", sourceDetail(file, "Course material generation")));
     }
 
     @PostMapping("/questions/save")
+    @RequireRoles({"ADMIN", "TEACHER"})
     public ApiResponse<Map<String, Object>> saveGeneratedQuestions(@Valid @RequestBody SaveGeneratedQuestionsRequest request) {
-        AuthUser user = roleAccessService.requireAnyRole("ADMIN", "TEACHER");
+        AuthUser user = currentUser();
         List<Map<String, Object>> saved = request.getQuestions().stream()
                 .map(this::toQuestionRequest)
                 .map(question -> questionBankService.createQuestion(question, user))
                 .toList();
-        return ApiResponse.ok("AI题目草稿已保存", Map.of(
+        List<Object> questionReviewLogIds = saved.stream()
+                .map(question -> question.get("questionReviewLogId"))
+                .filter(id -> id != null)
+                .toList();
+        return ApiResponse.ok("AI question drafts saved", Map.of(
                 "savedCount", saved.size(),
+                "questionReviewLogIds", questionReviewLogIds,
                 "questions", saved
         ));
     }
 
     @PostMapping("/wrong-question/explain")
+    @RequireRoles({"STUDENT"})
     public ApiResponse<String> explainWrongQuestion(@Valid @RequestBody WrongQuestionExplainRequest request) {
-        roleAccessService.requireLogin();
-        return ApiResponse.ok(aiService.explainWrongQuestion(request));
+        return ApiResponse.ok(aiService.explainWrongQuestion(request, currentUser()));
     }
 
     @PostMapping("/suggest-review")
+    @RequireRoles({"ADMIN", "TEACHER"})
     public ApiResponse<String> suggestReview(@Valid @RequestBody SuggestReviewRequest request) {
-        roleAccessService.requireAnyRole("ADMIN", "TEACHER");
         return ApiResponse.ok(aiService.suggestReview(request));
+    }
+
+    private AuthUser currentUser() {
+        return AuthContext.requireSession().getUser();
     }
 
     private QuestionRequest toQuestionRequest(AiGeneratedQuestion draft) {
@@ -158,7 +170,8 @@ public class AiController {
         request.setSourceExcerpt(draft.getSourceExcerpt());
         request.setAiModel(draft.getAiModel());
         request.setPromptVersion(draft.getPromptVersion());
-        request.setOptions(draft.getOptions().stream().map(this::toOptionRequest).toList());
+        List<AiGeneratedQuestionOption> options = draft.getOptions() == null ? List.of() : draft.getOptions();
+        request.setOptions(options.stream().map(this::toOptionRequest).toList());
         return request;
     }
 
@@ -172,8 +185,11 @@ public class AiController {
 
     private String sourceDetail(MultipartFile file, String fallback) {
         String filename = file.getOriginalFilename();
-        String detail = filename == null || filename.isBlank() ? fallback : fallback + "：" + filename;
-        return detail.length() > 255 ? detail.substring(0, 255) : detail;
+        String detail = filename == null || filename.isBlank() ? fallback : fallback + ": " + filename;
+        if (detail.length() > MAX_SOURCE_DETAIL_LENGTH) {
+            throw new IllegalArgumentException("AI source detail must be 255 characters or less");
+        }
+        return detail;
     }
 
     private QuestionOptionRequest toOptionRequest(AiGeneratedQuestionOption option) {

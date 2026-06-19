@@ -538,7 +538,7 @@ public class BasicDataService {
         return Map.of("deleted", true, "id", id);
     }
 
-    public List<Map<String, Object>> listNotices(String keyword, Integer status, AuthUser user) {
+    public List<Map<String, Object>> listNotices(String keyword, Integer status, Long noticeId, AuthUser user) {
         JdbcTemplate jt = requireJdbcTemplate();
         List<Map<String, Object>> rows = jt.queryForList("""
                 SELECT n.id, n.title, n.content, n.status, n.publish_time AS publishTime,
@@ -549,8 +549,10 @@ public class BasicDataService {
                 WHERE n.deleted = 0
                   AND (? IS NULL OR n.title LIKE CONCAT('%', ?, '%') OR n.content LIKE CONCAT('%', ?, '%'))
                   AND (? IS NULL OR n.status = ?)
+                  AND (? IS NULL OR n.id = ?)
                 ORDER BY n.id DESC
-                """, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), status, status);
+                """, blankToNull(keyword), blankToNull(keyword), blankToNull(keyword), status, status,
+                noticeId, noticeId);
         List<Map<String, Object>> visible = new ArrayList<>();
         for (Map<String, Object> row : rows) {
             List<Map<String, Object>> targets = getNoticeTargets(numberValue(row.get("id")));
@@ -626,7 +628,7 @@ public class BasicDataService {
                 "classCourses", listClassCourses(null, null, user).size(),
                 "subjects", listSubjects(null, null).size(),
                 "knowledgePoints", listKnowledgePoints(null, null, null).size(),
-                "notices", listNotices(null, null, user).size()
+                "notices", listNotices(null, null, null, user).size()
         );
     }
 
@@ -792,10 +794,14 @@ public class BasicDataService {
                 return;
             }
             notificationService.sendBatch(new ArrayList<>(recipients), "New notice: " + trim(request.getTitle()),
-                    trim(request.getContent()), "NOTICE", "/basic/data");
+                    trim(request.getContent()), "NOTICE", noticeLink(noticeId), "NOTICE", noticeId);
         } catch (Exception ex) {
             // Notifications are secondary. Notice publishing must not fail because of push errors.
         }
+    }
+
+    private String noticeLink(Long noticeId) {
+        return "/basic/notices?noticeId=" + noticeId;
     }
 
     private Set<Long> resolveNoticeRecipients(JdbcTemplate jt, List<TargetSpec> targets) {

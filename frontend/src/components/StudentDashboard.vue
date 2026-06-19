@@ -32,6 +32,52 @@
       </div>
     </div>
 
+    <div class="mp-card student-action-center">
+      <div class="mp-card-title student-action-title">
+        <span>
+          <el-icon><AlarmClock /></el-icon>
+          Action Center
+        </span>
+        <el-tag :type="data.actionCenter.total > 0 ? 'warning' : 'success'" effect="plain">
+          {{ data.actionCenter.total }} open
+        </el-tag>
+      </div>
+      <div class="student-action-summary">
+        <button
+          v-for="item in actionSummaryRows"
+          :key="item.key"
+          type="button"
+          class="student-action-summary-item"
+          @click="emit('navigate', item.target)"
+        >
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+        </button>
+      </div>
+      <div class="student-action-list">
+        <button
+          v-for="item in data.actionCenter.items"
+          :key="actionItemKey(item)"
+          type="button"
+          class="student-action-row"
+          @click="openActionItem(item)"
+        >
+          <span :class="['student-action-icon', `severity-${String(item.severity || 'INFO').toLowerCase()}`]">
+            <el-icon><component :is="actionIcon(item.type)" /></el-icon>
+          </span>
+          <span class="student-action-main">
+            <strong>{{ item.title }}</strong>
+            <small>{{ item.subject || '-' }}</small>
+            <small>{{ item.detail || '-' }}</small>
+          </span>
+          <span class="student-action-side">
+            <el-tag :type="actionSeverityType(item.severity)" size="small">{{ item.count }}</el-tag>
+          </span>
+        </button>
+        <el-empty v-if="data.actionCenter.items.length === 0" description="No open student actions" :image-size="80" />
+      </div>
+    </div>
+
     <div class="dashboard-grid">
       <div class="mp-card">
         <div class="mp-card-title">
@@ -39,7 +85,7 @@
           最近考试
         </div>
         <div class="exam-list">
-          <button v-for="exam in data.recentExams" :key="exam.attemptId || exam.name" type="button" class="exam-row" @click="emit('navigate', '/student/exams')">
+          <button v-for="exam in data.recentExams" :key="exam.attemptId || exam.name" type="button" class="exam-row" @click="openRecentExam(exam)">
             <span class="exam-dot" :class="phaseClass(exam.phase)"></span>
             <span class="exam-main">
               <strong>{{ exam.name }}</strong>
@@ -99,6 +145,32 @@ interface RecentExam {
   maxAttempts?: number;
 }
 
+interface StudentActionItem {
+  type: 'RESUME_EXAM' | 'CONFIRM_RULES' | 'ENTER_EXAM' | 'UPCOMING_EXAM' | 'SCORE_RELEASED' | 'SCORE_PENDING' | 'APPEAL_STATUS' | 'WRONG_BOOK' | string;
+  title: string;
+  subject?: string;
+  detail?: string;
+  count: number | string;
+  severity?: 'HIGH' | 'WARN' | 'INFO' | string;
+  target: string;
+  attemptId?: number | null;
+  examId?: number | null;
+  appealId?: number | null;
+}
+
+interface StudentActionCenter {
+  generatedAt?: string;
+  total: number;
+  activeExams: number;
+  readyExams: number;
+  waitingSoonExams: number;
+  releasedScores: number;
+  pendingScores: number;
+  openAppeals: number;
+  wrongQuestions: number;
+  items: StudentActionItem[];
+}
+
 interface StudentOverview {
   upcomingExams: number;
   activeExams: number;
@@ -109,7 +181,20 @@ interface StudentOverview {
   scoreTrend: Array<{ date: string; score: number; examName: string }>;
   knowledgePoints: Array<{ name: string; mastery: number }>;
   recentExams: RecentExam[];
+  actionCenter: StudentActionCenter;
 }
+
+const emptyActionCenter = (): StudentActionCenter => ({
+  total: 0,
+  activeExams: 0,
+  readyExams: 0,
+  waitingSoonExams: 0,
+  releasedScores: 0,
+  pendingScores: 0,
+  openAppeals: 0,
+  wrongQuestions: 0,
+  items: []
+});
 
 const data = ref<StudentOverview>({
   upcomingExams: 0,
@@ -120,7 +205,8 @@ const data = ref<StudentOverview>({
   bestScore: 0,
   scoreTrend: [],
   knowledgePoints: [],
-  recentExams: []
+  recentExams: [],
+  actionCenter: emptyActionCenter()
 });
 
 const greeting = computed(() => {
@@ -140,12 +226,31 @@ const statCards = computed(() => [
   { group: '错题回顾', label: '错题数', value: data.value.wrongQuestions, icon: Warning, iconClass: 'mp-icon-orange', color: '#dc2626' }
 ]);
 
+const actionSummaryRows = computed(() => [
+  { key: 'active', label: 'Resume', value: data.value.actionCenter.activeExams, target: '/student/exams' },
+  { key: 'ready', label: 'Ready', value: data.value.actionCenter.readyExams, target: '/student/exams' },
+  { key: 'soon', label: 'Soon', value: data.value.actionCenter.waitingSoonExams, target: '/student/exams' },
+  { key: 'released', label: 'Released', value: data.value.actionCenter.releasedScores, target: '/student/results' },
+  { key: 'pending', label: 'Pending score', value: data.value.actionCenter.pendingScores, target: '/student/results' },
+  { key: 'appeals', label: 'Appeals', value: data.value.actionCenter.openAppeals, target: '/student/results' },
+  { key: 'wrong', label: 'Wrong book', value: data.value.actionCenter.wrongQuestions, target: '/student/wrong-questions' }
+]);
+
 const scoreTrendChart = ref<HTMLElement>();
 const kpChart = ref<HTMLElement>();
 
 onMounted(async () => {
   try {
-    data.value = (await getJson<StudentOverview>('/api/overview/student')).data;
+    const overview = (await getJson<StudentOverview>('/api/overview/student')).data;
+    data.value = {
+      ...data.value,
+      ...overview,
+      actionCenter: {
+        ...emptyActionCenter(),
+        ...(overview.actionCenter || {}),
+        items: overview.actionCenter?.items || []
+      }
+    };
     await new Promise((resolve) => setTimeout(resolve, 100));
     renderCharts();
   } catch {
@@ -213,6 +318,39 @@ function statusText(status?: number) {
   if ((status || 0) >= 2) return '已交卷';
   return '可进入';
 }
+function openRecentExam(exam: RecentExam) {
+  const attemptId = Number(exam.attemptId || 0);
+  if (Number.isFinite(attemptId) && attemptId > 0) {
+    emit('navigate', `/student/exams?attemptId=${attemptId}`);
+    return;
+  }
+  emit('navigate', '/student/exams');
+}
+
+function actionIcon(type?: string) {
+  const normalized = String(type || '').toUpperCase();
+  if (normalized === 'RESUME_EXAM' || normalized === 'CONFIRM_RULES' || normalized === 'ENTER_EXAM') return AlarmClock;
+  if (normalized === 'UPCOMING_EXAM') return Calendar;
+  if (normalized === 'SCORE_RELEASED') return CircleCheck;
+  if (normalized === 'SCORE_PENDING' || normalized === 'APPEAL_STATUS') return TrendCharts;
+  if (normalized === 'WRONG_BOOK') return Notebook;
+  return AlarmClock;
+}
+
+function actionSeverityType(severity?: string) {
+  const normalized = String(severity || '').toUpperCase();
+  if (normalized === 'HIGH') return 'danger';
+  if (normalized === 'WARN') return 'warning';
+  return 'info';
+}
+
+function actionItemKey(item: StudentActionItem) {
+  return `${item.type}-${item.attemptId || 'none'}-${item.appealId || item.title}`;
+}
+
+function openActionItem(item: StudentActionItem) {
+  emit('navigate', item.target || '/student/exams');
+}
 </script>
 
 <style scoped>
@@ -246,6 +384,129 @@ function statusText(status?: number) {
 
 .chart-box.wide {
   height: 320px;
+}
+
+.student-action-center {
+  margin-bottom: 16px;
+}
+
+.student-action-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.student-action-title > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.student-action-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.student-action-summary-item {
+  min-height: 58px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111827;
+  text-align: left;
+  cursor: pointer;
+}
+
+.student-action-summary-item:hover {
+  border-color: #bfdbfe;
+  background: #f8fbff;
+}
+
+.student-action-summary-item span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.student-action-summary-item strong {
+  color: #111827;
+  font-size: 18px;
+}
+
+.student-action-list {
+  display: grid;
+  gap: 10px;
+}
+
+.student-action-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.student-action-row:hover {
+  border-color: #bfdbfe;
+  background: #f8fbff;
+}
+
+.student-action-icon {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.student-action-icon.severity-high {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.student-action-icon.severity-warn {
+  background: #fff7ed;
+  color: #ea580c;
+}
+
+.student-action-main {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.student-action-main strong,
+.student-action-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-action-main strong {
+  color: #111827;
+}
+
+.student-action-main small {
+  color: #64748b;
+}
+
+.student-action-side {
+  display: grid;
+  justify-items: end;
 }
 
 .exam-list {
@@ -319,6 +580,15 @@ function statusText(status?: number) {
 
   .dashboard-head {
     display: grid;
+  }
+
+  .student-action-row {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .student-action-side {
+    grid-column: 2;
+    justify-items: start;
   }
 }
 </style>

@@ -59,7 +59,7 @@
               link
               type="primary"
               :icon="MagicStick"
-              :loading="aiExplainingQuestionId === scope.row.questionId"
+              :loading="aiExplainingWrongKey === wrongQuestionKey(scope.row)"
               @click="aiExplainWrong(scope.row as WrongQuestion)"
             >
               AI讲解
@@ -71,7 +71,7 @@
     </div>
 
     <el-dialog v-model="aiExplainVisible" :title="aiExplainTitle" width="min(880px, 92vw)" top="6vh" class="ai-explain-dialog">
-      <el-skeleton v-if="aiExplainingQuestionId" :rows="5" animated />
+      <el-skeleton v-if="aiExplainingWrongKey" :rows="5" animated />
       <div v-else class="ai-explain-shell">
         <div v-if="activeWrongQuestion" class="ai-question-card">
           <div class="ai-question-meta">
@@ -105,7 +105,7 @@ const wrongQuestions = ref<WrongQuestion[]>([]);
 const aiExplainVisible = ref(false);
 const aiExplanation = ref('');
 const aiExplainTitle = ref('AI错题讲解');
-const aiExplainingQuestionId = ref<number | null>(null);
+const aiExplainingWrongKey = ref<string | null>(null);
 const activeWrongQuestion = ref<WrongQuestion | null>(null);
 
 interface AiExplainSection {
@@ -148,29 +148,18 @@ async function aiExplainWrong(item: WrongQuestion) {
   aiExplanation.value = '';
   aiExplainTitle.value = 'AI错题讲解';
   activeWrongQuestion.value = item;
-  aiExplainingQuestionId.value = item.questionId;
+  aiExplainingWrongKey.value = wrongQuestionKey(item);
   try {
     const response = await explainWrongQuestion({
       questionId: item.questionId,
-      stem: item.stem,
-      questionType: item.questionType,
-      correctAnswer: item.correctAnswer,
-      analysis: item.analysis,
-      wrongCount: item.wrongCount,
-      options: (item.options || [])
-        .filter((option) => Boolean(option.optionLabel && option.optionContent))
-        .map((option) => ({
-          optionLabel: option.optionLabel,
-          optionContent: option.optionContent,
-          correct: isCorrectValue(option.correct ?? option.isCorrect)
-        }))
+      examId: item.examId
     });
     aiExplanation.value = response.data;
   } catch (error) {
     aiExplainVisible.value = false;
     ElMessage.error(error instanceof Error ? error.message : 'AI讲解请求失败');
   } finally {
-    aiExplainingQuestionId.value = null;
+    aiExplainingWrongKey.value = null;
   }
 }
 
@@ -178,6 +167,10 @@ const aiExplainSections = computed<AiExplainSection[]>(() => parseAiExplanation(
 
 function isCorrectValue(value: boolean | number | undefined) {
   return value === true || value === 1;
+}
+
+function wrongQuestionKey(item: { examId?: number; questionId?: number }) {
+  return `${item.examId}:${item.questionId}`;
 }
 
 function typeText(type?: string) {

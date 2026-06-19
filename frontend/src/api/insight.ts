@@ -16,6 +16,9 @@ export interface StudentExamRecord {
   subjectName: string;
   score: number | null;
   totalScore: number;
+  questionCount?: number | string | null;
+  answeredCount?: number | string | null;
+  unansweredCount?: number | string | null;
   submitTime: string;
 }
 

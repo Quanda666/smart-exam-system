@@ -30,6 +30,15 @@ export interface PaperInfo {
   createdAt?: string;
   updatedAt?: string;
   questionCount: number;
+  examCount?: number;
+  locked?: boolean;
+  lockReason?: string;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  canPublish?: boolean;
+  canRevoke?: boolean;
+  canCopy?: boolean;
+  operationLogId?: number | null;
   questions?: PaperQuestionInfo[];
 }
 
@@ -86,6 +95,7 @@ export interface PaperSummary {
 export type DeleteResult = {
   deleted: boolean;
   id: number;
+  operationLogId?: number | null;
 };
 
 function queryString(query: PaperQuery = {}) {
@@ -117,6 +127,10 @@ export function createPaper(payload: PaperPayload) {
 
 export function generatePaper(payload: GeneratePaperPayload) {
   return postJson<PaperInfo, GeneratePaperPayload>('/api/papers/generate', payload);
+}
+
+export function copyPaper(id: number) {
+  return postJson<PaperInfo>(`/api/papers/${id}/copy`);
 }
 
 export function updatePaper(id: number, payload: PaperPayload) {

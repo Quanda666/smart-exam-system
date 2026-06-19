@@ -1,9 +1,12 @@
 package com.smartexam.controller;
 
+import com.smartexam.auth.RequireRoles;
+import com.smartexam.auth.AuthContext;
 import com.smartexam.common.ApiResponse;
+import com.smartexam.dto.auth.AuthUser;
 import com.smartexam.dto.auth.MenuItem;
 import com.smartexam.service.MenuService;
-import com.smartexam.service.RoleAccessService;
+import com.smartexam.service.OperationLogService;
 import com.smartexam.service.UserService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,21 +22,21 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/system/roles")
+@RequireRoles("ADMIN")
 public class RoleController {
 
     private final UserService userService;
     private final MenuService menuService;
-    private final RoleAccessService roleAccessService;
+    private final OperationLogService operationLogService;
 
-    public RoleController(UserService userService, MenuService menuService, RoleAccessService roleAccessService) {
+    public RoleController(UserService userService, MenuService menuService, OperationLogService operationLogService) {
         this.userService = userService;
         this.menuService = menuService;
-        this.roleAccessService = roleAccessService;
+        this.operationLogService = operationLogService;
     }
 
     @GetMapping
     public ApiResponse<List<Map<String, Object>>> list() {
-        roleAccessService.requireRole("ADMIN");
         Map<String, List<String>> pageMap = menuService.rolePageMap();
         List<Map<String, Object>> availablePages = menuService.allMenuItems().stream()
                 .map(this::toPageOption)
@@ -55,12 +58,22 @@ public class RoleController {
     @PutMapping("/{roleCode}/pages")
     public ApiResponse<Map<String, Object>> updatePages(@PathVariable String roleCode,
                                                         @RequestBody Map<String, List<String>> body) {
-        roleAccessService.requireRole("ADMIN");
+        AuthUser admin = currentUser();
+        String normalizedRoleCode = roleCode == null ? "" : roleCode.toUpperCase();
+        List<String> beforePages = menuService.rolePageMap().getOrDefault(normalizedRoleCode, List.of());
         List<String> pages = menuService.updateRolePages(roleCode, body == null ? List.of() : body.getOrDefault("pages", List.of()));
+        Long operationLogId = operationLogService.record(admin.getId(), admin.getRealName(),
+                "UPDATE_ROLE_PAGES", "ROLE#" + normalizedRoleCode,
+                "before=" + String.join(",", beforePages) + "; after=" + String.join(",", pages));
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("roleCode", roleCode == null ? "" : roleCode.toUpperCase());
+        result.put("roleCode", normalizedRoleCode);
         result.put("pages", pages);
+        result.put("operationLogId", operationLogId);
         return ApiResponse.ok("授权已保存", result);
+    }
+
+    private AuthUser currentUser() {
+        return AuthContext.requireSession().getUser();
     }
 
     private Map<String, Object> toPageOption(MenuItem menu) {

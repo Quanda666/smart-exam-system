@@ -23,6 +23,11 @@ public class CorsConfig {
         allowedOriginPatterns().forEach(configuration::addAllowedOriginPattern);
         configuration.addAllowedHeader("*");
         configuration.addAllowedMethod("*");
+        configuration.setExposedHeaders(List.of(
+                "Content-Disposition",
+                "X-Request-Id",
+                "X-Response-Time-Ms"
+        ));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

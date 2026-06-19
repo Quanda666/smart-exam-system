@@ -4,6 +4,26 @@ export interface ApiResponse<T> {
   message: string;
   data: T;
   timestamp: string;
+  requestId?: string;
+  responseTimeMs?: number;
+}
+
+export class ApiError extends Error {
+  code: string;
+  status: number;
+  requestId?: string;
+  responseTimeMs?: number;
+  rawMessage: string;
+
+  constructor(message: string, code = 'REQUEST_FAILED', status = 0, requestId?: string, responseTimeMs?: number) {
+    super(requestId ? `${message}（请求ID：${requestId}）` : message);
+    this.name = 'ApiError';
+    this.rawMessage = message;
+    this.code = code;
+    this.status = status;
+    this.requestId = requestId;
+    this.responseTimeMs = responseTimeMs;
+  }
 }
 
 const TOKEN_KEY = 'smart_exam_token';
@@ -37,6 +57,7 @@ export async function postJson<T, B = unknown>(url: string, body?: B): Promise<A
 export async function postForm<T>(url: string, body: FormData): Promise<ApiResponse<T>> {
   const token = getToken();
   const headers = new Headers();
+  headers.set('X-Request-Id', createRequestId());
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
@@ -48,13 +69,18 @@ export async function postForm<T>(url: string, body: FormData): Promise<ApiRespo
   });
 
   const payload = (await response.json().catch(() => null)) as ApiResponse<T> | null;
+  const trace = traceHeaders(response);
   if (!response.ok) {
-    throw new Error(payload?.message || `请求失败：${response.status}`);
+    throw new ApiError(payload?.message || `Request failed: ${response.status}`,
+      payload?.code,
+      response.status,
+      trace.requestId,
+      trace.responseTimeMs);
   }
   if (!payload) {
-    throw new Error('接口响应为空');
+    throw new ApiError('Empty API response', 'EMPTY_RESPONSE', response.status, trace.requestId, trace.responseTimeMs);
   }
-  return payload;
+  return withTrace(payload, trace);
 }
 
 export async function putJson<T, B = unknown>(url: string, body?: B): Promise<ApiResponse<T>> {
@@ -78,22 +104,28 @@ export async function deleteJson<T>(url: string): Promise<ApiResponse<T>> {
 export async function downloadFile(url: string, fallbackName = 'export.csv'): Promise<void> {
   const token = getToken();
   const headers = new Headers();
+  headers.set('X-Request-Id', createRequestId());
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
 
   const response = await fetch(resolveUrl(url), { method: 'GET', headers });
+  const trace = traceHeaders(response);
   if (!response.ok) {
     let message = `下载失败：${response.status}`;
+    let code = 'DOWNLOAD_FAILED';
     try {
       const payload = (await response.json()) as ApiResponse<unknown> | null;
       if (payload?.message) {
         message = payload.message;
       }
+      if (payload?.code) {
+        code = payload.code;
+      }
     } catch {
       // 错误响应体不是 JSON 时忽略，沿用状态码提示
     }
-    throw new Error(message);
+    throw new ApiError(message, code, response.status, trace.requestId, trace.responseTimeMs);
   }
 
   const blob = await response.blob();
@@ -128,6 +160,7 @@ async function requestJson<T>(url: string, init: RequestInit): Promise<ApiRespon
   const token = getToken();
   const headers = new Headers(init.headers);
   headers.set('Content-Type', 'application/json');
+  headers.set('X-Request-Id', createRequestId());
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
@@ -138,16 +171,17 @@ async function requestJson<T>(url: string, init: RequestInit): Promise<ApiRespon
   });
 
   const payload = (await response.json().catch(() => null)) as ApiResponse<T> | null;
+  const trace = traceHeaders(response);
   if (!response.ok) {
-    const message = payload?.message || `请求失败：${response.status}`;
-    throw new Error(message);
+    const message = payload?.message || `Request failed: ${response.status}`;
+    throw new ApiError(message, payload?.code, response.status, trace.requestId, trace.responseTimeMs);
   }
 
   if (!payload) {
-    throw new Error('接口响应为空');
+    throw new ApiError('Empty API response', 'EMPTY_RESPONSE', response.status, trace.requestId, trace.responseTimeMs);
   }
 
-  return payload;
+  return withTrace(payload, trace);
 }
 
 function resolveUrl(url: string) {
@@ -155,4 +189,26 @@ function resolveUrl(url: string) {
     return url;
   }
   return `${API_BASE_URL}${url}`;
+}
+
+function createRequestId() {
+  const random = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID().replace(/-/g, '')
+    : Math.random().toString(16).slice(2) + Date.now().toString(16);
+  return `web-${random}`.slice(0, 80);
+}
+
+function traceHeaders(response: Response) {
+  const requestId = response.headers.get('X-Request-Id') || undefined;
+  const rawResponseTime = response.headers.get('X-Response-Time-Ms');
+  const responseTimeMs = rawResponseTime && !Number.isNaN(Number(rawResponseTime))
+    ? Number(rawResponseTime)
+    : undefined;
+  return { requestId, responseTimeMs };
+}
+
+function withTrace<T>(payload: ApiResponse<T>, trace: { requestId?: string; responseTimeMs?: number }) {
+  payload.requestId = trace.requestId;
+  payload.responseTimeMs = trace.responseTimeMs;
+  return payload;
 }

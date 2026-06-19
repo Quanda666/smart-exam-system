@@ -7,40 +7,40 @@ import jakarta.validation.constraints.Size;
 public class RegisterRequest {
 
     @NotBlank(message = "用户名不能为空")
-    @Size(min = 3, max = 64, message = "用户名长度需在 3 到 64 位之间")
+    @Size(min = 3, max = 64, message = "用户名长度需在3到64位之间")
     @Pattern(regexp = "^[A-Za-z0-9_]+$", message = "用户名只能包含字母、数字和下划线")
     private String username;
 
     @NotBlank(message = "密码不能为空")
-    @Size(min = 6, max = 64, message = "密码长度需在 6 到 64 位之间")
+    @Size(min = 6, max = 64, message = "密码长度需在6到64位之间")
     private String password;
 
     @NotBlank(message = "真实姓名不能为空")
-    @Size(max = 64, message = "真实姓名不能超过 64 个字符")
+    @Size(max = 64, message = "真实姓名不能超过64个字符")
     private String realName;
 
     @NotBlank(message = "角色类型不能为空")
     @Pattern(regexp = "^(STUDENT|TEACHER)$", message = "仅支持学生或教师注册")
     private String roleType;
 
-    @Size(max = 64, message = "学号不能超过 64 个字符")
+    @Size(max = 64, message = "学号不能超过64个字符")
     private String studentNo;
 
     private Long classId;
 
-    @Size(max = 64, message = "工号不能超过 64 个字符")
+    @Size(max = 64, message = "工号不能超过64个字符")
     private String teacherNo;
 
-    @Size(max = 64, message = "职称不能超过 64 个字符")
+    @Size(max = 64, message = "职称不能超过64个字符")
     private String title;
 
-    @Size(max = 512, message = "简介不能超过 512 个字符")
+    @Size(max = 512, message = "简介不能超过512个字符")
     private String introduction;
 
-    @Size(max = 32, message = "手机号不能超过 32 个字符")
+    @Size(max = 32, message = "手机号不能超过32个字符")
     private String phone;
 
-    @Size(max = 128, message = "邮箱不能超过 128 个字符")
+    @Size(max = 128, message = "邮箱不能超过128个字符")
     private String email;
 
     public String getUsername() {

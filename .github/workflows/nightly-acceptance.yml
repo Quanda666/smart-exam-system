@@ -1,0 +1,240 @@
+name: Nightly acceptance
+
+on:
+  schedule:
+    - cron: '30 18 * * *'
+  workflow_dispatch:
+    inputs:
+      submit_replay:
+        description: Run destructive submit replay on disposable fixture
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      load_concurrency:
+        description: Non-destructive load smoke concurrency
+        required: false
+        default: '5'
+      load_iterations:
+        description: Non-destructive load smoke iterations
+        required: false
+        default: '2'
+      max_p95_request_latency_ms:
+        description: Fail load smoke when global P95 latency exceeds this value
+        required: false
+        default: '5000'
+      max_p99_request_latency_ms:
+        description: Fail load smoke when global P99 latency exceeds this value
+        required: false
+        default: '8000'
+
+jobs:
+  attempt-resilience:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: smart_exam_system
+          MYSQL_USER: smartexam
+          MYSQL_PASSWORD: smartexam123
+          TZ: Asia/Shanghai
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -usmartexam -psmartexam123"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      MYSQL_URL: jdbc:mysql://127.0.0.1:3306/smart_exam_system?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      MYSQL_USERNAME: smartexam
+      MYSQL_PASSWORD: smartexam123
+      DB_INIT_MODE: always
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+      REDIS_HEALTH_ENABLED: true
+      EXAM_DRAFT_REDIS_ENABLED: true
+      EXAM_DRAFT_REDIS_TTL_SECONDS: 21600
+      EXAM_DRAFT_FLUSH_DELAY_MS: 60000
+      EXAM_DRAFT_FLUSH_INITIAL_DELAY_MS: 180000
+      AI_MOCK_ENABLED: true
+      PROMETHEUS_METRICS_ENABLED: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Validate PowerShell scripts
+        shell: pwsh
+        run: |
+          $files = @(
+            'scripts/run-attempt-resilience-acceptance.ps1',
+            'scripts/verify-attempt-resilience.ps1',
+            'scripts/run-exam-load-smoke.ps1',
+            'scripts/check-exam-metrics-smoke.ps1',
+            'scripts/write-acceptance-summary.ps1',
+            'scripts/cleanup-attempt-resilience-fixtures.ps1',
+            'scripts/check-ops-health.ps1'
+          )
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              Write-Host $file
+              $errors | ForEach-Object { Write-Host $_.Message }
+              exit 1
+            }
+          }
+
+      - name: Start backend
+        working-directory: backend
+        run: |
+          nohup mvn -B spring-boot:run > backend.log 2>&1 &
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:8080/api/health > /tmp/health.json; then
+              break
+            fi
+            sleep 3
+          done
+          cat /tmp/health.json
+          grep '"success":true' /tmp/health.json
+
+      - name: Verify ops health
+        shell: pwsh
+        run: ./scripts/check-ops-health.ps1 -BaseUrl http://127.0.0.1:8080 -ExpectPrometheus
+
+      - name: Run disposable attempt acceptance
+        id: acceptance
+        shell: pwsh
+        run: |
+          $submitReplay = '${{ github.event.inputs.submit_replay }}' -eq 'true'
+          $args = @(
+            '-BaseUrl', 'http://127.0.0.1:8080',
+            '-AdminUsername', 'admin',
+            '-AdminPassword', 'admin123',
+            '-StudentUsername', "verify_student_nightly_$($env:GITHUB_RUN_ID)",
+            '-StudentPassword', 'student123',
+            '-ExpectWriteBack',
+            '-ResultFile', 'artifacts/nightly-acceptance-result.json'
+          )
+          if (-not $submitReplay) {
+            $args += '-SkipSubmit'
+          }
+          ./scripts/run-attempt-resilience-acceptance.ps1 @args
+          $result = Get-Content artifacts/nightly-acceptance-result.json -Raw | ConvertFrom-Json
+          "attempt_id=$($result.attemptId)" >> $env:GITHUB_OUTPUT
+          "student_username=$($result.studentUsername)" >> $env:GITHUB_OUTPUT
+          "student_password=$($result.studentPassword)" >> $env:GITHUB_OUTPUT
+
+      - name: Run non-destructive load smoke
+        if: ${{ github.event.inputs.submit_replay != 'true' }}
+        shell: pwsh
+        run: |
+          $concurrency = '${{ github.event.inputs.load_concurrency }}'
+          $iterations = '${{ github.event.inputs.load_iterations }}'
+          $maxP95 = '${{ github.event.inputs.max_p95_request_latency_ms }}'
+          $maxP99 = '${{ github.event.inputs.max_p99_request_latency_ms }}'
+          if (-not $concurrency) { $concurrency = '5' }
+          if (-not $iterations) { $iterations = '2' }
+          if (-not $maxP95) { $maxP95 = '5000' }
+          if (-not $maxP99) { $maxP99 = '8000' }
+          $concurrencyValue = [int]$concurrency
+          $iterationsValue = [int]$iterations
+          $maxP95Value = [int]$maxP95
+          $maxP99Value = [int]$maxP99
+          ./scripts/run-exam-load-smoke.ps1 `
+            -BaseUrl http://127.0.0.1:8080 `
+            -AttemptIds ${{ steps.acceptance.outputs.attempt_id }} `
+            -Username '${{ steps.acceptance.outputs.student_username }}' `
+            -Password '${{ steps.acceptance.outputs.student_password }}' `
+            -ConcurrentUsers $concurrencyValue `
+            -Iterations $iterationsValue `
+            -ThinkTimeMs 100 `
+            -MaxP95RequestLatencyMs $maxP95Value `
+            -MaxP99RequestLatencyMs $maxP99Value `
+            -MaxOperationP95Ms "startExam=$maxP95Value,saveDraft=$maxP95Value,attemptHeartbeat=$maxP95Value" `
+            -MaxOperationP99Ms "startExam=$maxP99Value,saveDraft=$maxP99Value,attemptHeartbeat=$maxP99Value" `
+            -ResultFile artifacts/nightly-load-smoke-result.json
+
+      - name: Verify exam operation metrics
+        shell: pwsh
+        run: |
+          $submitReplay = '${{ github.event.inputs.submit_replay }}' -eq 'true'
+          $operations = @(
+            'prepareAttemptResilienceFixture',
+            'startExam',
+            'saveDraft',
+            'attemptHeartbeat'
+          )
+          if ($submitReplay) {
+            $operations += 'submitExam'
+          }
+          $metricsArgs = @(
+            '-BaseUrl', 'http://127.0.0.1:8080',
+            '-RequiredOperations'
+          ) + $operations + @(
+            '-ResultFile', 'artifacts/nightly-metrics-smoke-result.json'
+          )
+          if ($submitReplay) {
+            $metricsArgs += '-RequireSubmitReplayMismatchOutcomes'
+          }
+          ./scripts/check-exam-metrics-smoke.ps1 @metricsArgs
+
+      - name: Cleanup disposable fixtures
+        if: always()
+        shell: pwsh
+        run: |
+          ./scripts/cleanup-attempt-resilience-fixtures.ps1 `
+            -BaseUrl http://127.0.0.1:8080 `
+            -AdminUsername admin `
+            -AdminPassword admin123 `
+            -StudentPrefix "verify_student_nightly_${{ github.run_id }}" `
+            -OlderThanHours 0 `
+            -Execute
+
+      - name: Write acceptance summary
+        if: always()
+        shell: pwsh
+        run: |
+          ./scripts/write-acceptance-summary.ps1 `
+            -AcceptanceResultFile artifacts/nightly-acceptance-result.json `
+            -LoadResultFile artifacts/nightly-load-smoke-result.json `
+            -MetricsResultFile artifacts/nightly-metrics-smoke-result.json `
+            -OutputFile artifacts/nightly-summary.md `
+            -AlsoWriteStepSummary
+
+      - name: Upload backend and acceptance logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-acceptance-artifacts
+          path: |
+            backend/backend.log
+            artifacts/nightly-acceptance-result.json
+            artifacts/nightly-load-smoke-result.json
+            artifacts/nightly-metrics-smoke-result.json
+            artifacts/nightly-summary.md

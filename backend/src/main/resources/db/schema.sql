@@ -273,6 +273,11 @@ CREATE TABLE IF NOT EXISTS question (
   analysis           TEXT          COMMENT '解析',
   default_score      DECIMAL(6,2)  NOT NULL DEFAULT 5.00 COMMENT '默认分值',
   status             TINYINT       NOT NULL DEFAULT 0 COMMENT '0草稿 1已发布',
+  version_no         INT           NOT NULL DEFAULT 1 COMMENT 'current content version',
+  review_status      VARCHAR(32)   NOT NULL DEFAULT 'DRAFT' COMMENT 'DRAFT/PENDING/APPROVED/REJECTED',
+  reviewed_by        BIGINT        DEFAULT NULL COMMENT 'reviewer sys_user.id',
+  reviewed_at        DATETIME      DEFAULT NULL COMMENT 'review time',
+  review_comment     VARCHAR(500)  DEFAULT NULL COMMENT 'review comment',
   deleted            TINYINT       NOT NULL DEFAULT 0,
   created_by         BIGINT        DEFAULT NULL,
   source_type        VARCHAR(32)   NOT NULL DEFAULT 'MANUAL' COMMENT '来源：MANUAL手动/AI_GENERATED生成/AI_IMPORTED识别/AI_MATERIAL材料生成/AI_RAG资料库生成',
@@ -288,6 +293,7 @@ CREATE TABLE IF NOT EXISTS question (
   PRIMARY KEY (id),
   KEY idx_question_subject (subject_id),
   KEY idx_question_kp (knowledge_point_id),
+  KEY idx_question_review_status (review_status, status, deleted),
   KEY idx_question_source (source_type),
   KEY idx_question_material (material_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='题目';
@@ -304,6 +310,69 @@ CREATE TABLE IF NOT EXISTS question_option (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='题目选项（随题目物理删除）';
 
 -- ---------- 试卷 ----------
+
+CREATE TABLE IF NOT EXISTS question_version (
+  id                 BIGINT        NOT NULL AUTO_INCREMENT,
+  question_id        BIGINT        NOT NULL,
+  version_no         INT           NOT NULL DEFAULT 1,
+  subject_id         BIGINT        NOT NULL,
+  knowledge_point_id BIGINT        DEFAULT NULL,
+  question_type      VARCHAR(32)   NOT NULL,
+  difficulty         VARCHAR(32)   NOT NULL,
+  stem               TEXT          NOT NULL,
+  correct_answer     TEXT          DEFAULT NULL,
+  analysis           TEXT          DEFAULT NULL,
+  default_score      DECIMAL(6,2)  NOT NULL DEFAULT 5.00,
+  status             TINYINT       NOT NULL DEFAULT 0,
+  review_status      VARCHAR(32)   NOT NULL DEFAULT 'DRAFT',
+  source_type        VARCHAR(32)   NOT NULL DEFAULT 'MANUAL',
+  source_detail      VARCHAR(255)  DEFAULT NULL,
+  material_id        BIGINT        DEFAULT NULL,
+  source_page        INT           DEFAULT NULL,
+  source_paragraph   INT           DEFAULT NULL,
+  source_excerpt     VARCHAR(500)  DEFAULT NULL,
+  ai_model           VARCHAR(64)   DEFAULT NULL,
+  prompt_version     VARCHAR(64)   DEFAULT NULL,
+  snapshot_reason    VARCHAR(32)   NOT NULL DEFAULT 'EDIT',
+  snapshot_by        BIGINT        DEFAULT NULL,
+  created_at         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_question_version (question_id, version_no),
+  KEY idx_question_version_question (question_id, id),
+  KEY idx_question_version_review (review_status, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='question content version';
+
+CREATE TABLE IF NOT EXISTS question_version_option (
+  id                  BIGINT        NOT NULL AUTO_INCREMENT,
+  question_version_id BIGINT        NOT NULL,
+  question_id         BIGINT        NOT NULL,
+  option_label        VARCHAR(16)   NOT NULL,
+  option_content      VARCHAR(1000) NOT NULL,
+  is_correct          TINYINT       NOT NULL DEFAULT 0,
+  sort_order          INT           NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_qvo_version_label (question_version_id, option_label),
+  KEY idx_qvo_version (question_version_id),
+  KEY idx_qvo_question (question_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='question version options';
+
+CREATE TABLE IF NOT EXISTS question_review_log (
+  id                 BIGINT       NOT NULL AUTO_INCREMENT,
+  question_id        BIGINT       NOT NULL,
+  version_no         INT          NOT NULL DEFAULT 1,
+  action_type        VARCHAR(32)  NOT NULL,
+  from_status        TINYINT      DEFAULT NULL,
+  to_status          TINYINT      DEFAULT NULL,
+  from_review_status VARCHAR(32)  DEFAULT NULL,
+  to_review_status   VARCHAR(32)  DEFAULT NULL,
+  comment            VARCHAR(500) DEFAULT NULL,
+  operated_by        BIGINT       DEFAULT NULL,
+  operated_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_question_review_log_question (question_id, operated_at),
+  KEY idx_question_review_log_action (action_type, operated_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='question review audit log';
 
 CREATE TABLE IF NOT EXISTS paper (
   id          BIGINT        NOT NULL AUTO_INCREMENT,
@@ -325,11 +394,13 @@ CREATE TABLE IF NOT EXISTS paper_question (
   id          BIGINT       NOT NULL AUTO_INCREMENT,
   paper_id    BIGINT       NOT NULL,
   question_id BIGINT       NOT NULL,
+  question_version_id BIGINT DEFAULT NULL,
   score       DECIMAL(6,2) NOT NULL DEFAULT 0.00 COMMENT '该题在本卷分值',
   sort_order  INT          NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   KEY idx_pq_paper (paper_id),
-  KEY idx_pq_question (question_id)
+  KEY idx_pq_question (question_id),
+  KEY idx_pq_question_version (question_version_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='试卷-题目（随试卷物理删除）';
 
 -- ---------- 考试 / 答卷 / 阅卷 ----------
@@ -377,6 +448,55 @@ CREATE TABLE IF NOT EXISTS exam_target (
   KEY idx_exam_target_lookup (target_type, target_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='考试目标范围';
 
+CREATE TABLE IF NOT EXISTS exam_candidate_snapshot (
+  id          BIGINT       NOT NULL AUTO_INCREMENT,
+  exam_id     BIGINT       NOT NULL,
+  user_id     BIGINT       NOT NULL COMMENT '考生 sys_user.id',
+  source_type VARCHAR(32)  NOT NULL DEFAULT 'LEGACY' COMMENT 'CLASS/CLASS_COURSE/USER/LEGACY',
+  source_id   BIGINT       DEFAULT NULL,
+  real_name   VARCHAR(64)  DEFAULT NULL,
+  student_no  VARCHAR(64)  DEFAULT NULL,
+  class_name  VARCHAR(128) DEFAULT NULL,
+  created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_exam_candidate_snapshot (exam_id, user_id),
+  KEY idx_exam_candidate_user (user_id, exam_id),
+  KEY idx_exam_candidate_source (source_type, source_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='考试考生范围快照';
+
+CREATE TABLE IF NOT EXISTS exam_question_snapshot (
+  id             BIGINT        NOT NULL AUTO_INCREMENT,
+  exam_id        BIGINT        NOT NULL,
+  paper_id       BIGINT        NOT NULL,
+  question_id    BIGINT        NOT NULL,
+  knowledge_point_id BIGINT    DEFAULT NULL,
+  question_type  VARCHAR(32)   NOT NULL,
+  stem           TEXT          NOT NULL,
+  correct_answer TEXT          DEFAULT NULL,
+  analysis       TEXT          DEFAULT NULL,
+  score          DECIMAL(6,2)  NOT NULL DEFAULT 0.00,
+  sort_order     INT           NOT NULL DEFAULT 0,
+  created_at     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_exam_question_snapshot (exam_id, question_id),
+  KEY idx_exam_question_snapshot_exam (exam_id, sort_order),
+  KEY idx_exam_question_snapshot_question (question_id),
+  KEY idx_exam_question_snapshot_kp (knowledge_point_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='考试试卷题目快照';
+
+CREATE TABLE IF NOT EXISTS exam_question_option_snapshot (
+  id             BIGINT        NOT NULL AUTO_INCREMENT,
+  exam_id        BIGINT        NOT NULL,
+  question_id    BIGINT        NOT NULL,
+  option_label   VARCHAR(16)   NOT NULL,
+  option_content VARCHAR(1000) NOT NULL,
+  sort_order     INT           NOT NULL DEFAULT 0,
+  created_at     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_exam_question_option_snapshot (exam_id, question_id, option_label),
+  KEY idx_exam_question_option_snapshot (exam_id, question_id, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='考试试卷选项快照';
+
 CREATE TABLE IF NOT EXISTS exam_attempt (
   id          BIGINT        NOT NULL AUTO_INCREMENT,
   exam_id     BIGINT        NOT NULL,
@@ -385,14 +505,137 @@ CREATE TABLE IF NOT EXISTS exam_attempt (
   status      TINYINT       NOT NULL DEFAULT 0 COMMENT '0未开始 1进行中 2已交卷 4待批阅 5已完成',
   score       DECIMAL(10,2) DEFAULT NULL,
   start_time  DATETIME      DEFAULT NULL,
+  rules_confirmed_at DATETIME DEFAULT NULL,
   submit_time DATETIME      DEFAULT NULL,
+  submit_type VARCHAR(32)   DEFAULT NULL COMMENT 'MANUAL/TIMEOUT/FORCED',
+  submit_reason VARCHAR(255) DEFAULT NULL,
+  last_heartbeat_at DATETIME DEFAULT NULL,
+  last_draft_saved_at DATETIME DEFAULT NULL,
+  draft_version BIGINT      NOT NULL DEFAULT 0,
+  submit_token VARCHAR(80)  DEFAULT NULL,
+  submit_payload_hash VARCHAR(64) DEFAULT NULL,
   created_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_attempt_exam (exam_id),
   KEY idx_attempt_user (user_id),
-  KEY idx_attempt_exam_user_no (exam_id, user_id, attempt_no)
+  UNIQUE KEY uk_attempt_exam_user_no (exam_id, user_id, attempt_no),
+  KEY idx_attempt_submit_token (submit_token)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='考试参与/答卷';
+
+CREATE TABLE IF NOT EXISTS exam_submit_response (
+  id                  BIGINT      NOT NULL AUTO_INCREMENT,
+  attempt_id          BIGINT      NOT NULL,
+  submit_token        VARCHAR(80) DEFAULT NULL,
+  submit_payload_hash VARCHAR(64) DEFAULT NULL,
+  response_json       LONGTEXT    NOT NULL,
+  created_at          DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at          DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_exam_submit_response_attempt (attempt_id),
+  KEY idx_exam_submit_response_token (submit_token),
+  KEY idx_exam_submit_response_hash (submit_payload_hash)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='考试提交响应快照';
+
+CREATE TABLE IF NOT EXISTS exam_approval_log (
+  id          BIGINT      NOT NULL AUTO_INCREMENT,
+  exam_id     BIGINT      NOT NULL,
+  action      VARCHAR(32) NOT NULL COMMENT 'SUBMIT/RESUBMIT/APPROVE/REJECT/DIRECT_PUBLISH',
+  status_from TINYINT     DEFAULT NULL,
+  status_to   TINYINT     DEFAULT NULL,
+  note        VARCHAR(1000) DEFAULT NULL,
+  actor_id    BIGINT      NOT NULL,
+  candidate_count        INT NOT NULL DEFAULT 0,
+  notified_student_count INT NOT NULL DEFAULT 0,
+  notified_attempt_count INT NOT NULL DEFAULT 0,
+  created_at  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_exam_approval_exam (exam_id, created_at),
+  KEY idx_exam_approval_actor (actor_id, created_at),
+  KEY idx_exam_approval_action (action, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='考试发布审批日志';
+
+CREATE TABLE IF NOT EXISTS score_release (
+  id           BIGINT   NOT NULL AUTO_INCREMENT,
+  exam_id      BIGINT   NOT NULL,
+  status       TINYINT  NOT NULL DEFAULT 0 COMMENT '0未发布/已撤回 1已发布',
+  published_by BIGINT   DEFAULT NULL,
+  published_at DATETIME DEFAULT NULL,
+  revoked_by   BIGINT   DEFAULT NULL,
+  revoked_at   DATETIME DEFAULT NULL,
+  publish_note VARCHAR(500) DEFAULT NULL,
+  revoke_reason VARCHAR(500) DEFAULT NULL,
+  note         VARCHAR(500) DEFAULT NULL,
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_score_release_exam (exam_id),
+  KEY idx_score_release_status (status, published_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='成绩发布状态';
+
+CREATE TABLE IF NOT EXISTS score_release_log (
+  id                     BIGINT       NOT NULL AUTO_INCREMENT,
+  exam_id                BIGINT       NOT NULL,
+  action                 VARCHAR(32)  NOT NULL,
+  status_from            TINYINT      DEFAULT NULL,
+  status_to              TINYINT      NOT NULL,
+  note                   VARCHAR(500) DEFAULT NULL,
+  actor_id               BIGINT       NOT NULL,
+  visible_attempt_count  INT          NOT NULL DEFAULT 0,
+  notified_student_count INT          NOT NULL DEFAULT 0,
+  notified_attempt_count INT          NOT NULL DEFAULT 0,
+  created_at             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_score_release_log_exam (exam_id, created_at),
+  KEY idx_score_release_log_actor (actor_id, created_at),
+  KEY idx_score_release_log_action (action, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='score release audit log';
+
+CREATE TABLE IF NOT EXISTS score_appeal (
+  id            BIGINT   NOT NULL AUTO_INCREMENT,
+  attempt_id    BIGINT   NOT NULL,
+  exam_id       BIGINT   NOT NULL COMMENT '鍐楀余瀛樺偍鑰冭瘯ID锛岀敤浜庢垚缁╁彂甯冮樆鏂?',
+  question_id   BIGINT   DEFAULT NULL,
+  user_id       BIGINT   NOT NULL COMMENT '申诉学生 sys_user.id',
+  reason        VARCHAR(1000) NOT NULL,
+  status        TINYINT  NOT NULL DEFAULT 0 COMMENT '0待处理 1已回复 2已关闭',
+  teacher_reply VARCHAR(1000) DEFAULT NULL,
+  handling_result VARCHAR(32) DEFAULT NULL,
+  handled_by    BIGINT   DEFAULT NULL,
+  handled_at    DATETIME DEFAULT NULL,
+  recheck_note  VARCHAR(1000) DEFAULT NULL,
+  rechecked_by  BIGINT   DEFAULT NULL,
+  rechecked_at  DATETIME DEFAULT NULL,
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_score_appeal_attempt (attempt_id),
+  KEY idx_score_appeal_exam_status (exam_id, status, handling_result),
+  KEY idx_score_appeal_active_target (attempt_id, user_id, question_id, status),
+  KEY idx_score_appeal_user (user_id, created_at),
+  KEY idx_score_appeal_status (status, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='成绩申诉';
+
+CREATE TABLE IF NOT EXISTS score_appeal_log (
+  id              BIGINT        NOT NULL AUTO_INCREMENT,
+  appeal_id       BIGINT        NOT NULL,
+  attempt_id      BIGINT        NOT NULL,
+  exam_id         BIGINT        NOT NULL,
+  question_id     BIGINT        DEFAULT NULL,
+  user_id         BIGINT        NOT NULL,
+  action          VARCHAR(32)   NOT NULL,
+  status_from     TINYINT       DEFAULT NULL,
+  status_to       TINYINT       NOT NULL,
+  handling_result VARCHAR(32)   DEFAULT NULL,
+  note            VARCHAR(1000) DEFAULT NULL,
+  actor_id        BIGINT        NOT NULL,
+  created_at      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_score_appeal_log_appeal (appeal_id, created_at),
+  KEY idx_score_appeal_log_exam (exam_id, created_at),
+  KEY idx_score_appeal_log_actor (actor_id, created_at),
+  KEY idx_score_appeal_log_action (action, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='score appeal audit log';
 
 CREATE TABLE IF NOT EXISTS answer_record (
   id             BIGINT       NOT NULL AUTO_INCREMENT,
@@ -404,6 +647,7 @@ CREATE TABLE IF NOT EXISTS answer_record (
   review_status  TINYINT      NOT NULL DEFAULT 0 COMMENT '0待批阅 1已批阅',
   created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
+  UNIQUE KEY uk_answer_attempt_question (attempt_id, question_id),
   KEY idx_ar_attempt (attempt_id),
   KEY idx_ar_question (question_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='答题记录';
@@ -419,17 +663,39 @@ CREATE TABLE IF NOT EXISTS review_record (
   KEY idx_rr_answer (answer_record_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='主观题阅卷记录';
 
+CREATE TABLE IF NOT EXISTS review_score_log (
+  id               BIGINT        NOT NULL AUTO_INCREMENT,
+  attempt_id       BIGINT        NOT NULL,
+  answer_record_id BIGINT        NOT NULL,
+  question_id      BIGINT        NOT NULL,
+  exam_id          BIGINT        NOT NULL,
+  user_id          BIGINT        NOT NULL,
+  old_score        DECIMAL(6,2)  DEFAULT NULL,
+  new_score        DECIMAL(6,2)  NOT NULL DEFAULT 0.00,
+  max_score        DECIMAL(6,2)  NOT NULL DEFAULT 0.00,
+  comment          VARCHAR(1000) DEFAULT NULL,
+  reviewer_id      BIGINT        NOT NULL,
+  created_at       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_review_score_log_attempt (attempt_id, created_at),
+  KEY idx_review_score_log_answer (answer_record_id, created_at),
+  KEY idx_review_score_log_exam (exam_id, created_at),
+  KEY idx_review_score_log_reviewer (reviewer_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='review score audit log';
+
 CREATE TABLE IF NOT EXISTS wrong_question_book (
   id              BIGINT   NOT NULL AUTO_INCREMENT,
   user_id         BIGINT   NOT NULL,
+  exam_id         BIGINT   NOT NULL DEFAULT 0,
   question_id     BIGINT   NOT NULL,
   wrong_count     INT      NOT NULL DEFAULT 1,
   last_wrong_time DATETIME DEFAULT NULL,
   created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uk_wrong_user_question (user_id, question_id),
-  KEY idx_wrong_user (user_id)
+  UNIQUE KEY uk_wrong_user_exam_question (user_id, exam_id, question_id),
+  KEY idx_wrong_user (user_id),
+  KEY idx_wrong_exam_question (exam_id, question_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='错题本';
 
 -- ---------- 监控 / 日志 ----------
@@ -437,12 +703,62 @@ CREATE TABLE IF NOT EXISTS wrong_question_book (
 CREATE TABLE IF NOT EXISTS cheat_event (
   id         BIGINT      NOT NULL AUTO_INCREMENT,
   attempt_id BIGINT      NOT NULL,
+  exam_id    BIGINT      NOT NULL,
+  user_id    BIGINT      NOT NULL,
   event_type VARCHAR(64) NOT NULL COMMENT '事件类型，如切屏/复制等',
   extra_info TEXT        COMMENT '附加信息',
+  risk_score INT         NOT NULL DEFAULT 0,
+  client_event_id VARCHAR(80) DEFAULT NULL,
+  client_event_time DATETIME DEFAULT NULL,
   event_time DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  KEY idx_cheat_attempt (attempt_id)
+  UNIQUE KEY uk_cheat_attempt_client_event (attempt_id, client_event_id),
+  KEY idx_cheat_attempt (attempt_id),
+  KEY idx_cheat_exam_time (exam_id, event_time),
+  KEY idx_cheat_exam_risk_time (exam_id, risk_score, event_time),
+  KEY idx_cheat_user_time (user_id, event_time),
+  KEY idx_cheat_attempt_client_time (attempt_id, client_event_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='防作弊事件';
+
+CREATE TABLE IF NOT EXISTS exam_monitor_session (
+  id                BIGINT      NOT NULL AUTO_INCREMENT,
+  attempt_id        BIGINT      NOT NULL,
+  exam_id           BIGINT      NOT NULL,
+  user_id           BIGINT      NOT NULL,
+  status            VARCHAR(32) NOT NULL DEFAULT 'ONLINE' COMMENT 'ONLINE/OFFLINE/SUBMITTED',
+  last_heartbeat_at DATETIME    DEFAULT NULL,
+  last_event_at     DATETIME    DEFAULT NULL,
+  event_count       INT         NOT NULL DEFAULT 0,
+  risk_score        INT         NOT NULL DEFAULT 0,
+  last_event_type   VARCHAR(64) DEFAULT NULL,
+  created_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_monitor_attempt (attempt_id),
+  KEY idx_monitor_exam_status (exam_id, status, last_heartbeat_at),
+  KEY idx_monitor_user (user_id),
+  KEY idx_monitor_risk (exam_id, risk_score)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='考试监考会话';
+
+CREATE TABLE IF NOT EXISTS exam_monitor_action (
+  id          BIGINT      NOT NULL AUTO_INCREMENT,
+  session_id  BIGINT      NOT NULL,
+  attempt_id  BIGINT      NOT NULL,
+  exam_id     BIGINT      NOT NULL,
+  user_id     BIGINT      NOT NULL,
+  action_type VARCHAR(32) NOT NULL COMMENT 'WARN/ACKNOWLEDGE/FORCE_SUBMIT/NOTE',
+  note        VARCHAR(1000) DEFAULT NULL,
+  notification_sent TINYINT NOT NULL DEFAULT 0 COMMENT '1 if this action sent a student notification',
+  notification_id BIGINT DEFAULT NULL COMMENT 'notification.id created for WARN/FORCE_SUBMIT',
+  handled_by  BIGINT      NOT NULL,
+  handled_at  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_monitor_action_session (session_id, handled_at),
+  KEY idx_monitor_action_exam (exam_id, handled_at),
+  KEY idx_monitor_action_attempt (attempt_id),
+  KEY idx_monitor_action_notification (notification_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='考试监考处置记录';
 
 CREATE TABLE IF NOT EXISTS operation_log (
   id            BIGINT       NOT NULL AUTO_INCREMENT,
@@ -466,21 +782,64 @@ CREATE TABLE IF NOT EXISTS notification (
   content    TEXT         DEFAULT NULL COMMENT '通知内容',
   type       VARCHAR(32)  DEFAULT 'INFO' COMMENT '通知类型：INFO/EXAM/APPROVAL/SYSTEM',
   link       VARCHAR(255) DEFAULT NULL COMMENT '关联跳转路径（可选）',
+  related_type VARCHAR(64) DEFAULT NULL COMMENT '关联业务类型，如 EXAM_ATTEMPT',
+  related_id BIGINT DEFAULT NULL COMMENT '关联业务ID',
   is_read    TINYINT      NOT NULL DEFAULT 0 COMMENT '0 未读，1 已读',
   created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  dedup_key VARCHAR(255) DEFAULT NULL,
   PRIMARY KEY (id),
-  KEY idx_notification_user (user_id, is_read, created_at)
+  KEY idx_notification_user (user_id, is_read, created_at),
+  KEY idx_notification_related (related_type, related_id),
+  UNIQUE KEY uk_notification_dedup_key (dedup_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='站内通知';
 
+-- ---------- 系统配置（管理员维护运行参数） ----------
+
+CREATE TABLE IF NOT EXISTS system_config (
+  id           BIGINT        NOT NULL AUTO_INCREMENT,
+  config_key   VARCHAR(128)  NOT NULL,
+  config_value VARCHAR(1000) NOT NULL,
+  value_type   VARCHAR(32)   NOT NULL DEFAULT 'STRING' COMMENT 'STRING/NUMBER/BOOLEAN',
+  category     VARCHAR(64)   NOT NULL DEFAULT 'GENERAL',
+  description  VARCHAR(255)  DEFAULT NULL,
+  editable     TINYINT       NOT NULL DEFAULT 1,
+  updated_by   BIGINT        DEFAULT NULL,
+  created_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_system_config_key (config_key),
+  KEY idx_system_config_category (category)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统配置';
+
 -- ---------- 答题草稿（自动暂存，支持刷新/断线后恢复作答） ----------
+
+CREATE TABLE IF NOT EXISTS system_config_log (
+  id          BIGINT        NOT NULL AUTO_INCREMENT,
+  config_key  VARCHAR(128)  NOT NULL,
+  old_value   VARCHAR(1000) DEFAULT NULL,
+  new_value   VARCHAR(1000) NOT NULL,
+  value_type  VARCHAR(32)   NOT NULL,
+  category    VARCHAR(64)   NOT NULL,
+  actor_id    BIGINT        NOT NULL,
+  created_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_config_log_key_time (config_key, created_at),
+  KEY idx_config_log_category_time (category, created_at),
+  KEY idx_config_log_actor_time (actor_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='system config audit log';
 
 CREATE TABLE IF NOT EXISTS exam_answer_draft (
   id         BIGINT   NOT NULL AUTO_INCREMENT,
   attempt_id BIGINT   NOT NULL,
   answers    TEXT     COMMENT '前端答案 JSON 快照',
+  client_draft_id VARCHAR(80) DEFAULT NULL,
+  revision BIGINT NOT NULL DEFAULT 0,
+  saved_count INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uk_draft_attempt (attempt_id)
+  UNIQUE KEY uk_draft_attempt (attempt_id),
+  KEY idx_draft_attempt_revision (attempt_id, revision)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='答题草稿（自动暂存）';
 
 -- ---------- AI 配置与调用审计 ----------
@@ -591,6 +950,16 @@ CREATE TABLE IF NOT EXISTS email_verification (
   PRIMARY KEY (id),
   KEY idx_ev_email_purpose (email, purpose, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='邮箱验证码';
+
+CREATE TABLE IF NOT EXISTS login_attempt (
+  account       VARCHAR(128) NOT NULL COMMENT '登录账号/邮箱，小写归一化',
+  failure_count INT          NOT NULL DEFAULT 0 COMMENT '连续失败次数',
+  locked_until  DATETIME     DEFAULT NULL COMMENT '临时锁定截止时间',
+  created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (account),
+  KEY idx_login_attempt_locked_until (locked_until)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='登录失败锁定状态';
 
 -- ---------- V3.0: Token 持久化 ----------
 

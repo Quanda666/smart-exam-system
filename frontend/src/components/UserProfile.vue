@@ -317,6 +317,24 @@ function handleCommand(command: string) {
   }
 }
 
+function openProfileDialog() {
+  handleCommand('profile');
+}
+
+function openAccountPanel(panel?: string | null) {
+  if (panel === 'security') {
+    handleCommand('security');
+    return;
+  }
+  if (panel === 'password') {
+    handleCommand('password');
+    return;
+  }
+  openProfileDialog();
+}
+
+defineExpose({ openProfileDialog, openAccountPanel });
+
 async function loadLoginLogs() {
   loginLogsLoading.value = true;
   try {

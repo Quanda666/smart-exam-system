@@ -10,6 +10,8 @@ import com.smartexam.dto.ai.GenerateQuestionBatchRequest;
 import com.smartexam.dto.ai.MaterialQuestionGenerationRequest;
 import com.smartexam.dto.ai.SuggestReviewRequest;
 import com.smartexam.dto.ai.WrongQuestionExplainRequest;
+import com.smartexam.dto.auth.AuthUser;
+import com.smartexam.exception.DatabaseUnavailableException;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -39,12 +41,16 @@ public class AiService {
 
     public static final String PROMPT_VERSION_QUESTION_GENERATE = "question-generate-v2";
     public static final String PROMPT_VERSION_QUESTION_IMPORT = "question-import-v2";
-    public static final String PROMPT_VERSION_MATERIAL_GENERATE = "material-question-v2";
+    public static final String PROMPT_VERSION_MATERIAL_GENERATE = "material-question-v3";
     public static final String PROMPT_VERSION_MATERIAL_OUTLINE = "material-outline-v1";
 
     private static final List<String> OBJECTIVE_TYPES = List.of("SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE");
     private static final List<String> ALL_TYPES = List.of("SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_BLANK", "SUBJECTIVE");
     private static final List<String> ALL_DIFFICULTIES = List.of("EASY", "MEDIUM", "HARD");
+    private static final int MAX_GENERATED_QUESTION_TEXT_LENGTH = 4000;
+    private static final int MAX_GENERATED_OPTION_CONTENT_LENGTH = 1000;
+    private static final int MAX_MATERIAL_TYPE_COUNT = 30;
+    private static final int MAX_BATCH_QUESTION_COUNT = 10;
     private static final Pattern QUESTION_START = Pattern.compile("^(?:第\\s*\\d+\\s*题\\s*[：:]?|\\d{1,3}\\s*[.、)）]\\s*).+");
     private static final Pattern OPTION_MARKER = Pattern.compile("(?<![A-Za-z0-9])([A-Ha-h])\\s*[、.．)）]\\s*");
     private static final Pattern ANSWER_LINE = Pattern.compile("^(?:正确答案|参考答案|答案)\\s*[：:]\\s*(.*)$");
@@ -137,14 +143,123 @@ public class AiService {
         return stampQuestionRuntime(local, PROMPT_VERSION_MATERIAL_GENERATE);
     }
 
-    public String explainWrongQuestion(WrongQuestionExplainRequest request) {
-        String prompt = buildWrongQuestionPrompt(request);
+    public String explainWrongQuestion(WrongQuestionExplainRequest request, AuthUser user) {
+        WrongQuestionExplainRequest grounded = loadReleasedWrongQuestionForExplain(
+                request.getQuestionId(), request.getExamId(), user);
+        String prompt = buildWrongQuestionPrompt(grounded);
         if (isMockMode()) {
-            String local = buildLocalWrongQuestionExplanation(request);
+            String local = buildLocalWrongQuestionExplanation(grounded);
             logAiUsage("WRONG_QUESTION_EXPLAIN_LOCAL", prompt, local, true, null);
             return local;
         }
         return requestRemote("WRONG_QUESTION_EXPLAIN", prompt, aiProperties.getApiKey());
+    }
+
+    private WrongQuestionExplainRequest loadReleasedWrongQuestionForExplain(Long questionId, Long examId, AuthUser user) {
+        if (questionId == null) {
+            throw new IllegalArgumentException("questionId is required");
+        }
+        if (questionId <= 0) {
+            throw new IllegalArgumentException("questionId must be positive");
+        }
+        if (examId == null) {
+            throw new IllegalArgumentException("examId is required");
+        }
+        if (examId <= 0) {
+            throw new IllegalArgumentException("examId must be positive");
+        }
+        JdbcTemplate jdbcTemplate = requireJdbcTemplate();
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
+                WITH wrong_answers AS (
+                  SELECT ar.id AS answer_record_id,
+                         ar.question_id,
+                         e.id AS exam_id,
+                         COALESCE(eqs.stem, q.stem) AS stem,
+                         COALESCE(eqs.question_type, q.question_type) AS question_type,
+                         COALESCE(eqs.correct_answer, q.correct_answer) AS correct_answer,
+                         COALESCE(eqs.analysis, q.analysis) AS analysis,
+                         ar.answer_content AS student_answer,
+                         COALESCE(ea.submit_time, ar.created_at) AS wrong_time
+                  FROM answer_record ar
+                  JOIN exam_attempt ea ON ea.id = ar.attempt_id
+                  JOIN exam e ON e.id = ea.exam_id AND e.deleted = 0
+                  JOIN score_release sr ON sr.exam_id = e.id AND sr.status = 1
+                  JOIN question q ON q.id = ar.question_id
+                  LEFT JOIN exam_question_snapshot eqs
+                    ON eqs.exam_id = e.id AND eqs.question_id = ar.question_id
+                  WHERE ea.user_id = ?
+                    AND ar.question_id = ?
+                    AND e.id = ?
+                    AND ea.status = 5
+                    AND ea.score IS NOT NULL
+                    AND ar.review_status = 1
+                    AND ar.is_correct = 0
+                    AND NOT EXISTS (
+                      SELECT 1 FROM score_appeal sa
+                      WHERE sa.attempt_id = ea.id
+                        AND sa.status = 1
+                        AND sa.handling_result = 'RECHECK_REQUIRED'
+                    )
+                ),
+                ranked_wrong AS (
+                  SELECT wrong_answers.*,
+                         COUNT(*) OVER (PARTITION BY question_id, exam_id) AS wrong_count,
+                         ROW_NUMBER() OVER (
+                           PARTITION BY question_id, exam_id
+                           ORDER BY wrong_time DESC, answer_record_id DESC
+                         ) AS row_no
+                  FROM wrong_answers
+                )
+                SELECT question_id, exam_id, stem, question_type, correct_answer, analysis,
+                       student_answer, wrong_count
+                FROM ranked_wrong
+                WHERE row_no = 1
+                """, user.getId(), questionId, examId);
+        if (rows.isEmpty()) {
+            throw new IllegalStateException("Wrong question explanation is only available for released wrong answers");
+        }
+        Map<String, Object> row = rows.get(0);
+        WrongQuestionExplainRequest grounded = new WrongQuestionExplainRequest();
+        grounded.setQuestionId(((Number) row.get("question_id")).longValue());
+        grounded.setExamId(((Number) row.get("exam_id")).longValue());
+        grounded.setStem(stringValue(row.get("stem")));
+        grounded.setQuestionType(stringValue(row.get("question_type")));
+        grounded.setCorrectAnswer(stringValue(row.get("correct_answer")));
+        grounded.setAnalysis(stringValue(row.get("analysis")));
+        grounded.setStudentAnswer(stringValue(row.get("student_answer")));
+        grounded.setWrongCount(((Number) row.get("wrong_count")).intValue());
+        grounded.setOptions(loadWrongQuestionOptionsForExplain(jdbcTemplate,
+                ((Number) row.get("exam_id")).longValue(), questionId, grounded.getCorrectAnswer()));
+        return grounded;
+    }
+
+    private List<AiGeneratedQuestionOption> loadWrongQuestionOptionsForExplain(JdbcTemplate jdbcTemplate,
+                                                                               Long examId,
+                                                                               Long questionId,
+                                                                               String correctAnswer) {
+        List<AiGeneratedQuestionOption> snapshotOptions = jdbcTemplate.query("""
+                SELECT option_label, option_content
+                FROM exam_question_option_snapshot
+                WHERE exam_id = ? AND question_id = ?
+                ORDER BY sort_order
+                """, (rs, rowNum) -> option(
+                rs.getString("option_label"),
+                rs.getString("option_content"),
+                answerContainsOption(correctAnswer, rs.getString("option_label"))
+        ), examId, questionId);
+        if (!snapshotOptions.isEmpty()) {
+            return snapshotOptions;
+        }
+        return jdbcTemplate.query("""
+                SELECT option_label, option_content, is_correct
+                FROM question_option
+                WHERE question_id = ?
+                ORDER BY sort_order
+                """, (rs, rowNum) -> option(
+                rs.getString("option_label"),
+                rs.getString("option_content"),
+                rs.getInt("is_correct") == 1
+        ), questionId);
     }
 
     public String suggestReview(SuggestReviewRequest request) {
@@ -172,6 +287,39 @@ public class AiService {
 
     public String currentModel() {
         return firstNonBlank(aiProperties.getModel(), "mock-local");
+    }
+
+    private JdbcTemplate requireJdbcTemplate() {
+        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        if (jdbcTemplate == null) {
+            throw new DatabaseUnavailableException("Database connection is unavailable");
+        }
+        return jdbcTemplate;
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private boolean answerContainsOption(Object correctAnswer, Object optionLabel) {
+        String answer = normalizeAnswerToken(correctAnswer);
+        String label = normalizeAnswerToken(optionLabel);
+        return !label.isEmpty() && answer.contains(label);
+    }
+
+    private String normalizeAnswerToken(Object value) {
+        if (value == null) {
+            return "";
+        }
+        String text = String.valueOf(value);
+        StringBuilder normalized = new StringBuilder(text.length());
+        for (int i = 0; i < text.length(); i++) {
+            char ch = text.charAt(i);
+            if (Character.isLetterOrDigit(ch)) {
+                normalized.append(Character.toUpperCase(ch));
+            }
+        }
+        return normalized.toString();
     }
 
     private String callAi(String scene, String prompt) {
@@ -306,6 +454,7 @@ public class AiService {
         if (!ALL_DIFFICULTIES.contains(difficulty)) {
             throw new IllegalArgumentException("不支持的难度：" + request.getDifficulty());
         }
+        normalizedCount(request.getCount());
     }
 
     private void validateDocumentDefaults(GenerateQuestionBatchRequest request) {
@@ -401,7 +550,7 @@ public class AiService {
         return """
                 请根据课程材料生成在线考试题库草稿，只返回 JSON 数组，不要输出 Markdown。
                 每道题包含：subjectId, knowledgePointId, questionType, difficulty, stem, correctAnswer, analysis, defaultScore, status, options。
-                如课程材料中带有“[页x 段y]”标记，请同时返回 sourcePage、sourceParagraph、sourceExcerpt。
+                If material chunks use labels like [page 1 paragraph 2], return sourcePage, sourceParagraph, and sourceExcerpt.
 
                 课程上下文：
                 - 科目：%s（ID=%d）
@@ -686,16 +835,42 @@ public class AiService {
         if (blankToNull(normalized.getStem()) == null) {
             normalized.setStem(createLocalQuestionDraft(typedRequest, index).getStem());
         } else {
-            normalized.setStem(truncate(normalized.getStem().trim(), 4000));
+            normalized.setStem(normalizeGeneratedQuestionText(normalized.getStem(), "AI generated question stem"));
         }
-        normalized.setAnalysis(truncate(firstNonBlank(normalized.getAnalysis(), "请结合题干条件分析关键概念，按步骤判断后再得出答案。"), 4000));
+        normalized.setAnalysis(normalizeGeneratedQuestionText(
+                firstNonBlank(normalized.getAnalysis(), "请结合题干条件分析关键概念，按步骤判断后再得出答案。"),
+                "AI generated question analysis"));
 
         if (OBJECTIVE_TYPES.contains(normalizedType)) {
             normalized.setOptions(normalizeObjectiveOptions(normalized, typedRequest, index, allowIncompleteAnswer));
             normalized.setCorrectAnswer(correctLabels(normalized.getOptions()).stream().collect(Collectors.joining(",")));
         } else {
             normalized.setOptions(List.of());
-            normalized.setCorrectAnswer(truncate(firstNonBlank(normalized.getCorrectAnswer(), createLocalQuestionDraft(typedRequest, index).getCorrectAnswer()), 4000));
+            normalized.setCorrectAnswer(normalizeGeneratedQuestionText(
+                    firstNonBlank(normalized.getCorrectAnswer(), createLocalQuestionDraft(typedRequest, index).getCorrectAnswer()),
+                    "AI generated question correct answer"));
+        }
+        return normalized;
+    }
+
+    private String normalizeGeneratedQuestionText(String value, String fieldName) {
+        String normalized = blankToNull(value);
+        if (normalized == null) {
+            throw new IllegalArgumentException(fieldName + " is required");
+        }
+        if (normalized.length() > MAX_GENERATED_QUESTION_TEXT_LENGTH) {
+            throw new IllegalArgumentException(fieldName + " must be 4000 characters or less");
+        }
+        return normalized;
+    }
+
+    private String normalizeGeneratedOptionContent(String value) {
+        String normalized = blankToNull(value);
+        if (normalized == null) {
+            throw new IllegalArgumentException("AI generated option content is required");
+        }
+        if (normalized.length() > MAX_GENERATED_OPTION_CONTENT_LENGTH) {
+            throw new IllegalArgumentException("AI generated option content must be 1000 characters or less");
         }
         return normalized;
     }
@@ -727,7 +902,9 @@ public class AiService {
                     String content = blankToNull(item.getOptionContent()) == null
                             ? (i == 0 ? "正确" : "错误")
                             : item.getOptionContent().trim();
-                    normalized.add(option(String.valueOf((char) ('A' + i)), truncate(content, 1000), Boolean.TRUE.equals(item.getCorrect())));
+                    normalized.add(option(String.valueOf((char) ('A' + i)),
+                            normalizeGeneratedOptionContent(content),
+                            Boolean.TRUE.equals(item.getCorrect())));
                 }
                 if (blankToNull(question.getCorrectAnswer()) == null && correctLabels(normalized).isEmpty()) {
                     return normalized;
@@ -755,7 +932,7 @@ public class AiService {
                 continue;
             }
             normalized.add(option(String.valueOf((char) ('A' + normalized.size())),
-                    truncate(item.getOptionContent().trim(), 1000),
+                    normalizeGeneratedOptionContent(item.getOptionContent()),
                     Boolean.TRUE.equals(item.getCorrect())));
         }
         if (normalized.size() < 4) {
@@ -1048,7 +1225,10 @@ public class AiService {
         for (String type : ALL_TYPES) {
             int value = raw == null ? 0 : raw.getOrDefault(type, raw.getOrDefault(type.toLowerCase(Locale.ROOT), 0));
             if (value > 0) {
-                result.put(type, Math.min(value, 30));
+                if (value > MAX_MATERIAL_TYPE_COUNT) {
+                    throw new IllegalArgumentException("Each material question type count must be 30 or less");
+                }
+                result.put(type, value);
             }
         }
         return result;
@@ -1191,7 +1371,13 @@ public class AiService {
 
     private int normalizedCount(Integer count) {
         int value = count == null ? 3 : count;
-        return Math.max(1, Math.min(value, 10));
+        if (value < 1) {
+            throw new IllegalArgumentException("AI batch question count must be at least 1");
+        }
+        if (value > MAX_BATCH_QUESTION_COUNT) {
+            throw new IllegalArgumentException("AI batch question count must be 10 or less");
+        }
+        return value;
     }
 
     private String normalizeCode(String value) {

@@ -8,6 +8,23 @@
       </div>
     </div>
 
+    <el-alert
+      v-if="lastBasicOperationAudit"
+      class="basic-operation-audit"
+      type="success"
+      :closable="true"
+      show-icon
+      @close="lastBasicOperationAudit = null"
+    >
+      <template #title>
+        <div class="basic-operation-audit-content">
+          <span>{{ lastBasicOperationAudit.action }} audit recorded: #{{ lastBasicOperationAudit.operationLogId }}</span>
+          <el-button link type="primary" :icon="DocumentCopy" @click="copyLatestBasicOperationAuditId">Copy audit ID</el-button>
+          <el-button link type="primary" :icon="DocumentCopy" @click="copyLatestBasicOperationAuditLink">Copy audit link</el-button>
+        </div>
+      </template>
+    </el-alert>
+
     <el-tabs v-model="activeTab" class="basic-tabs" @tab-change="handleTabChange">
       <el-tab-pane v-if="canViewClasses" label="班级管理" name="classes">
         <div class="toolbar-line">
@@ -373,7 +390,7 @@
           </el-form-item>
         </el-form>
 
-        <el-table :data="notices" border>
+        <el-table :data="notices" border :row-class-name="noticeRowClassName">
           <el-table-column prop="id" label="ID" width="80" />
           <el-table-column prop="title" label="标题" min-width="180" />
           <el-table-column prop="content" label="内容" min-width="260" show-overflow-tooltip />
@@ -400,6 +417,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { DocumentCopy } from '@element-plus/icons-vue';
+import { useRoute, useRouter } from 'vue-router';
 import {
   createClass,
   createClassCourse,
@@ -439,12 +458,18 @@ import {
 } from '../api/basic';
 import { listUsers, type SystemUser } from '../api/admin';
 import type { RoleCode } from '../api/auth';
+import {
+  copyOperationLogIdToClipboard,
+  copyOperationLogLinkToClipboard
+} from '../utils/clipboard';
 
 const props = defineProps<{
   path: string;
   role: RoleCode;
   currentUserId?: number;
 }>();
+const router = useRouter();
+const route = useRoute();
 
 const activeTab = ref(tabFromPath(props.path));
 const query = reactive<{ keyword: string; status: number | null; subjectId: number | null }>({
@@ -462,6 +487,7 @@ const subjects = ref<SubjectInfo[]>([]);
 const knowledgePoints = ref<KnowledgePointInfo[]>([]);
 const notices = ref<NoticeInfo[]>([]);
 const summary = ref<Record<string, number>>({ classes: 0, courses: 0, classCourses: 0, subjects: 0, knowledgePoints: 0, notices: 0 });
+const lastBasicOperationAudit = ref<{ action: string; operationLogId: number | string } | null>(null);
 
 const editingClassId = ref<number | null>(null);
 const classForm = reactive<{ className: string; classCode: string; classType: NonNullable<ClassInfo['classType']>; major: string; grade: string; status: number }>({
@@ -524,6 +550,7 @@ function canManageNotice(row: NoticeInfo) {
 }
 const canViewClasses = computed(() => props.role === 'ADMIN' || props.role === 'TEACHER');
 const canViewSubjects = computed(() => props.role === 'ADMIN' || props.role === 'TEACHER' || props.role === 'STUDENT');
+const focusedNoticeId = computed(() => routeNoticeId());
 
 const summaryCards = computed(() => [
   { label: '班级', value: summary.value.classes || 0, remark: '支撑考试任务发布' },
@@ -543,9 +570,44 @@ watch(
   }
 );
 
+watch(
+  () => route.query.noticeId,
+  async () => {
+    if (activeTab.value !== 'notices') return;
+    await loadNotices();
+  }
+);
+
 onMounted(async () => {
   await loadBootstrapData();
 });
+
+function rememberBasicOperationAudit(action: string, operationLogId?: number | string | null) {
+  if (operationLogId === null || operationLogId === undefined || operationLogId === '') return;
+  lastBasicOperationAudit.value = { action, operationLogId };
+}
+
+async function copyLatestBasicOperationAuditId() {
+  const operationLogId = lastBasicOperationAudit.value?.operationLogId;
+  if (!operationLogId) return;
+  try {
+    await copyOperationLogIdToClipboard(operationLogId);
+    ElMessage.success('Audit ID copied');
+  } catch {
+    ElMessage.error('Failed to copy audit ID');
+  }
+}
+
+async function copyLatestBasicOperationAuditLink() {
+  const operationLogId = lastBasicOperationAudit.value?.operationLogId;
+  if (!operationLogId) return;
+  try {
+    await copyOperationLogLinkToClipboard(operationLogId);
+    ElMessage.success('Audit link copied');
+  } catch {
+    ElMessage.error('Failed to copy audit link');
+  }
+}
 
 async function loadBootstrapData() {
   await Promise.all([loadSubjects(), loadCourses(), loadClasses(), loadClassCourses(), loadTeachers(), loadSummary()]);
@@ -641,12 +703,27 @@ async function loadKnowledgePoints() {
 }
 
 async function loadNotices() {
-  const response = await listNotices({ keyword: query.keyword, status: query.status });
+  const response = await listNotices({
+    keyword: query.keyword,
+    status: query.status,
+    noticeId: focusedNoticeId.value || undefined
+  });
   notices.value = response.data;
+}
+
+function routeNoticeId() {
+  const raw = Array.isArray(route.query.noticeId) ? route.query.noticeId[0] : route.query.noticeId;
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function noticeRowClassName({ row }: { row: NoticeInfo }) {
+  return row.id === focusedNoticeId.value ? 'notice-row-focused' : '';
 }
 
 function handleTabChange() {
   resetQuery();
+  router.replace(`/basic/${activeTab.value}`).catch(() => {});
   loadActiveData();
 }
 
@@ -676,10 +753,12 @@ function teacherRoleText(role?: string) {
 async function saveClass() {
   const payload = { ...classForm };
   if (editingClassId.value) {
-    await updateClass(editingClassId.value, payload);
+    const response = await updateClass(editingClassId.value, payload);
+    rememberBasicOperationAudit('Update class', response.data.operationLogId);
     ElMessage.success('班级已更新');
   } else {
-    await createClass(payload);
+    const response = await createClass(payload);
+    rememberBasicOperationAudit('Create class', response.data.operationLogId);
     ElMessage.success('班级已新增');
   }
   resetClassForm();
@@ -699,7 +778,8 @@ function editClass(row: ClassInfo) {
 
 async function removeClass(id: number) {
   await confirmDelete('确认删除该班级吗？');
-  await deleteClass(id);
+  const response = await deleteClass(id);
+  rememberBasicOperationAudit('Delete class', response.data.operationLogId);
   ElMessage.success('班级已删除');
   await loadClasses();
   await loadSummary();
@@ -722,10 +802,12 @@ async function saveCourse() {
   }
   const payload = { ...courseForm };
   if (editingCourseId.value) {
-    await updateCourse(editingCourseId.value, payload);
+    const response = await updateCourse(editingCourseId.value, payload);
+    rememberBasicOperationAudit('Update course', response.data.operationLogId);
     ElMessage.success('课程已更新');
   } else {
-    await createCourse(payload);
+    const response = await createCourse(payload);
+    rememberBasicOperationAudit('Create course', response.data.operationLogId);
     ElMessage.success('课程已新增');
   }
   resetCourseForm();
@@ -745,7 +827,8 @@ function editCourse(row: CourseInfo) {
 
 async function removeCourse(id: number) {
   await confirmDelete('确认删除该课程吗？');
-  await deleteCourse(id);
+  const response = await deleteCourse(id);
+  rememberBasicOperationAudit('Delete course', response.data.operationLogId);
   ElMessage.success('课程已删除');
   await loadCourses();
   await loadClassCourses();
@@ -776,10 +859,12 @@ async function saveClassCourse() {
     status: classCourseForm.status
   };
   if (editingClassCourseId.value) {
-    await updateClassCourse(editingClassCourseId.value, payload);
+    const response = await updateClassCourse(editingClassCourseId.value, payload);
+    rememberBasicOperationAudit('Update class course', response.data.operationLogId);
     ElMessage.success('课程班已更新');
   } else {
-    await createClassCourse(payload);
+    const response = await createClassCourse(payload);
+    rememberBasicOperationAudit('Create class course', response.data.operationLogId);
     ElMessage.success('课程班已新增');
   }
   resetClassCourseForm();
@@ -797,7 +882,8 @@ function editClassCourse(row: ClassCourseInfo) {
 
 async function removeClassCourse(id: number) {
   await confirmDelete('确认删除该课程班吗？');
-  await deleteClassCourse(id);
+  const response = await deleteClassCourse(id);
+  rememberBasicOperationAudit('Delete class course', response.data.operationLogId);
   ElMessage.success('课程班已删除');
   await loadClassCourses();
   await loadTeachingAssignments();
@@ -819,11 +905,12 @@ async function saveTeachingAssignment() {
     ElMessage.warning('请选择教师和课程班');
     return;
   }
-  await createTeachingAssignment({
+  const response = await createTeachingAssignment({
     teacherUserId,
     classCourseId,
     teacherRole: teachingForm.teacherRole
   });
+  rememberBasicOperationAudit('Create teaching assignment', response.data.operationLogId);
   ElMessage.success('授课分配已保存');
   resetTeachingForm();
   await loadTeachingAssignments();
@@ -831,7 +918,8 @@ async function saveTeachingAssignment() {
 
 async function removeTeachingAssignment(id: number) {
   await confirmDelete('确认移除该授课分配吗？');
-  await deleteTeachingAssignment(id);
+  const response = await deleteTeachingAssignment(id);
+  rememberBasicOperationAudit('Delete teaching assignment', response.data.operationLogId);
   ElMessage.success('授课分配已移除');
   await loadTeachingAssignments();
 }
@@ -845,10 +933,12 @@ function resetTeachingForm() {
 async function saveSubject() {
   const payload = { ...subjectForm };
   if (editingSubjectId.value) {
-    await updateSubject(editingSubjectId.value, payload);
+    const response = await updateSubject(editingSubjectId.value, payload);
+    rememberBasicOperationAudit('Update subject', response.data.operationLogId);
     ElMessage.success('科目已更新');
   } else {
-    await createSubject(payload);
+    const response = await createSubject(payload);
+    rememberBasicOperationAudit('Create subject', response.data.operationLogId);
     ElMessage.success('科目已新增');
   }
   resetSubjectForm();
@@ -865,7 +955,8 @@ function editSubject(row: SubjectInfo) {
 
 async function removeSubject(id: number) {
   await confirmDelete('确认删除该科目吗？相关知识点会同步移除。');
-  await deleteSubject(id);
+  const response = await deleteSubject(id);
+  rememberBasicOperationAudit('Delete subject', response.data.operationLogId);
   ElMessage.success('科目已删除');
   await loadSubjects();
   await loadKnowledgePoints();
@@ -886,10 +977,12 @@ async function saveKnowledgePoint() {
   }
   const payload = { ...knowledgeForm, subjectId: knowledgeForm.subjectId };
   if (editingKnowledgeId.value) {
-    await updateKnowledgePoint(editingKnowledgeId.value, payload);
+    const response = await updateKnowledgePoint(editingKnowledgeId.value, payload);
+    rememberBasicOperationAudit('Update knowledge point', response.data.operationLogId);
     ElMessage.success('知识点已更新');
   } else {
-    await createKnowledgePoint(payload);
+    const response = await createKnowledgePoint(payload);
+    rememberBasicOperationAudit('Create knowledge point', response.data.operationLogId);
     ElMessage.success('知识点已新增');
   }
   resetKnowledgeForm();
@@ -908,7 +1001,8 @@ function editKnowledgePoint(row: KnowledgePointInfo) {
 
 async function removeKnowledgePoint(id: number) {
   await confirmDelete('确认删除该知识点吗？');
-  await deleteKnowledgePoint(id);
+  const response = await deleteKnowledgePoint(id);
+  rememberBasicOperationAudit('Delete knowledge point', response.data.operationLogId);
   ElMessage.success('知识点已删除');
   await loadKnowledgePoints();
   await loadSummary();
@@ -936,10 +1030,12 @@ async function saveNotice() {
     targets
   };
   if (editingNoticeId.value) {
-    await updateNotice(editingNoticeId.value, payload);
+    const response = await updateNotice(editingNoticeId.value, payload);
+    rememberBasicOperationAudit('Update notice', response.data.operationLogId);
     ElMessage.success('公告已更新');
   } else {
-    await createNotice(payload);
+    const response = await createNotice(payload);
+    rememberBasicOperationAudit('Create notice', response.data.operationLogId);
     ElMessage.success('公告已发布');
   }
   resetNoticeForm();
@@ -957,7 +1053,8 @@ function editNotice(row: NoticeInfo) {
 
 async function removeNotice(id: number) {
   await confirmDelete('确认删除该公告吗？');
-  await deleteNotice(id);
+  const response = await deleteNotice(id);
+  rememberBasicOperationAudit('Delete notice', response.data.operationLogId);
   ElMessage.success('公告已删除');
   await loadNotices();
   await loadSummary();
@@ -1128,6 +1225,17 @@ function tabFromPath(path: string) {
   line-height: 1.4;
 }
 
+.basic-operation-audit {
+  margin-top: -2px;
+}
+
+.basic-operation-audit-content {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .basic-tabs {
   background: white;
   border: 1px solid #e5e7eb;
@@ -1272,6 +1380,10 @@ function tabFromPath(path: string) {
 
 .el-table :deep(.el-table__row:hover) {
   background: #f9fafb;
+}
+
+:deep(.notice-row-focused td) {
+  background: #fffbeb !important;
 }
 
 .el-table :deep(.el-button.is-link) {

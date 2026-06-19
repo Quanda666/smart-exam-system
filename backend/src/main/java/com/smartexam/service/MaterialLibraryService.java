@@ -25,6 +25,14 @@ import java.util.Map;
 public class MaterialLibraryService {
 
     private static final int MAX_CONTEXT_LENGTH = 18_000;
+    private static final int MAX_MATERIAL_TITLE_LENGTH = 200;
+    private static final int MAX_MATERIAL_FILENAME_LENGTH = 255;
+    private static final int MAX_MATERIAL_OUTLINE_TITLE_LENGTH = 200;
+    private static final int MAX_MATERIAL_OUTLINE_SUMMARY_LENGTH = 1000;
+    private static final int MAX_MATERIAL_OUTLINE_KEYWORDS_LENGTH = 500;
+    private static final int MAX_MATERIAL_CHUNK_HEADING_LENGTH = 200;
+    private static final int MAX_MATERIAL_CHUNK_KEYWORDS_LENGTH = 500;
+    private static final int MAX_MATERIAL_CHUNK_CONTENT_LENGTH = 4000;
 
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
     private final DocumentTextExtractorService documentTextExtractorService;
@@ -46,15 +54,15 @@ public class MaterialLibraryService {
         JdbcTemplate jdbc = requireJdbcTemplate();
         validateSubject(jdbc, subjectId);
         String text = documentTextExtractorService.extract(file);
-        String filename = safeFilename(file.getOriginalFilename());
-        String materialTitle = firstNonBlank(title, filename.isBlank() ? "未命名课程资料" : filename);
+        String filename = normalizeMaterialFilename(file.getOriginalFilename());
+        String materialTitle = normalizeMaterialTitle(firstNonBlank(title, filename.isBlank() ? "Untitled course material" : filename));
         List<MaterialChunk> chunks = buildChunks(text);
         List<Map<String, Object>> outline = aiService.generateMaterialOutline(materialTitle, materialContext(chunks));
 
         jdbc.update("""
                 INSERT INTO course_material (subject_id, title, file_name, file_type, content_text, outline_json, uploaded_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, subjectId, truncate(materialTitle, 200), truncate(filename, 255), extensionOf(filename),
+                """, subjectId, materialTitle, filename, extensionOf(filename),
                 text, toJson(outline), user.getId());
         Long materialId = jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
 
@@ -62,8 +70,9 @@ public class MaterialLibraryService {
             jdbc.update("""
                     INSERT INTO course_material_chunk (material_id, chunk_order, page_no, paragraph_no, heading, content, keywords)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """, materialId, chunk.order(), chunk.pageNo(), chunk.paragraphNo(), truncate(chunk.heading(), 200),
-                    chunk.content(), truncate(chunk.keywords(), 500));
+                    """, materialId, chunk.order(), chunk.pageNo(), chunk.paragraphNo(),
+                    normalizeMaterialChunkHeading(chunk.heading()), chunk.content(),
+                    normalizeMaterialChunkKeywords(chunk.keywords()));
         }
         insertOutline(jdbc, materialId, outline);
         return getMaterialDetail(materialId, user);
@@ -117,7 +126,7 @@ public class MaterialLibraryService {
         Map<String, Object> material = getMaterialRow(jdbc, materialId, user);
         List<MaterialChunk> chunks = listChunks(jdbc, materialId);
         if (chunks.isEmpty()) {
-            throw new IllegalArgumentException("资料未生成有效分段，请重新上传");
+            throw new IllegalArgumentException("Material has no valid chunks; upload it again");
         }
         List<MaterialChunk> selected = selectChunks(chunks, request);
         MaterialQuestionGenerationRequest aiRequest = toAiRequest(material, request);
@@ -126,7 +135,7 @@ public class MaterialLibraryService {
             AiGeneratedQuestion question = questions.get(i);
             MaterialChunk chunk = selected.get(i % selected.size());
             question.setSourceType("AI_RAG");
-            question.setSourceDetail("资料库生成：" + material.get("title"));
+            question.setSourceDetail("Material library: " + material.get("title"));
             question.setMaterialId(materialId);
             if (question.getSourcePage() == null) {
                 question.setSourcePage(chunk.pageNo());
@@ -143,6 +152,23 @@ public class MaterialLibraryService {
         return questions;
     }
 
+    @Transactional
+    public Map<String, Object> deleteMaterial(Long materialId, AuthUser user) {
+        JdbcTemplate jdbc = requireJdbcTemplate();
+        Map<String, Object> material = getMaterialRow(jdbc, materialId, user);
+        int rows = jdbc.update("""
+                UPDATE course_material
+                SET deleted = 1, status = 0, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND deleted = 0
+                """, materialId);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("deleted", rows > 0);
+        result.put("id", materialId);
+        result.put("title", material.get("title"));
+        result.put("fileName", material.get("fileName"));
+        return result;
+    }
+
     private Map<String, Object> getMaterialRow(JdbcTemplate jdbc, Long materialId, AuthUser user) {
         int globalScope = user.hasRole("ADMIN") ? 1 : 0;
         List<Map<String, Object>> rows = jdbc.queryForList("""
@@ -156,7 +182,7 @@ public class MaterialLibraryService {
                 WHERE m.id = ? AND m.deleted = 0 AND (? = 1 OR m.uploaded_by = ?)
                 """, materialId, globalScope, user.getId());
         if (rows.isEmpty()) {
-            throw new IllegalArgumentException("资料不存在或无权访问");
+            throw new IllegalArgumentException("Material not found or not accessible");
         }
         return new LinkedHashMap<>(rows.get(0));
     }
@@ -192,7 +218,7 @@ public class MaterialLibraryService {
             paragraph++;
             if (looksLikeHeading(line)) {
                 if (!buffer.isEmpty()) {
-                    chunks.add(chunk(chunks.size() + 1, startParagraph, heading, buffer.toString()));
+                    appendContentChunks(chunks, startParagraph, heading, buffer.toString());
                     buffer.setLength(0);
                 }
                 heading = line;
@@ -202,25 +228,57 @@ public class MaterialLibraryService {
             if (buffer.isEmpty()) {
                 startParagraph = paragraph;
             }
-            if (buffer.length() + line.length() > 1200) {
-                chunks.add(chunk(chunks.size() + 1, startParagraph, heading, buffer.toString()));
+            if (!buffer.isEmpty() && buffer.length() + line.length() > 1200) {
+                appendContentChunks(chunks, startParagraph, heading, buffer.toString());
                 buffer.setLength(0);
                 startParagraph = paragraph;
             }
             buffer.append(buffer.isEmpty() ? "" : "\n").append(line);
         }
         if (!buffer.isEmpty()) {
-            chunks.add(chunk(chunks.size() + 1, startParagraph, heading, buffer.toString()));
+            appendContentChunks(chunks, startParagraph, heading, buffer.toString());
         }
         if (chunks.isEmpty() && !text.isBlank()) {
-            chunks.add(chunk(1, 1, heading, text));
+            appendContentChunks(chunks, 1, heading, text);
         }
         return chunks;
     }
 
+    private void appendContentChunks(List<MaterialChunk> chunks, int paragraph, String heading, String content) {
+        String normalized = blankToNull(content);
+        if (normalized == null) {
+            return;
+        }
+        int offset = 0;
+        while (offset < normalized.length()) {
+            int end = chunkContentSplitEnd(normalized, offset);
+            String part = normalized.substring(offset, end).trim();
+            if (!part.isBlank()) {
+                chunks.add(chunk(chunks.size() + 1, paragraph, heading, part));
+            }
+            offset = end;
+            while (offset < normalized.length() && Character.isWhitespace(normalized.charAt(offset))) {
+                offset++;
+            }
+        }
+    }
+
+    private int chunkContentSplitEnd(String content, int offset) {
+        int hardEnd = Math.min(content.length(), offset + MAX_MATERIAL_CHUNK_CONTENT_LENGTH);
+        if (hardEnd >= content.length()) {
+            return content.length();
+        }
+        for (int i = hardEnd - 1; i > offset; i--) {
+            if (Character.isWhitespace(content.charAt(i))) {
+                return i;
+            }
+        }
+        return hardEnd;
+    }
+
     private MaterialChunk chunk(int order, int paragraph, String heading, String content) {
         int pageNo = Math.max(1, (paragraph - 1) / 6 + 1);
-        String normalized = truncate(content.trim(), 4000);
+        String normalized = normalizeMaterialChunkContent(content);
         return new MaterialChunk(order, pageNo, Math.max(1, paragraph), heading, normalized, keywordsOf(heading + " " + normalized));
     }
 
@@ -240,7 +298,7 @@ public class MaterialLibraryService {
     private int score(MaterialChunk chunk, String query) {
         String haystack = (safeText(chunk.heading()) + " " + safeText(chunk.keywords()) + " " + safeText(chunk.content())).toLowerCase(Locale.ROOT);
         int score = 0;
-        for (String term : query.toLowerCase(Locale.ROOT).split("\\s+|,|，|、")) {
+        for (String term : query.toLowerCase(Locale.ROOT).split("\\s+|,|;|\\.|:")) {
             if (term.length() >= 2 && haystack.contains(term)) {
                 score += term.length();
             }
@@ -254,7 +312,7 @@ public class MaterialLibraryService {
             if (builder.length() >= MAX_CONTEXT_LENGTH) {
                 break;
             }
-            builder.append("[页").append(chunk.pageNo()).append(" 段").append(chunk.paragraphNo()).append("] ");
+            builder.append("[page ").append(chunk.pageNo()).append(" paragraph ").append(chunk.paragraphNo()).append("] ");
             if (blankToNull(chunk.heading()) != null) {
                 builder.append(chunk.heading()).append("\n");
             }
@@ -268,7 +326,7 @@ public class MaterialLibraryService {
                                                           MaterialQuestionFromLibraryRequest request) {
         int total = request.getTypeCounts().values().stream().mapToInt(value -> Math.max(0, value == null ? 0 : value)).sum();
         if (total <= 0) {
-            throw new IllegalArgumentException("请至少设置一种题型数量");
+            throw new IllegalArgumentException("At least one question type count is required");
         }
         MaterialQuestionGenerationRequest aiRequest = new MaterialQuestionGenerationRequest();
         aiRequest.setSubjectId(longValue(material.get("subjectId")));
@@ -288,26 +346,26 @@ public class MaterialLibraryService {
             jdbc.update("""
                     INSERT INTO course_material_outline (material_id, outline_order, title, summary, keywords, source_page, source_paragraph)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """, materialId, order++, truncate(String.valueOf(item.getOrDefault("title", "知识点")), 200),
-                    truncate(stringValue(item.get("summary")), 1000), truncate(stringValue(item.get("keywords")), 500),
+                    """, materialId, order++, normalizeMaterialOutlineTitle(item.get("title")),
+                    normalizeMaterialOutlineSummary(item.get("summary")), normalizeMaterialOutlineKeywords(item.get("keywords")),
                     intValue(item.get("sourcePage")), intValue(item.get("sourceParagraph")));
         }
     }
 
     private void validateSubject(JdbcTemplate jdbc, Long subjectId) {
         if (subjectId == null) {
-            throw new IllegalArgumentException("请先选择科目");
+            throw new IllegalArgumentException("Subject is required");
         }
         Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM edu_subject WHERE id = ? AND deleted = 0", Integer.class, subjectId);
         if (count == null || count == 0) {
-            throw new IllegalArgumentException("科目不存在");
+            throw new IllegalArgumentException("Subject not found");
         }
     }
 
     private boolean looksLikeHeading(String line) {
         return line.length() >= 4 && line.length() <= 60
-                && !line.endsWith("。")
-                && line.matches("^(第[一二三四五六七八九十\\d]+[章节].*|[一二三四五六七八九十]+[、.].*|\\d+(?:\\.\\d+)*[、.\\s].*|[#*-]+\\s*.+|.*(概述|原理|流程|机制|方法|应用|特性|结构|案例|总结))$");
+                && !line.matches(".*[.;:!?]$")
+                && line.matches("^(\\d+(?:\\.\\d+)*[\\.\\s].*|[#*-]+\\s*.+|.{4,60})$");
     }
 
     private String keywordsOf(String text) {
@@ -335,7 +393,7 @@ public class MaterialLibraryService {
     private JdbcTemplate requireJdbcTemplate() {
         JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
         if (jdbcTemplate == null) {
-            throw new DatabaseUnavailableException("数据库连接不可用，请检查本地或云端数据源配置");
+            throw new DatabaseUnavailableException("Database connection is unavailable");
         }
         return jdbcTemplate;
     }
@@ -370,8 +428,71 @@ public class MaterialLibraryService {
         return dot < 0 ? "" : filename.substring(dot + 1).toLowerCase(Locale.ROOT);
     }
 
-    private String safeFilename(String filename) {
-        return filename == null ? "" : filename.trim();
+    private String normalizeMaterialFilename(String filename) {
+        String normalized = filename == null ? "" : filename.trim();
+        if (normalized.length() > MAX_MATERIAL_FILENAME_LENGTH) {
+            throw new IllegalArgumentException("Material filename must be 255 characters or less");
+        }
+        return normalized;
+    }
+
+    private String normalizeMaterialTitle(String title) {
+        String normalized = blankToNull(title);
+        if (normalized == null) {
+            throw new IllegalArgumentException("Material title is required");
+        }
+        if (normalized.length() > MAX_MATERIAL_TITLE_LENGTH) {
+            throw new IllegalArgumentException("Material title must be 200 characters or less");
+        }
+        return normalized;
+    }
+
+    private String normalizeMaterialOutlineTitle(Object title) {
+        String normalized = normalizeMaterialOutlineText(title, MAX_MATERIAL_OUTLINE_TITLE_LENGTH, "Material outline title");
+        return normalized == null ? "Knowledge point" : normalized;
+    }
+
+    private String normalizeMaterialOutlineSummary(Object summary) {
+        return normalizeMaterialOutlineText(summary, MAX_MATERIAL_OUTLINE_SUMMARY_LENGTH, "Material outline summary");
+    }
+
+    private String normalizeMaterialOutlineKeywords(Object keywords) {
+        return normalizeMaterialOutlineText(keywords, MAX_MATERIAL_OUTLINE_KEYWORDS_LENGTH, "Material outline keywords");
+    }
+
+    private String normalizeMaterialOutlineText(Object value, int maxLength, String fieldName) {
+        String normalized = blankToNull(stringValue(value));
+        if (normalized != null && normalized.length() > maxLength) {
+            throw new IllegalArgumentException(fieldName + " must be " + maxLength + " characters or less");
+        }
+        return normalized;
+    }
+
+    private String normalizeMaterialChunkHeading(String heading) {
+        return normalizeMaterialChunkText(heading, MAX_MATERIAL_CHUNK_HEADING_LENGTH, "Material chunk heading");
+    }
+
+    private String normalizeMaterialChunkKeywords(String keywords) {
+        return normalizeMaterialChunkText(keywords, MAX_MATERIAL_CHUNK_KEYWORDS_LENGTH, "Material chunk keywords");
+    }
+
+    private String normalizeMaterialChunkContent(String content) {
+        String normalized = blankToNull(content);
+        if (normalized == null) {
+            throw new IllegalArgumentException("Material chunk content is required");
+        }
+        if (normalized.length() > MAX_MATERIAL_CHUNK_CONTENT_LENGTH) {
+            throw new IllegalArgumentException("Material chunk content must be 4000 characters or less");
+        }
+        return normalized;
+    }
+
+    private String normalizeMaterialChunkText(String value, int maxLength, String fieldName) {
+        String normalized = blankToNull(value);
+        if (normalized != null && normalized.length() > maxLength) {
+            throw new IllegalArgumentException(fieldName + " must be " + maxLength + " characters or less");
+        }
+        return normalized;
     }
 
     private String firstNonBlank(String first, String fallback) {

@@ -1,6 +1,9 @@
 server:
   port: ${PORT:${SERVER_PORT:8080}}
   shutdown: graceful
+  tomcat:
+    mbeanregistry:
+      enabled: true
   compression:
     enabled: true
     mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
@@ -44,6 +47,13 @@ spring:
       # Optimizations for cloud database connections
       keepalive-time: 300000
       validation-timeout: 5000
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: ${REDIS_TIMEOUT:2s}
 
 app:
   cors:
@@ -54,6 +64,16 @@ app:
     model: ${OPENAI_MODEL:gpt-4o-mini}
     mock-enabled: ${AI_MOCK_ENABLED:true}
     timeout-seconds: ${AI_TIMEOUT_SECONDS:30}
+  exam:
+    draft-cache:
+      redis-enabled: ${EXAM_DRAFT_REDIS_ENABLED:false}
+      ttl-seconds: ${EXAM_DRAFT_REDIS_TTL_SECONDS:21600}
+
+smart-exam:
+  draft-flush-delay-ms: ${EXAM_DRAFT_FLUSH_DELAY_MS:60000}
+  draft-flush-initial-delay-ms: ${EXAM_DRAFT_FLUSH_INITIAL_DELAY_MS:180000}
+  request-tracing:
+    slow-warning-ms: ${REQUEST_SLOW_WARNING_MS:1000}
 
 # Logging configuration
 logging:
@@ -63,20 +83,25 @@ logging:
     org.springframework.web: ${SPRING_WEB_LOG_LEVEL:INFO}
     org.springframework.jdbc: ${SPRING_JDBC_LOG_LEVEL:INFO}
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level traceId=%X{traceId} %logger{36} - %msg%n"
 
 # Management endpoints for health checks
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
       base-path: /actuator
   endpoint:
     health:
       show-details: ${HEALTH_SHOW_DETAILS:when-authorized}
       probes:
         enabled: true
+      group:
+        readiness:
+          include: readinessState,db,diskSpace
+        liveness:
+          include: livenessState,ping
   health:
     livenessState:
       enabled: true
@@ -84,3 +109,18 @@ management:
       enabled: true
     db:
       enabled: true
+    redis:
+      enabled: ${REDIS_HEALTH_ENABLED:false}
+  metrics:
+    tags:
+      application: smart-exam-backend
+  prometheus:
+    metrics:
+      export:
+        enabled: ${PROMETHEUS_METRICS_ENABLED:true}
+
+info:
+  app:
+    name: smart-exam-backend
+    description: Smart Exam System backend
+    version: 0.1.0-SNAPSHOT

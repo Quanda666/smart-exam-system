@@ -13,12 +13,27 @@ export interface Notification {
   content: string;
   type: string;
   link?: string;
+  relatedType?: string | null;
+  relatedId?: number | null;
   isRead: number;
   createdAt: string;
 }
 
-export function getMyNotifications(page = 1, size = 10) {
-  return getJson<PageResult<Notification>>(`/api/notifications/my?page=${page}&size=${size}`);
+export interface NotificationQuery {
+  type?: string;
+  relatedType?: string;
+  relatedId?: number | string;
+}
+
+export function getMyNotifications(page = 1, size = 10, query: NotificationQuery = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    size: String(size)
+  });
+  if (query.type) params.set('type', query.type);
+  if (query.relatedType) params.set('relatedType', query.relatedType);
+  if (query.relatedId !== undefined && query.relatedId !== null) params.set('relatedId', String(query.relatedId));
+  return getJson<PageResult<Notification>>(`/api/notifications/my?${params.toString()}`);
 }
 
 export function getUnreadCount() {

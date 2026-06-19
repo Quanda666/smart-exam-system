@@ -2,12 +2,14 @@ package com.smartexam.dto.review;
 
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
 public class ReviewRequest {
 
     @NotNull(message = "答案记录ID不能为空")
+    @Positive(message = "answerRecordId must be positive")
     private Long answerRecordId;
 
     @NotNull(message = "分数不能为空")

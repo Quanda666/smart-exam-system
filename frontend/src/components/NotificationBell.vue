@@ -39,6 +39,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { Bell } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { getMyNotifications, getUnreadCount, markRead, markAllRead, type Notification } from '../api/notification';
@@ -48,6 +49,7 @@ const unreadCount = ref(0);
 const page = ref(1);
 const size = ref(10);
 const total = ref(0);
+const router = useRouter();
 
 onMounted(async () => {
   await loadNotifications(1);
@@ -93,7 +95,7 @@ async function handleClick(item: Notification) {
     }
   }
   if (item.link) {
-    window.location.pathname = item.link;
+    await router.push(item.link).catch(() => {});
   }
 }
 

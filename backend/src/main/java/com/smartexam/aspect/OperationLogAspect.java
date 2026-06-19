@@ -13,9 +13,8 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * 自动记录所有写操作（POST/PUT/DELETE）到操作日志。
- * 排除 /api/auth（登录在 AuthController 内已做精确埋点）与 /api/system/users
- * （用户管理在 UserController 内已做"启用/禁用/重置密码/删除"等精确埋点），避免重复记录。
+ * 自动记录控制器写操作到操作日志。
+ * 认证和用户管理接口已有更精确的审计记录，这里跳过以避免重复写入。
  */
 @Aspect
 @Component
@@ -54,7 +53,7 @@ public class OperationLogAspect {
             AuthUser user = session.getUser();
             operationLogService.record(user.getId(), user.getRealName(), actionOf(request.getMethod(), uri), uri, null);
         } catch (Exception ignored) {
-            // 日志记录失败不影响主流程
+            // 审计日志失败不能影响主业务流程。
         }
     }
 

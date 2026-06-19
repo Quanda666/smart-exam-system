@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.zip.InflaterInputStream;
 import java.util.zip.ZipEntry;
@@ -25,6 +26,7 @@ public class DocumentTextExtractorService {
 
     private static final int MAX_FILE_BYTES = 25 * 1024 * 1024;
     private static final int MAX_TEXT_LENGTH = 80_000;
+    private static final Set<String> SUPPORTED_EXTENSIONS = Set.of("txt", "text", "md", "doc", "docx", "ppt", "pptx", "pdf");
     private static final Pattern XML_TAG = Pattern.compile("<[^>]+>");
     private static final Pattern CONTROL_CHARS = Pattern.compile("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]+");
 
@@ -39,18 +41,20 @@ public class DocumentTextExtractorService {
             byte[] bytes = file.getBytes();
             String filename = safeFilename(file.getOriginalFilename());
             String extension = extensionOf(filename);
+            ensureSupportedExtension(extension);
             String text = switch (extension) {
                 case "txt", "text", "md" -> decodePlainText(bytes);
                 case "docx" -> extractDocx(bytes);
                 case "pptx" -> extractPptx(bytes);
                 case "pdf" -> extractPdf(bytes);
                 case "doc", "ppt" -> extractLegacyOffice(bytes);
-                default -> decodePlainText(bytes);
+                default -> throw unsupportedDocumentExtension(extension);
             };
             String normalized = normalizeText(text);
             if (normalized.isBlank()) {
                 throw new IllegalArgumentException("文档未抽取到可识别文本，请确认文件不是扫描图片或加密文档");
             }
+            ensureExtractedTextWithinLimit(normalized);
             if ("pdf".equals(extension) && looksLikePdfNoise(normalized)) {
                 throw new IllegalArgumentException("PDF文本提取结果疑似字体/语言标记，无法可靠识别题目；请改用Word/TXT，或先将PDF转换为可复制文本后再上传");
             }
@@ -308,7 +312,13 @@ public class DocumentTextExtractorService {
                 .replaceAll(" *\\n *", "\n")
                 .replaceAll("\\n{3,}", "\n\n")
                 .trim();
-        return normalized.length() > MAX_TEXT_LENGTH ? normalized.substring(0, MAX_TEXT_LENGTH) : normalized;
+        return normalized;
+    }
+
+    private void ensureExtractedTextWithinLimit(String normalized) {
+        if (normalized != null && normalized.length() > MAX_TEXT_LENGTH) {
+            throw new IllegalArgumentException("Extracted document text must be 80000 characters or less; split large materials before upload");
+        }
     }
 
     private boolean looksLikePdfNoise(String text) {
@@ -341,6 +351,16 @@ public class DocumentTextExtractorService {
 
     private String safeFilename(String filename) {
         return filename == null ? "" : filename;
+    }
+
+    private void ensureSupportedExtension(String extension) {
+        if (!SUPPORTED_EXTENSIONS.contains(extension)) {
+            throw unsupportedDocumentExtension(extension);
+        }
+    }
+
+    private IllegalArgumentException unsupportedDocumentExtension(String extension) {
+        return new IllegalArgumentException("Unsupported document file type; supported: txt, text, md, doc, docx, ppt, pptx, pdf");
     }
 
     private String extensionOf(String filename) {

@@ -35,6 +35,23 @@
         <el-button type="primary" :loading="saving" @click="savePermissions">保存授权</el-button>
       </div>
 
+      <el-alert
+        v-if="lastOperationAudit"
+        class="role-operation-audit"
+        type="success"
+        :closable="true"
+        show-icon
+        @close="lastOperationAudit = null"
+      >
+        <template #title>
+          <div class="role-operation-audit-content">
+            <span>Role permission audit recorded: #{{ lastOperationAudit.operationLogId }}</span>
+            <el-button link type="primary" :icon="DocumentCopy" @click="copyLatestOperationAuditId">Copy audit ID</el-button>
+            <el-button link type="primary" :icon="DocumentCopy" @click="copyLatestOperationAuditLink">Copy audit link</el-button>
+          </div>
+        </template>
+      </el-alert>
+
       <div v-if="selectedRole" class="permission-body">
         <div class="permission-tree-card">
           <el-tree
@@ -81,7 +98,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
+import { DocumentCopy } from '@element-plus/icons-vue';
 import { listRoles, updateRolePages, type RolePageOption, type SystemRole } from '../api/admin';
+import {
+  copyOperationLogIdToClipboard,
+  copyOperationLogLinkToClipboard
+} from '../utils/clipboard';
 
 interface PermissionNode {
   key: string;
@@ -97,6 +119,7 @@ const loading = ref(false);
 const saving = ref(false);
 const selectedRoleCode = ref('');
 const checkedPages = ref<string[]>([]);
+const lastOperationAudit = ref<{ operationLogId: number | string } | null>(null);
 const permissionTreeRef = ref<{ setCheckedKeys: (keys: string[]) => void; getCheckedKeys: (leafOnly?: boolean) => string[] }>();
 const treeProps = { label: 'label', children: 'children', disabled: 'disabled' };
 
@@ -175,6 +198,7 @@ async function savePermissions() {
     role.pages = response.data.pages;
     checkedPages.value = [...role.pages];
     permissionTreeRef.value?.setCheckedKeys(checkedPages.value);
+    rememberOperationAudit(response.data.operationLogId);
     ElMessage.success('授权已保存');
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '授权保存失败');
@@ -183,21 +207,48 @@ async function savePermissions() {
   }
 }
 
+function rememberOperationAudit(operationLogId?: number | string | null) {
+  if (operationLogId === null || operationLogId === undefined || operationLogId === '') return;
+  lastOperationAudit.value = { operationLogId };
+}
+
+async function copyLatestOperationAuditId() {
+  const operationLogId = lastOperationAudit.value?.operationLogId;
+  if (!operationLogId) return;
+  try {
+    await copyOperationLogIdToClipboard(operationLogId);
+    ElMessage.success('Audit ID copied');
+  } catch {
+    ElMessage.error('Failed to copy audit ID');
+  }
+}
+
+async function copyLatestOperationAuditLink() {
+  const operationLogId = lastOperationAudit.value?.operationLogId;
+  if (!operationLogId) return;
+  try {
+    await copyOperationLogLinkToClipboard(operationLogId);
+    ElMessage.success('Audit link copied');
+  } catch {
+    ElMessage.error('Failed to copy audit link');
+  }
+}
+
 function permissionGroups(roleCode: string) {
   if (roleCode === 'ADMIN') {
     return [
       { key: 'workspace', label: '工作台', paths: ['/admin'] },
-      { key: 'exam', label: '考试与题库', paths: ['/question-bank', '/papers', '/exam/analysis'] },
+      { key: 'exam', label: '考试与题库', paths: ['/exam-approvals', '/question-bank', '/materials', '/papers', '/exam/analysis', '/exam-monitor'] },
       { key: 'data', label: '基础数据', paths: ['/basic/data'] },
-      { key: 'security', label: '用户与权限', paths: ['/system/users', '/system/roles'] },
+    { key: 'security', label: '用户与权限', paths: ['/system/users', '/system/roles', '/system/config'] },
       { key: 'monitor', label: '系统监控', paths: ['/monitor/logs'] }
     ];
   }
   if (roleCode === 'TEACHER') {
     return [
       { key: 'workspace', label: '工作台', paths: ['/teacher'] },
-      { key: 'exam', label: '考试管理', paths: ['/exam-tasks', '/reviews', '/teacher/analysis'] },
-      { key: 'paper', label: '试卷题库', paths: ['/papers', '/question-bank'] },
+      { key: 'exam', label: '考试管理', paths: ['/exam-tasks', '/exam-monitor', '/reviews', '/teacher/analysis'] },
+      { key: 'paper', label: '试卷题库', paths: ['/papers', '/question-bank', '/materials'] },
       { key: 'data', label: '教学数据', paths: ['/teacher/students', '/basic/data'] }
     ];
   }
@@ -209,7 +260,7 @@ function permissionGroups(roleCode: string) {
 }
 
 function requiredPages(roleCode: string) {
-  if (roleCode === 'ADMIN') return ['/admin', '/system/users', '/system/roles'];
+  if (roleCode === 'ADMIN') return ['/admin', '/system/users', '/system/roles', '/system/config'];
   if (roleCode === 'TEACHER') return ['/teacher'];
   if (roleCode === 'STUDENT') return ['/student'];
   return [];
@@ -309,6 +360,17 @@ function tagType(code: string) {
 .permission-title {
   gap: 10px;
   margin-bottom: 8px;
+}
+
+.role-operation-audit {
+  margin-bottom: 16px;
+}
+
+.role-operation-audit-content {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .permission-body {

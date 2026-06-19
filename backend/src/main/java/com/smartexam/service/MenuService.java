@@ -45,9 +45,9 @@ public class MenuService {
     public Map<String, List<String>> defaultRolePageMap() {
         Map<String, List<String>> data = new LinkedHashMap<>();
         // 管理员：概况 -> 核心业务 -> 基础数据 -> 系统管理
-        data.put("ADMIN", List.of("/admin", "/question-bank", "/papers", "/exam/analysis", "/basic/data", "/system/users", "/system/roles", "/monitor/logs"));
+        data.put("ADMIN", List.of("/admin", "/exam-approvals", "/question-bank", "/materials", "/papers", "/exam/analysis", "/exam-monitor", "/basic/data", "/system/users", "/system/roles", "/system/config", "/monitor/logs"));
         // 教师：概况 -> 核心业务 -> 基础数据
-        data.put("TEACHER", List.of("/teacher", "/exam-tasks", "/reviews", "/teacher/analysis", "/teacher/students", "/question-bank", "/papers", "/basic/data"));
+        data.put("TEACHER", List.of("/teacher", "/exam-tasks", "/exam-monitor", "/reviews", "/teacher/analysis", "/teacher/students", "/question-bank", "/materials", "/papers", "/basic/data"));
         // 学生：概况 -> 核心功能 -> 基础数据
         data.put("STUDENT", List.of("/student", "/student/exams", "/student/results", "/student/wrong-questions", "/basic/data"));
         return data;
@@ -132,12 +132,16 @@ public class MenuService {
         return List.of(
                 // 管理员菜单 - 按使用频率排序
                 new MenuItem("概况", "/admin", "DataAnalysis", List.of("ADMIN")),
+                new MenuItem("考试审批", "/exam-approvals", "Tickets", List.of("ADMIN")),
                 new MenuItem("题库管理", "/question-bank", "Collection", List.of("ADMIN", "TEACHER")),
+                new MenuItem("课程资料库", "/materials", "Notebook", List.of("ADMIN", "TEACHER")),
                 new MenuItem("试卷管理", "/papers", "Files", List.of("ADMIN", "TEACHER")),
                 new MenuItem("成绩分析", "/exam/analysis", "PieChart", List.of("ADMIN")),
+                new MenuItem("实时监考", "/exam-monitor", "DataLine", List.of("ADMIN", "TEACHER")),
                 new MenuItem("基础数据", "/basic/data", "Management", List.of("ADMIN", "TEACHER", "STUDENT")),
                 new MenuItem("用户管理", "/system/users", "User", List.of("ADMIN")),
                 new MenuItem("角色管理", "/system/roles", "Lock", List.of("ADMIN")),
+                new MenuItem("系统配置", "/system/config", "Setting", List.of("ADMIN")),
                 new MenuItem("系统日志", "/monitor/logs", "Document", List.of("ADMIN")),
 
                 // 教师菜单 - 按使用频率排序
@@ -166,16 +170,16 @@ public class MenuService {
         if (user != null && user.hasRole("ADMIN")) {
             return groups(flatMenus,
                     group("工作台", "House", "/admin"),
-                    group("考试与题库", "Collection", "/question-bank", "/papers", "/exam/analysis"),
+                    group("考试与题库", "Collection", "/exam-approvals", "/question-bank", "/materials", "/papers", "/exam/analysis", "/exam-monitor"),
                     group("基础数据", "Management", "/basic/data"),
-                    group("用户与权限", "User", "/system/users", "/system/roles"),
+                    group("用户与权限", "User", "/system/users", "/system/roles", "/system/config"),
                     group("系统监控", "Document", "/monitor/logs"));
         }
         if (user != null && user.hasRole("TEACHER")) {
             return groups(flatMenus,
                     group("工作台", "House", "/teacher"),
-                    group("考试管理", "Calendar", "/exam-tasks", "/reviews", "/teacher/analysis"),
-                    group("试卷题库", "Files", "/papers", "/question-bank"),
+                    group("考试管理", "Calendar", "/exam-tasks", "/reviews", "/teacher/analysis", "/exam-monitor"),
+                    group("试卷题库", "Files", "/papers", "/question-bank", "/materials"),
                     group("教学数据", "DataLine", "/teacher/students", "/basic/data"));
         }
         if (user != null && user.hasRole("STUDENT")) {

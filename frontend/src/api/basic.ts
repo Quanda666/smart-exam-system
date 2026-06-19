@@ -10,6 +10,7 @@ export interface ClassInfo {
   status: number;
   createdAt?: string;
   updatedAt?: string;
+  operationLogId?: number | null;
 }
 
 export interface SubjectInfo {
@@ -19,6 +20,7 @@ export interface SubjectInfo {
   status: number;
   createdAt?: string;
   updatedAt?: string;
+  operationLogId?: number | null;
 }
 
 export interface KnowledgePointInfo {
@@ -31,6 +33,7 @@ export interface KnowledgePointInfo {
   status: number;
   createdAt?: string;
   updatedAt?: string;
+  operationLogId?: number | null;
 }
 
 export interface CourseInfo {
@@ -44,6 +47,7 @@ export interface CourseInfo {
   status: number;
   createdAt?: string;
   updatedAt?: string;
+  operationLogId?: number | null;
 }
 
 export interface ClassCourseInfo {
@@ -59,6 +63,7 @@ export interface ClassCourseInfo {
   subjectName?: string;
   termName: string;
   status: number;
+  operationLogId?: number | null;
 }
 
 export interface TeachingAssignmentInfo {
@@ -72,6 +77,7 @@ export interface TeachingAssignmentInfo {
   termName: string;
   teacherRole: string;
   status: number;
+  operationLogId?: number | null;
 }
 
 export interface StudentMembershipInfo {
@@ -85,6 +91,7 @@ export interface StudentMembershipInfo {
   membershipType: 'PRIMARY' | 'ELECTIVE' | 'TEMPORARY';
   source?: string;
   status: number;
+  operationLogId?: number | null;
 }
 
 export interface NoticeTargetInfo {
@@ -107,17 +114,20 @@ export interface NoticeInfo {
   targetSummary?: string;
   createdAt?: string;
   updatedAt?: string;
+  operationLogId?: number | null;
 }
 
 export interface BasicQuery {
   keyword?: string;
   status?: number | null;
   subjectId?: number | null;
+  noticeId?: number | null;
 }
 
 export type DeleteResult = {
   deleted: boolean;
   id: number;
+  operationLogId?: number | null;
 };
 
 function queryString(query: BasicQuery = {}) {

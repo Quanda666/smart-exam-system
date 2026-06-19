@@ -23,11 +23,11 @@ public class ApiResponse<T> {
     }
 
     public static <T> ApiResponse<T> ok(T data) {
-        return new ApiResponse<>(true, "OK", "操作成功", data);
+        return new ApiResponse<>(true, ErrorCode.OK, "操作成功", data);
     }
 
     public static <T> ApiResponse<T> ok(String message, T data) {
-        return new ApiResponse<>(true, "OK", message, data);
+        return new ApiResponse<>(true, ErrorCode.OK, message, data);
     }
 
     public static <T> ApiResponse<T> fail(String code, String message) {
