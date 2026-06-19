@@ -39,6 +39,9 @@ public class OverviewService {
         JdbcTemplate jt = requireJdbcTemplate();
         Map<String, Object> data = new LinkedHashMap<>();
 
+        // 用户信息
+        data.put("role", user.getRole());
+
         // 统计卡片
         data.put("totalStudents", queryInt(jt, "SELECT COUNT(*) FROM sys_user u JOIN sys_user_role ur ON ur.user_id = u.id JOIN sys_role r ON r.id = ur.role_id WHERE r.role_code = 'STUDENT' AND u.deleted = 0"));
         data.put("totalTeachers", queryInt(jt, "SELECT COUNT(*) FROM sys_user u JOIN sys_user_role ur ON ur.user_id = u.id JOIN sys_role r ON r.id = ur.role_id WHERE r.role_code = 'TEACHER' AND u.deleted = 0"));
