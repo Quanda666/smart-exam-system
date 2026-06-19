@@ -396,7 +396,7 @@ public class QuestionBankService {
         List<Object> listParams = new ArrayList<>(params);
         listParams.add(safeSize);
         listParams.add(offset);
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(questionReviewAuditSelectSql() + where + """
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(questionReviewAuditSelectSql() + where + " " + """
                 ORDER BY qrl.operated_at DESC, qrl.id DESC
                 LIMIT ? OFFSET ?
                 """, listParams.toArray());
@@ -411,7 +411,7 @@ public class QuestionBankService {
         StringBuilder where = new StringBuilder(" WHERE 1 = 1");
         appendReviewAuditFilters(where, params, logId, questionId, keyword, actionType, reviewStatus,
                 subjectId, operatorId, startFrom, startTo);
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(questionReviewAuditSelectSql() + where + """
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(questionReviewAuditSelectSql() + where + " " + """
                 ORDER BY qrl.operated_at DESC, qrl.id DESC
                 LIMIT 5000
                 """, params.toArray());

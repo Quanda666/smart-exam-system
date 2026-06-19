@@ -140,9 +140,9 @@ public class NotificationService {
                        n.is_read AS isRead,
                        n.created_at AS createdAt
                 FROM notification n
-                LEFT JOIN sys_user u ON u.id = n.user_id 
+                LEFT JOIN sys_user u ON u.id = n.user_id
                 """
-                + where +
+                + where + " " +
                 """
                 ORDER BY n.created_at DESC, n.id DESC
                 LIMIT ? OFFSET ?
@@ -172,9 +172,9 @@ public class NotificationService {
                        n.is_read AS isRead,
                        n.created_at AS createdAt
                 FROM notification n
-                LEFT JOIN sys_user u ON u.id = n.user_id 
+                LEFT JOIN sys_user u ON u.id = n.user_id
                 """
-                + where +
+                + where + " " +
                 """
                 ORDER BY n.created_at DESC, n.id DESC
                 LIMIT 5000
@@ -225,9 +225,9 @@ public class NotificationService {
                        related_id AS relatedId,
                        is_read AS isRead,
                        created_at AS createdAt
-                FROM notification 
+                FROM notification
                 """
-                + where +
+                + where + " " +
                 """
                 ORDER BY created_at DESC
                 LIMIT ? OFFSET ?

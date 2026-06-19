@@ -99,9 +99,9 @@ public class SystemConfigService {
                        actor.username AS actorUsername,
                        l.created_at AS createdAt
                 FROM system_config_log l
-                LEFT JOIN sys_user actor ON actor.id = l.actor_id 
+                LEFT JOIN sys_user actor ON actor.id = l.actor_id
                 """
-                + where +
+                + where + " " +
                 """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT ? OFFSET ?
@@ -132,9 +132,9 @@ public class SystemConfigService {
                        actor.username AS actorUsername,
                        l.created_at AS createdAt
                 FROM system_config_log l
-                LEFT JOIN sys_user actor ON actor.id = l.actor_id 
+                LEFT JOIN sys_user actor ON actor.id = l.actor_id
                 """
-                + where +
+                + where + " " +
                 """
                 ORDER BY l.created_at DESC, l.id DESC
                 LIMIT 5000
