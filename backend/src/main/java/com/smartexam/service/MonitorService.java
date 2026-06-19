@@ -937,8 +937,8 @@ public class MonitorService {
                 .orElseGet(() -> fallbackIncidentSessionSnapshot(sessionId, actionSession));
     }
 
-    private Map<String, Object> fallbackIncidentSessionSnapshot(Long sessionId, Map<String, Object> session) {
-        Map<String, Object> result = new LinkedHashMap<>();
+    private LinkedHashMap<String, Object> fallbackIncidentSessionSnapshot(Long sessionId, Map<String, Object> session) {
+        LinkedHashMap<String, Object> result = new LinkedHashMap<>();
         result.put("id", sessionId);
         result.put("attemptId", session.get("attempt_id"));
         result.put("examId", session.get("exam_id"));
