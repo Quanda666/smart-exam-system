@@ -310,7 +310,7 @@ public class NotificationService {
             where.append(" AND related_id = ?");
             params.add(relatedId);
         }
-        return where.toString();
+        return where.toString() + " ";
     }
 
     private String normalize(String value) {
