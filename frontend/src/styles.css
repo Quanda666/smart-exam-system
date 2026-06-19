@@ -33,23 +33,28 @@
 
 /* ===== Metapi 统计卡片 ===== */
 .mp-stat-grid {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
 }
 
+/* 智能列数调整：根据卡片数量优化布局，避免最后一行只有1-2个卡片 */
+.mp-stat-grid:has(.mp-stat-card:nth-last-child(6):first-child) { grid-template-columns: repeat(3, 1fr); } /* 6个 → 3列 */
+.mp-stat-grid:has(.mp-stat-card:nth-last-child(7):first-child) { grid-template-columns: repeat(4, 1fr); } /* 7个 → 4列 */
+.mp-stat-grid:has(.mp-stat-card:nth-last-child(8):first-child) { grid-template-columns: repeat(4, 1fr); } /* 8个 → 4列 */
+.mp-stat-grid:has(.mp-stat-card:nth-last-child(9):first-child) { grid-template-columns: repeat(3, 1fr); } /* 9个 → 3列 */
+.mp-stat-grid:has(.mp-stat-card:nth-last-child(10):first-child) { grid-template-columns: repeat(5, 1fr); } /* 10个 → 5列 */
+.mp-stat-grid:has(.mp-stat-card:nth-last-child(11):first-child) { grid-template-columns: repeat(4, 1fr); } /* 11个 → 4列 */
+
 .mp-stat-card {
-  flex: 1 1 200px;
-  min-width: 200px;
-  max-width: 280px;
   background: var(--mp-bg-card);
   border-radius: var(--mp-radius-md);
   padding: 20px;
   box-shadow: var(--mp-shadow-card);
   border: 1px solid var(--mp-border-light);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 0; /* 允许内容收缩 */
 }
 
 .mp-stat-card:hover {
