@@ -1,0 +1,99 @@
+# Docker Compose for Teacher Acceptance Demo
+# Simplified single-entry-point deployment using the integrated root Dockerfile
+# Teacher only needs: Docker Desktop + double-click the bat file
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: smart-exam-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-smart_exam_system}
+      TZ: Asia/Shanghai
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=caching_sha2_password
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./backend/src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./backend/src/main/resources/db/data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - smart-exam-network
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: smart-exam-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - smart-exam-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: smart-exam-app
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: "8080"
+      MYSQL_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-smart_exam_system}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      MYSQL_USERNAME: root
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      DB_INIT_MODE: always
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ""
+      REDIS_DATABASE: "0"
+      EXAM_DRAFT_REDIS_ENABLED: "true"
+      CORS_ALLOWED_ORIGIN_PATTERNS: http://localhost:*,http://127.0.0.1:*
+      LOG_LEVEL: INFO
+      SPRING_PROFILES_ACTIVE: prod
+      AI_MOCK_ENABLED: "${AI_MOCK_ENABLED:-true}"
+      OPENAI_BASE_URL: "${OPENAI_BASE_URL:-https://api.openai.com/v1}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      OPENAI_MODEL: "${OPENAI_MODEL:-gpt-4o-mini}"
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - smart-exam-network
+
+volumes:
+  mysql-data:
+    name: smart-exam-mysql-data
+  redis-data:
+    name: smart-exam-redis-data
+
+networks:
+  smart-exam-network:
+    name: smart-exam-network

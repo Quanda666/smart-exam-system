@@ -20,6 +20,7 @@
 | [ai-design.md](ai-design.md) | AI 功能设计（直接生成、Excel 模板导入、课程资料生成、RAG、错题讲解、阅卷建议） |
 | [api-design.md](api-design.md) | 当前 API 分组 |
 | [database-design.md](database-design.md) | 当前数据库结构说明 |
+| [deliver-integrated-jar.md](deliver-integrated-jar.md) | 交付老师验收说明（Docker Compose 一键启动 + 纯 Jar） |
 | [deploy-local.md](deploy-local.md) | 本地验收部署 |
 | [deploy-railway.md](deploy-railway.md) | Railway 云部署 |
 | [deploy-render.md](deploy-render.md) | Render 云部署 |
