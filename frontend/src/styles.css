@@ -40,7 +40,7 @@
 }
 
 .mp-stat-card {
-  flex: 0 1 calc((100% - 48px) / 4);
+  flex: 0 0 calc((100% - 48px) / 4);
   max-width: calc((100% - 48px) / 4);
   min-width: 200px;
   background: var(--mp-bg-card);
@@ -121,7 +121,7 @@
 }
 
 .dashboard .mp-stat-card {
-  flex: 0 1 calc((100% - 60px) / 4);
+  flex: 0 0 calc((100% - 60px) / 4);
   max-width: calc((100% - 60px) / 4);
   min-width: 220px;
   min-height: 152px;
