@@ -11,7 +11,7 @@
 - 三端概况：管理员、教师、学生分别查看当前角色相关的业务概览与快捷入口。
 - 基础数据：班级、课程、课程班、授课分配、学生班级关系、科目、知识点、公告统一维护。
 - 题库管理：支持单选、多选、判断、填空、主观题，含筛选、草稿、发布、撤回、删除和来源追踪。
-- AI 出题台：支持直接生成题目、上传题目文档批量识别、上传课程资料按题型数量生成题目；资料库/RAG 支持上传课件生成知识点大纲，再按资料分段来源生成可审查题目。
+- AI 出题台：支持直接生成题目、Excel 模板批量导入题目（下载模板→填写→上传解析）、上传课程资料按题型数量生成题目；资料库/RAG 支持上传课件生成知识点大纲，再按资料分段来源生成可审查题目。
 - 试卷与考试：支持手动组卷、规则组卷、发布撤回、考试任务、在线答题、服务端草稿保存、本机离线草稿恢复与交卷。
 - 阅卷与成绩：客观题自动评分，主观题教师评分，支持 AI 评分建议、成绩记录与结果详情。
 - 学习反馈：错题本、知识点掌握度、学生画像与错题 AI 讲解。
@@ -138,6 +138,9 @@ POST /api/ai/questions/generate-from-material
 POST /api/ai/questions/save
 POST /api/ai/wrong-question/explain
 POST /api/ai/suggest-review
+
+GET  /api/question-template/download
+POST /api/question-template/import
 ```
 
 完整接口分组见 [docs/api-design.md](docs/api-design.md)。
@@ -165,6 +168,7 @@ RESEND_FROM_EMAIL
 
 ## 文档导航
 
+- [docs/rebuild/README.md](docs/rebuild/README.md)：**重建开发活文档**，按迭代批次记录能力落地，是当前进度的权威来源。
 - [backend/README.md](backend/README.md)：后端接口、配置和运行说明。
 - [frontend/README.md](frontend/README.md)：前端页面、运行和构建说明。
 - [docs/ai-design.md](docs/ai-design.md)：AI 功能设计。
@@ -174,4 +178,4 @@ RESEND_FROM_EMAIL
 - [docs/deploy-railway.md](docs/deploy-railway.md)、[docs/deploy-render.md](docs/deploy-render.md)：云部署。
 - [docs/email-setup.md](docs/email-setup.md)：Resend 邮件配置。
 - [docs/test-records.md](docs/test-records.md)：最新验证记录。
-- [docs/assessment.md](docs/assessment.md)：项目审查和清理记录。
+- [docs/assessment.md](docs/assessment.md)：项目审查和清理记录（2026-06-09 历史快照，重建前）。
