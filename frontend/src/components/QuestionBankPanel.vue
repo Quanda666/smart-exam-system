@@ -1201,11 +1201,6 @@ async function aiGenerateQuestion() {
   }
 }
 
-function pickQuestionDocument() {
-  if (!currentDocumentContext()) return;
-  questionDocInputRef.value?.click();
-}
-
 function pickExcelFile() {
   if (!currentDocumentContext()) return;
   excelInputRef.value?.click();
@@ -1215,24 +1210,6 @@ function pickMaterialDocument() {
   if (!currentDocumentContext()) return;
   if (!validateMaterialQuestionCounts()) return;
   materialDocInputRef.value?.click();
-}
-
-async function handleQuestionDocumentSelected(event: Event) {
-  const file = selectedFile(event);
-  if (!file) return;
-  if (!validateDocumentUploadFile(file, QUESTION_DOCUMENT_SOURCE_LABEL)) return;
-  const context = currentDocumentContext();
-  if (!context) return;
-  aiImporting.value = true;
-  try {
-    const response = await importQuestionDocument(file, context);
-    showAiDrafts(response.data, `题目文档识别：${file.name}`);
-    ElMessage.success(`已识别 ${aiDrafts.value.length} 道题目草稿`);
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '题目文档识别失败');
-  } finally {
-    aiImporting.value = false;
-  }
 }
 
 async function handleExcelSelected(event: Event) {
