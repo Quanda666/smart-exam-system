@@ -2,6 +2,8 @@ package com.smartexam.exception;
 
 import com.smartexam.common.ApiResponse;
 import com.smartexam.common.ErrorCode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
@@ -15,6 +17,8 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidation(MethodArgumentNotValidException ex) {
@@ -49,8 +53,17 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleException(Exception ex) {
+        log.error("未处理的异常: {}", ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.fail(ErrorCode.SERVER_ERROR, "服务器处理请求失败：" + ex.getClass().getSimpleName()));
+                .body(ApiResponse.fail(ErrorCode.SERVER_ERROR, "服务器处理请求失败：" + ex.getClass().getSimpleName() + "（请求ID：" + getCurrentRequestId() + "）"));
+    }
+
+    private String getCurrentRequestId() {
+        try {
+            return org.slf4j.MDC.get("traceId");
+        } catch (Exception e) {
+            return "unknown";
+        }
     }
 
     private String formatFieldError(FieldError error) {
