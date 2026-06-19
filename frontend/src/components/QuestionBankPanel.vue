@@ -429,7 +429,6 @@ import {
 import {
   generateQuestionDrafts,
   generateQuestionsFromMaterial,
-  importQuestionDocument,
   importQuestionExcel,
   downloadQuestionTemplate,
   saveGeneratedQuestions,

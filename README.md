@@ -133,7 +133,6 @@ PUT  /api/questions/{id}/status
 DELETE /api/questions/{id}
 
 POST /api/ai/questions/generate
-POST /api/ai/questions/import-document
 POST /api/ai/questions/generate-from-material
 POST /api/ai/questions/save
 POST /api/ai/wrong-question/explain

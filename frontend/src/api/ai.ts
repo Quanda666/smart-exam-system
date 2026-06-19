@@ -50,11 +50,6 @@ export function generateQuestionDrafts(payload: GenerateQuestionBatchPayload) {
   return postJson<AiGeneratedQuestion[], GenerateQuestionBatchPayload>('/api/ai/questions/generate', payload);
 }
 
-export function importQuestionDocument(file: File, payload: QuestionDocumentPayload) {
-  const form = contextForm(file, payload);
-  return postForm<AiGeneratedQuestion[]>('/api/ai/questions/import-document', form);
-}
-
 export function importQuestionExcel(file: File, payload: QuestionDocumentPayload) {
   const form = contextForm(file, payload);
   return postForm<AiGeneratedQuestion[]>('/api/question-template/import', form);

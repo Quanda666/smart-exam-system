@@ -65,28 +65,6 @@ public class AiController {
         return ApiResponse.ok(withSource(aiService.generateQuestionDrafts(request), "AI_GENERATED", "AI generator"));
     }
 
-    @PostMapping(value = "/questions/import-document", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @RequireRoles({"ADMIN", "TEACHER"})
-    public ApiResponse<List<AiGeneratedQuestion>> importQuestionDocument(@RequestPart("file") MultipartFile file,
-                                                                         @RequestParam Long subjectId,
-                                                                         @RequestParam String subjectName,
-                                                                         @RequestParam(required = false) Long knowledgePointId,
-                                                                         @RequestParam(required = false) String knowledgePointName,
-                                                                         @RequestParam(defaultValue = "MEDIUM") String difficulty,
-                                                                         @RequestParam(defaultValue = "5") BigDecimal defaultScore) {
-        GenerateQuestionBatchRequest defaults = new GenerateQuestionBatchRequest();
-        defaults.setSubjectId(subjectId);
-        defaults.setSubjectName(subjectName);
-        defaults.setKnowledgePointId(knowledgePointId);
-        defaults.setKnowledgePointName(knowledgePointName);
-        defaults.setQuestionType("SINGLE_CHOICE");
-        defaults.setDifficulty(difficulty);
-        defaults.setDefaultScore(defaultScore);
-        String text = documentTextExtractorService.extract(file);
-        return ApiResponse.ok(withSource(aiService.importQuestionsFromDocument(text, defaults),
-                "AI_IMPORTED", sourceDetail(file, "Question document import")));
-    }
-
     @PostMapping(value = "/questions/generate-from-material", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @RequireRoles({"ADMIN", "TEACHER"})
     public ApiResponse<List<AiGeneratedQuestion>> generateFromMaterial(@RequestPart("file") MultipartFile file,
