@@ -10,34 +10,34 @@
 
     <div class="log-workbench">
       <el-tabs v-model="activeTab" class="log-tabs">
-        <el-tab-pane label="Login Audit" name="login">
+        <el-tab-pane label="登录审计" name="login">
           <div class="login-log-toolbar">
-            <el-input v-model="loginQuery.logId" placeholder="Login log ID" clearable @blur="normalizeLoginLogIdField" @keyup.enter="searchLoginLogs" />
-            <el-input v-model="loginQuery.keyword" placeholder="Account, security action, detail, IP" clearable @keyup.enter="searchLoginLogs" />
-            <el-input v-model="loginQuery.action" placeholder="Action" clearable @keyup.enter="searchLoginLogs" />
-            <el-input v-model="loginQuery.operatorId" placeholder="Operator ID" clearable @keyup.enter="searchLoginLogs" />
-            <el-select v-model="loginQuery.success" placeholder="Result" clearable>
-              <el-option label="Success" :value="true" />
-              <el-option label="Failed" :value="false" />
+            <el-input v-model="loginQuery.logId" placeholder="登录日志 ID" clearable @blur="normalizeLoginLogIdField" @keyup.enter="searchLoginLogs" />
+            <el-input v-model="loginQuery.keyword" placeholder="账号、安全操作、详情或 IP" clearable @keyup.enter="searchLoginLogs" />
+            <el-input v-model="loginQuery.action" placeholder="动作" clearable @keyup.enter="searchLoginLogs" />
+            <el-input v-model="loginQuery.operatorId" placeholder="操作人 ID" clearable @keyup.enter="searchLoginLogs" />
+            <el-select v-model="loginQuery.success" placeholder="结果" clearable>
+              <el-option label="成功" :value="true" />
+              <el-option label="失败" :value="false" />
             </el-select>
             <el-date-picker
               v-model="loginDateRange"
               type="datetimerange"
               value-format="YYYY-MM-DDTHH:mm:ss"
-              range-separator="to"
-              start-placeholder="Start"
-              end-placeholder="End"
+              range-separator="至"
+              start-placeholder="开始时间"
+              end-placeholder="结束时间"
               style="width: 100%"
             />
-            <el-button type="primary" @click="searchLoginLogs">Search</el-button>
-            <el-button @click="resetLoginFilters">Reset</el-button>
+            <el-button type="primary" @click="searchLoginLogs">查询</el-button>
+            <el-button @click="resetLoginFilters">重置</el-button>
             <el-button type="success" plain :icon="Download" :loading="loginExporting" @click="exportLoginLogs">
-              Export
+              导出
             </el-button>
           </div>
 
           <el-table v-loading="loading" :data="loginLogs" border max-height="620">
-            <el-table-column label="Log ID" width="140">
+            <el-table-column label="日志 ID" width="140">
               <template #default="scope">
                 <div class="login-log-id-cell">
                   <span>#{{ scope.row.id }}</span>
@@ -45,45 +45,45 @@
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy login audit ID"
-                    aria-label="Copy login audit ID"
+                    title="复制登录审计 ID"
+                    aria-label="复制登录审计 ID"
                     @click="copyLoginAuditId(scope.row.id)"
                   />
                   <el-button
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy login audit link"
-                    aria-label="Copy login audit link"
+                    title="复制登录审计链接"
+                    aria-label="复制登录审计链接"
                     @click="copyLoginAuditLink(scope.row.id)"
                   />
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="Time" width="180">
+            <el-table-column label="时间" width="180">
               <template #default="scope">{{ formatDateTime(scope.row.createdAt) }}</template>
             </el-table-column>
-            <el-table-column label="Result" width="100">
+            <el-table-column label="结果" width="100">
               <template #default="scope">
                 <el-tag size="small" :type="loginSuccess(scope.row.success) ? 'success' : 'danger'">
-                  {{ loginSuccess(scope.row.success) ? 'Success' : 'Failed' }}
+                  {{ loginSuccess(scope.row.success) ? '成功' : '失败' }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="Account/User" width="160">
+            <el-table-column label="账号/用户" width="160">
               <template #default="scope">{{ scope.row.operatorName || scope.row.operatorId || '-' }}</template>
             </el-table-column>
-            <el-table-column prop="action" label="Action" width="160" />
-            <el-table-column prop="detail" label="Detail" min-width="260" show-overflow-tooltip />
+            <el-table-column prop="action" label="动作" width="160" />
+            <el-table-column prop="detail" label="详情" min-width="260" show-overflow-tooltip />
             <el-table-column prop="ip" label="IP" width="150" />
             <template #empty>
-              <el-empty description="No login audit logs" />
+              <el-empty description="暂无登录审计日志" />
             </template>
           </el-table>
         </el-tab-pane>
         <el-tab-pane label="操作日志" name="operation">
           <div class="operation-log-toolbar">
-            <el-input v-model="operationQuery.logId" placeholder="Operation log ID" clearable @blur="normalizeOperationLogIdField" @keyup.enter="searchOperationLogs" />
+            <el-input v-model="operationQuery.logId" placeholder="操作日志 ID" clearable @blur="normalizeOperationLogIdField" @keyup.enter="searchOperationLogs" />
             <el-input v-model="operationQuery.keyword" placeholder="操作人、动作、对象、详情或 IP" clearable @keyup.enter="searchOperationLogs" />
             <el-input v-model="operationQuery.action" placeholder="动作" clearable @keyup.enter="searchOperationLogs" />
             <el-input v-model="operationQuery.target" placeholder="对象" clearable @keyup.enter="searchOperationLogs" />
@@ -104,7 +104,7 @@
           </div>
 
           <el-table v-loading="loading" :data="operationLogs" border max-height="620">
-            <el-table-column label="Log ID" width="140">
+            <el-table-column label="日志 ID" width="140">
               <template #default="scope">
                 <div class="operation-log-id-cell">
                   <span>#{{ scope.row.id }}</span>
@@ -112,16 +112,16 @@
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy operation log ID"
-                    aria-label="Copy operation log ID"
+                    title="复制操作日志 ID"
+                    aria-label="复制操作日志 ID"
                     @click="copyOperationLogId(scope.row.id)"
                   />
                   <el-button
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy operation log link"
-                    aria-label="Copy operation log link"
+                    title="复制操作日志链接"
+                    aria-label="复制操作日志链接"
                     @click="copyOperationLogLink(scope.row.id)"
                   />
                 </div>
@@ -209,41 +209,41 @@
           </el-table>
         </el-tab-pane>
 
-        <el-tab-pane label="Approval Reminder Audit" name="approvalReminder">
+        <el-tab-pane label="考试审批提醒审计" name="approvalReminder">
           <div class="approval-reminder-toolbar">
-            <el-input v-model="approvalReminderQuery.logId" placeholder="Reminder log ID" clearable @blur="normalizeApprovalReminderLogIdField" @keyup.enter="searchApprovalReminderLogs" />
-            <el-input v-model="approvalReminderQuery.keyword" placeholder="Actor, status, source, node, message" clearable @keyup.enter="searchApprovalReminderLogs" />
-            <el-select v-model="approvalReminderQuery.status" placeholder="Status" clearable>
-              <el-option label="Sent" value="SENT" />
-              <el-option label="Disabled" value="SKIPPED_DISABLED" />
-              <el-option label="No overdue" value="SKIPPED_EMPTY" />
-              <el-option label="No recipient" value="SKIPPED_NO_RECIPIENT" />
-              <el-option label="Cooldown" value="SKIPPED_COOLDOWN" />
-              <el-option label="Schedule disabled" value="SKIPPED_SCHEDULE_DISABLED" />
-              <el-option label="Waiting interval" value="SKIPPED_SCHEDULE_INTERVAL" />
+            <el-input v-model="approvalReminderQuery.logId" placeholder="提醒日志 ID" clearable @blur="normalizeApprovalReminderLogIdField" @keyup.enter="searchApprovalReminderLogs" />
+            <el-input v-model="approvalReminderQuery.keyword" placeholder="触发人、状态、来源、节点或消息" clearable @keyup.enter="searchApprovalReminderLogs" />
+            <el-select v-model="approvalReminderQuery.status" placeholder="状态" clearable>
+              <el-option label="已发送" value="SENT" />
+              <el-option label="已禁用" value="SKIPPED_DISABLED" />
+              <el-option label="无超期" value="SKIPPED_EMPTY" />
+              <el-option label="无接收人" value="SKIPPED_NO_RECIPIENT" />
+              <el-option label="冷却期" value="SKIPPED_COOLDOWN" />
+              <el-option label="计划已禁用" value="SKIPPED_SCHEDULE_DISABLED" />
+              <el-option label="等待间隔" value="SKIPPED_SCHEDULE_INTERVAL" />
             </el-select>
-            <el-select v-model="approvalReminderQuery.triggerSource" placeholder="Source" clearable>
-              <el-option label="Manual" value="MANUAL" />
-              <el-option label="Scheduled" value="SCHEDULE" />
+            <el-select v-model="approvalReminderQuery.triggerSource" placeholder="来源" clearable>
+              <el-option label="手动" value="MANUAL" />
+              <el-option label="计划任务" value="SCHEDULE" />
             </el-select>
             <el-date-picker
               v-model="approvalReminderDateRange"
               type="datetimerange"
               value-format="YYYY-MM-DDTHH:mm:ss"
-              range-separator="to"
-              start-placeholder="Start"
-              end-placeholder="End"
+              range-separator="至"
+              start-placeholder="开始时间"
+              end-placeholder="结束时间"
               style="width: 100%"
             />
-            <el-button type="primary" @click="searchApprovalReminderLogs">Search</el-button>
-            <el-button @click="resetApprovalReminderFilters">Reset</el-button>
+            <el-button type="primary" @click="searchApprovalReminderLogs">查询</el-button>
+            <el-button @click="resetApprovalReminderFilters">重置</el-button>
             <el-button type="success" plain :icon="Download" :loading="approvalReminderExporting" @click="exportApprovalReminderLogs">
-              Export
+              导出
             </el-button>
           </div>
 
           <el-table v-loading="loading" :data="approvalReminderLogs" border max-height="620">
-            <el-table-column label="Log ID" width="150">
+            <el-table-column label="日志 ID" width="150">
               <template #default="scope">
                 <div class="approval-reminder-id-cell">
                   <span>#{{ scope.row.id }}</span>
@@ -251,84 +251,84 @@
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy approval reminder audit ID"
-                    aria-label="Copy approval reminder audit ID"
+                    title="复制审批提醒审计 ID"
+                    aria-label="复制审批提醒审计 ID"
                     @click="copyApprovalReminderAuditId(scope.row.id)"
                   />
                   <el-button
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy approval reminder audit link"
-                    aria-label="Copy approval reminder audit link"
+                    title="复制审批提醒审计链接"
+                    aria-label="复制审批提醒审计链接"
                     @click="copyApprovalReminderAuditLink(scope.row.id)"
                   />
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="Time" width="180">
+            <el-table-column label="时间" width="180">
               <template #default="scope">{{ formatDateTime(scope.row.createdAt) }}</template>
             </el-table-column>
-            <el-table-column label="Status" width="150">
+            <el-table-column label="状态" width="150">
               <template #default="scope">
                 <el-tag size="small" :type="approvalReminderStatusTag(scope.row.status)">
                   {{ approvalReminderStatusText(scope.row.status) }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="Source" width="110">
+            <el-table-column label="来源" width="110">
               <template #default="scope">{{ approvalReminderSourceText(scope.row.triggerSource) }}</template>
             </el-table-column>
-            <el-table-column label="Triggered By" width="150">
+            <el-table-column label="触发人" width="150">
               <template #default="scope">{{ scope.row.triggeredByName || scope.row.triggeredBy || '-' }}</template>
             </el-table-column>
-            <el-table-column label="Overdue / Recipients" width="160">
+            <el-table-column label="超期 / 接收人" width="160">
               <template #default="scope">{{ scope.row.overdueExamCount || 0 }} / {{ scope.row.recipientCount || 0 }}</template>
             </el-table-column>
-            <el-table-column label="Thresholds" width="140">
+            <el-table-column label="阈值" width="140">
               <template #default="scope">{{ scope.row.overdueHours }}h / {{ scope.row.cooldownHours }}h</template>
             </el-table-column>
-            <el-table-column label="Node / Duration" min-width="170" show-overflow-tooltip>
+            <el-table-column label="节点 / 耗时" min-width="170" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.nodeId || '-' }} / {{ durationText(scope.row.durationMs) }}</template>
             </el-table-column>
-            <el-table-column prop="message" label="Message" min-width="220" show-overflow-tooltip>
+            <el-table-column prop="message" label="消息" min-width="220" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.message || '-' }}</template>
             </el-table-column>
             <template #empty>
-              <el-empty description="No approval reminder audit logs" />
+              <el-empty description="暂无审批提醒审计日志" />
             </template>
           </el-table>
         </el-tab-pane>
 
-        <el-tab-pane label="Exam Approval Audit" name="examApproval">
+        <el-tab-pane label="考试审批审计" name="examApproval">
           <div class="exam-approval-toolbar">
-            <el-input v-model="examApprovalQuery.logId" placeholder="Approval log ID" clearable @blur="normalizeExamApprovalLogIdField" @keyup.enter="searchExamApprovalLogs" />
-            <el-input v-model="examApprovalQuery.keyword" placeholder="Exam, paper, actor, note" clearable @keyup.enter="searchExamApprovalLogs" />
-            <el-select v-model="examApprovalQuery.action" placeholder="Action" clearable>
-              <el-option label="Submit" value="SUBMIT" />
-              <el-option label="Resubmit" value="RESUBMIT" />
-              <el-option label="Approve" value="APPROVE" />
-              <el-option label="Reject" value="REJECT" />
-              <el-option label="Direct publish" value="DIRECT_PUBLISH" />
+            <el-input v-model="examApprovalQuery.logId" placeholder="审批日志 ID" clearable @blur="normalizeExamApprovalLogIdField" @keyup.enter="searchExamApprovalLogs" />
+            <el-input v-model="examApprovalQuery.keyword" placeholder="考试、试卷、操作人或备注" clearable @keyup.enter="searchExamApprovalLogs" />
+            <el-select v-model="examApprovalQuery.action" placeholder="动作" clearable>
+              <el-option label="提交" value="SUBMIT" />
+              <el-option label="重新提交" value="RESUBMIT" />
+              <el-option label="通过" value="APPROVE" />
+              <el-option label="驳回" value="REJECT" />
+              <el-option label="直接发布" value="DIRECT_PUBLISH" />
             </el-select>
             <el-date-picker
               v-model="examApprovalDateRange"
               type="datetimerange"
               value-format="YYYY-MM-DDTHH:mm:ss"
-              range-separator="to"
-              start-placeholder="Start"
-              end-placeholder="End"
+              range-separator="至"
+              start-placeholder="开始时间"
+              end-placeholder="结束时间"
               style="width: 100%"
             />
-            <el-button type="primary" @click="searchExamApprovalLogs">Search</el-button>
-            <el-button @click="resetExamApprovalFilters">Reset</el-button>
+            <el-button type="primary" @click="searchExamApprovalLogs">查询</el-button>
+            <el-button @click="resetExamApprovalFilters">重置</el-button>
             <el-button type="success" plain :icon="Download" :loading="examApprovalExporting" @click="exportExamApprovalLogs">
-              Export
+              导出
             </el-button>
           </div>
 
           <el-table v-loading="loading" :data="examApprovalLogs" border max-height="620">
-            <el-table-column label="Log ID" width="150">
+            <el-table-column label="日志 ID" width="150">
               <template #default="scope">
                 <div class="exam-approval-id-cell">
                   <span>#{{ scope.row.id }}</span>
@@ -336,58 +336,58 @@
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy exam approval audit ID"
-                    aria-label="Copy exam approval audit ID"
+                    title="复制考试审批审计 ID"
+                    aria-label="复制考试审批审计 ID"
                     @click="copyExamApprovalAuditId(scope.row.id)"
                   />
                   <el-button
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy exam approval audit link"
-                    aria-label="Copy exam approval audit link"
+                    title="复制考试审批审计链接"
+                    aria-label="复制考试审批审计链接"
                     @click="copyExamApprovalAuditLink(scope.row.id)"
                   />
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="Time" width="180">
+            <el-table-column label="时间" width="180">
               <template #default="scope">{{ formatDateTime(scope.row.createdAt) }}</template>
             </el-table-column>
-            <el-table-column label="Action" width="130">
+            <el-table-column label="动作" width="130">
               <template #default="scope">
                 <el-tag size="small" :type="examApprovalActionTag(scope.row.action)">
                   {{ examApprovalActionText(scope.row.action) }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="examName" label="Exam" min-width="180" show-overflow-tooltip />
-            <el-table-column prop="paperName" label="Paper" min-width="160" show-overflow-tooltip />
-            <el-table-column label="Status" width="160">
+            <el-table-column prop="examName" label="考试" min-width="180" show-overflow-tooltip />
+            <el-table-column prop="paperName" label="试卷" min-width="160" show-overflow-tooltip />
+            <el-table-column label="状态" width="160">
               <template #default="scope">
                 {{ examApprovalStatusText(scope.row.statusFrom) }} -> {{ examApprovalStatusText(scope.row.statusTo) }}
               </template>
             </el-table-column>
-            <el-table-column label="Actor" width="130">
+            <el-table-column label="操作人" width="130">
               <template #default="scope">{{ scope.row.actorName || scope.row.actorId || '-' }}</template>
             </el-table-column>
-            <el-table-column label="Publish Reach" width="220">
+            <el-table-column label="发布影响" width="220">
               <template #default="scope">
-                {{ scope.row.candidateCount || 0 }} candidates / {{ scope.row.notifiedStudentCount || 0 }} students / {{ scope.row.notifiedAttemptCount || 0 }} attempts
+                {{ scope.row.candidateCount || 0 }} 名考生 / {{ scope.row.notifiedStudentCount || 0 }} 名学生 / {{ scope.row.notifiedAttemptCount || 0 }} 次答卷
               </template>
             </el-table-column>
-            <el-table-column prop="note" label="Note" min-width="220" show-overflow-tooltip>
+            <el-table-column prop="note" label="备注" min-width="220" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.note || '-' }}</template>
             </el-table-column>
             <template #empty>
-              <el-empty description="No exam approval audit logs" />
+              <el-empty description="暂无考试审批审计日志" />
             </template>
           </el-table>
         </el-tab-pane>
 
         <el-tab-pane label="成绩发布审计" name="scoreRelease">
           <div class="score-release-toolbar">
-            <el-input v-model="scoreReleaseQuery.logId" placeholder="Score release log ID" clearable @blur="normalizeScoreReleaseLogIdField" @keyup.enter="searchScoreReleaseLogs" />
+            <el-input v-model="scoreReleaseQuery.logId" placeholder="成绩发布日志 ID" clearable @blur="normalizeScoreReleaseLogIdField" @keyup.enter="searchScoreReleaseLogs" />
             <el-input v-model="scoreReleaseQuery.keyword" placeholder="考试、试卷或处理人" clearable @keyup.enter="searchScoreReleaseLogs" />
             <el-select v-model="scoreReleaseQuery.action" placeholder="动作" clearable>
               <el-option label="发布" value="PUBLISH" />
@@ -410,7 +410,7 @@
           </div>
 
           <el-table v-loading="loading" :data="scoreReleaseLogs" border max-height="620">
-            <el-table-column label="Log ID" width="150">
+            <el-table-column label="日志 ID" width="150">
               <template #default="scope">
                 <div class="score-release-id-cell">
                   <span>#{{ scope.row.id }}</span>
@@ -418,16 +418,16 @@
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy score release audit ID"
-                    aria-label="Copy score release audit ID"
+                    title="复制成绩发布审计 ID"
+                    aria-label="复制成绩发布审计 ID"
                     @click="copyScoreReleaseAuditId(scope.row.id)"
                   />
                   <el-button
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy score release audit link"
-                    aria-label="Copy score release audit link"
+                    title="复制成绩发布审计链接"
+                    aria-label="复制成绩发布审计链接"
                     @click="copyScoreReleaseAuditLink(scope.row.id)"
                   />
                 </div>
@@ -470,7 +470,7 @@
 
         <el-tab-pane label="成绩申诉审计" name="scoreAppeal">
           <div class="score-appeal-toolbar">
-            <el-input v-model="scoreAppealQuery.logId" placeholder="Score appeal log ID" clearable @blur="normalizeScoreAppealLogIdField" @keyup.enter="searchScoreAppealLogs" />
+            <el-input v-model="scoreAppealQuery.logId" placeholder="成绩申诉日志 ID" clearable @blur="normalizeScoreAppealLogIdField" @keyup.enter="searchScoreAppealLogs" />
             <el-input v-model="scoreAppealQuery.keyword" placeholder="考试、学生、处理人或说明" clearable @keyup.enter="searchScoreAppealLogs" />
             <el-select v-model="scoreAppealQuery.action" placeholder="动作" clearable>
               <el-option label="提交申诉" value="SUBMIT" />
@@ -500,7 +500,7 @@
           </div>
 
           <el-table v-loading="loading" :data="scoreAppealLogs" border max-height="620">
-            <el-table-column label="Log ID" width="150">
+            <el-table-column label="日志 ID" width="150">
               <template #default="scope">
                 <div class="score-appeal-id-cell">
                   <span>#{{ scope.row.id }}</span>
@@ -508,16 +508,16 @@
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy score appeal audit ID"
-                    aria-label="Copy score appeal audit ID"
+                    title="复制成绩申诉审计 ID"
+                    aria-label="复制成绩申诉审计 ID"
                     @click="copyScoreAppealAuditId(scope.row.id)"
                   />
                   <el-button
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy score appeal audit link"
-                    aria-label="Copy score appeal audit link"
+                    title="复制成绩申诉审计链接"
+                    aria-label="复制成绩申诉审计链接"
                     @click="copyScoreAppealAuditLink(scope.row.id)"
                   />
                 </div>
@@ -559,30 +559,30 @@
             </template>
           </el-table>
         </el-tab-pane>
-        <el-tab-pane label="Review Score Audit" name="reviewScore">
+        <el-tab-pane label="阅卷评分审计" name="reviewScore">
           <div class="review-score-toolbar">
-            <el-input v-model="reviewScoreQuery.logId" placeholder="Review score log ID" clearable @blur="normalizeReviewScoreLogIdField" @keyup.enter="searchReviewScoreLogs" />
-            <el-input v-model="reviewScoreQuery.keyword" placeholder="Exam, student, reviewer, question, comment" clearable @keyup.enter="searchReviewScoreLogs" />
-            <el-input v-model="reviewScoreQuery.examId" placeholder="Exam ID" clearable @keyup.enter="searchReviewScoreLogs" />
-            <el-input v-model="reviewScoreQuery.reviewerId" placeholder="Reviewer ID" clearable @keyup.enter="searchReviewScoreLogs" />
+            <el-input v-model="reviewScoreQuery.logId" placeholder="评分日志 ID" clearable @blur="normalizeReviewScoreLogIdField" @keyup.enter="searchReviewScoreLogs" />
+            <el-input v-model="reviewScoreQuery.keyword" placeholder="考试、学生、阅卷人、题目或评语" clearable @keyup.enter="searchReviewScoreLogs" />
+            <el-input v-model="reviewScoreQuery.examId" placeholder="考试 ID" clearable @keyup.enter="searchReviewScoreLogs" />
+            <el-input v-model="reviewScoreQuery.reviewerId" placeholder="阅卷人 ID" clearable @keyup.enter="searchReviewScoreLogs" />
             <el-date-picker
               v-model="reviewScoreDateRange"
               type="datetimerange"
               value-format="YYYY-MM-DDTHH:mm:ss"
-              range-separator="to"
-              start-placeholder="Start"
-              end-placeholder="End"
+              range-separator="至"
+              start-placeholder="开始时间"
+              end-placeholder="结束时间"
               style="width: 100%"
             />
-            <el-button type="primary" @click="searchReviewScoreLogs">Search</el-button>
-            <el-button @click="resetReviewScoreFilters">Reset</el-button>
+            <el-button type="primary" @click="searchReviewScoreLogs">查询</el-button>
+            <el-button @click="resetReviewScoreFilters">重置</el-button>
             <el-button type="success" plain :icon="Download" :loading="reviewScoreExporting" @click="exportReviewScoreLogs">
-              Export
+              导出
             </el-button>
           </div>
 
           <el-table v-loading="loading" :data="reviewScoreLogs" border max-height="620">
-            <el-table-column label="Log ID" width="150">
+            <el-table-column label="日志 ID" width="150">
               <template #default="scope">
                 <div class="review-score-id-cell">
                   <span>#{{ scope.row.id }}</span>
@@ -590,82 +590,82 @@
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy review score audit ID"
-                    aria-label="Copy review score audit ID"
+                    title="复制阅卷评分审计 ID"
+                    aria-label="复制阅卷评分审计 ID"
                     @click="copyReviewScoreAuditId(scope.row.id)"
                   />
                   <el-button
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy review score audit link"
-                    aria-label="Copy review score audit link"
+                    title="复制阅卷评分审计链接"
+                    aria-label="复制阅卷评分审计链接"
                     @click="copyReviewScoreAuditLink(scope.row.id)"
                   />
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="Time" width="180">
+            <el-table-column label="时间" width="180">
               <template #default="scope">{{ formatDateTime(scope.row.createdAt) }}</template>
             </el-table-column>
-            <el-table-column prop="examName" label="Exam" min-width="170" show-overflow-tooltip />
-            <el-table-column label="Student" width="140">
+            <el-table-column prop="examName" label="考试" min-width="170" show-overflow-tooltip />
+            <el-table-column label="学生" width="140">
               <template #default="scope">{{ scope.row.studentName || scope.row.userId || '-' }}</template>
             </el-table-column>
-            <el-table-column prop="studentNo" label="Student No" width="120" />
-            <el-table-column label="Score" width="150">
+            <el-table-column prop="studentNo" label="学号" width="120" />
+            <el-table-column label="分数" width="150">
               <template #default="scope">
                 {{ scope.row.oldScore ?? 0 }} -> {{ scope.row.newScore }} / {{ scope.row.maxScore }}
               </template>
             </el-table-column>
-            <el-table-column label="Reviewer" width="140">
+            <el-table-column label="阅卷人" width="140">
               <template #default="scope">{{ scope.row.reviewerName || scope.row.reviewerId || '-' }}</template>
             </el-table-column>
-            <el-table-column prop="questionStem" label="Question" min-width="220" show-overflow-tooltip />
-            <el-table-column prop="comment" label="Comment" min-width="180" show-overflow-tooltip>
+            <el-table-column prop="questionStem" label="题目" min-width="220" show-overflow-tooltip />
+            <el-table-column prop="comment" label="评语" min-width="180" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.comment || '-' }}</template>
             </el-table-column>
-            <el-table-column label="IDs" width="170">
+            <el-table-column label="ID" width="170">
               <template #default="scope">
                 A{{ scope.row.attemptId }} / R{{ scope.row.answerRecordId }} / Q{{ scope.row.questionId }}
               </template>
             </el-table-column>
             <template #empty>
-              <el-empty description="No review score audit records" />
+              <el-empty description="暂无阅卷评分审计记录" />
             </template>
           </el-table>
         </el-tab-pane>
-        <el-tab-pane label="Question Review Audit" name="questionReview">
+        <el-tab-pane label="题目审核审计" name="questionReview">
           <div class="question-review-toolbar">
-            <el-input v-model="questionReviewQuery.logId" placeholder="Question review log ID" clearable @blur="normalizeQuestionReviewLogIdField" @keyup.enter="searchQuestionReviewLogs" />
-            <el-input v-model="questionReviewQuery.questionId" placeholder="Question ID" clearable @keyup.enter="searchQuestionReviewLogs" />
-            <el-input v-model="questionReviewQuery.keyword" placeholder="Question, subject, operator, comment" clearable @keyup.enter="searchQuestionReviewLogs" />
-            <el-select v-model="questionReviewQuery.actionType" placeholder="Action" clearable>
+            <el-input v-model="questionReviewQuery.logId" placeholder="题目审核日志 ID" clearable @blur="normalizeQuestionReviewLogIdField" @keyup.enter="searchQuestionReviewLogs" />
+            <el-input v-model="questionReviewQuery.questionId" placeholder="题目 ID" clearable @keyup.enter="searchQuestionReviewLogs" />
+            <el-input v-model="questionReviewQuery.keyword" placeholder="题目、学科、操作人或评语" clearable @keyup.enter="searchQuestionReviewLogs" />
+            <el-select v-model="questionReviewQuery.actionType" placeholder="动作" clearable>
               <el-option v-for="item in questionReviewActionOptions" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
-            <el-select v-model="questionReviewQuery.reviewStatus" placeholder="Review status" clearable>
+            <el-select v-model="questionReviewQuery.reviewStatus" placeholder="审核状态" clearable>
               <el-option v-for="item in questionReviewStatusOptions" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
-            <el-input v-model="questionReviewQuery.subjectId" placeholder="Subject ID" clearable @keyup.enter="searchQuestionReviewLogs" />
-            <el-input v-model="questionReviewQuery.operatorId" placeholder="Operator ID" clearable @keyup.enter="searchQuestionReviewLogs" />
+            <el-input v-model="questionReviewQuery.subjectId" placeholder="学科 ID" clearable @keyup.enter="searchQuestionReviewLogs" />
+            <el-input v-model="questionReviewQuery.operatorId" placeholder="操作人 ID" clearable @keyup.enter="searchQuestionReviewLogs" />
             <el-date-picker
               v-model="questionReviewDateRange"
               type="datetimerange"
               value-format="YYYY-MM-DDTHH:mm:ss"
-              range-separator="to"
-              start-placeholder="Start"
-              end-placeholder="End"
+              range-separator="至"
+              start-placeholder="开始时间"
+              end-placeholder="结束时间"
               style="width: 100%"
             />
-            <el-button type="primary" @click="searchQuestionReviewLogs">Search</el-button>
-            <el-button @click="resetQuestionReviewFilters">Reset</el-button>
+            <el-button type="primary" @click="searchQuestionReviewLogs">查询</el-button>
+            <el-button @click="resetQuestionReviewFilters">重置</el-button>
             <el-button type="success" plain :icon="Download" :loading="questionReviewExporting" @click="exportQuestionReviewLogs">
-              Export
+              导出
             </el-button>
           </div>
 
           <el-table v-loading="loading" :data="questionReviewLogs" border max-height="620">
-            <el-table-column label="Log ID" width="150">
+            <el-table-column label="日志 ID" width="150">
               <template #default="scope">
                 <div class="question-review-id-cell">
                   <span>#{{ scope.row.id }}</span>
@@ -673,87 +673,87 @@
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy question review audit ID"
-                    aria-label="Copy question review audit ID"
+                    title="复制题目审核审计 ID"
+                    aria-label="复制题目审核审计 ID"
                     @click="copyQuestionReviewAuditId(scope.row.id)"
                   />
                   <el-button
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy question review audit link"
-                    aria-label="Copy question review audit link"
+                    title="复制题目审核审计链接"
+                    aria-label="复制题目审核审计链接"
                     @click="copyQuestionReviewAuditLink(scope.row.id)"
                   />
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="Time" width="180">
+            <el-table-column label="时间" width="180">
               <template #default="scope">{{ formatDateTime(scope.row.operatedAt) }}</template>
             </el-table-column>
-            <el-table-column label="Action" width="140">
+            <el-table-column label="动作" width="140">
               <template #default="scope">
                 <el-tag size="small" :type="questionReviewActionTag(scope.row.actionType)">
                   {{ questionReviewActionText(scope.row.actionType) }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="questionStem" label="Question" min-width="240" show-overflow-tooltip>
-              <template #default="scope">{{ scope.row.questionStem || `Question #${scope.row.questionId}` }}</template>
+            <el-table-column prop="questionStem" label="题目" min-width="240" show-overflow-tooltip>
+              <template #default="scope">{{ scope.row.questionStem || `题目 #${scope.row.questionId}` }}</template>
             </el-table-column>
-            <el-table-column prop="subjectName" label="Subject" min-width="130" show-overflow-tooltip />
-            <el-table-column label="Review" width="180">
+            <el-table-column prop="subjectName" label="学科" min-width="130" show-overflow-tooltip />
+            <el-table-column label="审核" width="180">
               <template #default="scope">
                 {{ questionReviewStatusText(scope.row.fromReviewStatus) }} -> {{ questionReviewStatusText(scope.row.toReviewStatus) }}
               </template>
             </el-table-column>
-            <el-table-column label="Question Status" width="130">
+            <el-table-column label="题目状态" width="130">
               <template #default="scope">{{ questionPublishStatusText(scope.row.fromStatus) }} -> {{ questionPublishStatusText(scope.row.toStatus) }}</template>
             </el-table-column>
-            <el-table-column label="Operator" width="150">
+            <el-table-column label="操作人" width="150">
               <template #default="scope">{{ scope.row.operatorName || scope.row.operatorUsername || scope.row.operatedBy || '-' }}</template>
             </el-table-column>
-            <el-table-column label="Creator" width="140">
+            <el-table-column label="创建人" width="140">
               <template #default="scope">{{ scope.row.creatorName || scope.row.creatorUsername || scope.row.createdBy || '-' }}</template>
             </el-table-column>
-            <el-table-column label="IDs" width="140">
+            <el-table-column label="ID" width="140">
               <template #default="scope">Q{{ scope.row.questionId }} / v{{ scope.row.versionNo }}</template>
             </el-table-column>
-            <el-table-column prop="comment" label="Comment" min-width="220" show-overflow-tooltip>
+            <el-table-column prop="comment" label="评语" min-width="220" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.comment || '-' }}</template>
             </el-table-column>
             <template #empty>
-              <el-empty description="No question review audit records" />
+              <el-empty description="暂无题目审核审计记录" />
             </template>
           </el-table>
         </el-tab-pane>
-        <el-tab-pane label="System Config Audit" name="systemConfig">
+        <el-tab-pane label="系统配置审计" name="systemConfig">
           <div class="system-config-toolbar">
-            <el-input v-model="systemConfigQuery.logId" placeholder="Config log ID" clearable @blur="normalizeSystemConfigLogIdField" @keyup.enter="searchSystemConfigLogs" />
-            <el-input v-model="systemConfigQuery.keyword" placeholder="Key, category, value, actor" clearable @keyup.enter="searchSystemConfigLogs" />
-            <el-select v-model="systemConfigQuery.category" clearable placeholder="Category">
+            <el-input v-model="systemConfigQuery.logId" placeholder="配置日志 ID" clearable @blur="normalizeSystemConfigLogIdField" @keyup.enter="searchSystemConfigLogs" />
+            <el-input v-model="systemConfigQuery.keyword" placeholder="配置键、类别、值或操作人" clearable @keyup.enter="searchSystemConfigLogs" />
+            <el-select v-model="systemConfigQuery.category" clearable placeholder="类别">
               <el-option v-for="item in systemConfigCategories" :key="item" :label="item" :value="item" />
             </el-select>
-            <el-input v-model="systemConfigQuery.configKey" placeholder="Config key" clearable @keyup.enter="searchSystemConfigLogs" />
-            <el-input v-model="systemConfigQuery.actorId" placeholder="Actor ID" clearable @keyup.enter="searchSystemConfigLogs" />
+            <el-input v-model="systemConfigQuery.configKey" placeholder="配置键" clearable @keyup.enter="searchSystemConfigLogs" />
+            <el-input v-model="systemConfigQuery.actorId" placeholder="操作人 ID" clearable @keyup.enter="searchSystemConfigLogs" />
             <el-date-picker
               v-model="systemConfigDateRange"
               type="datetimerange"
               value-format="YYYY-MM-DDTHH:mm:ss"
-              range-separator="to"
-              start-placeholder="Start"
-              end-placeholder="End"
+              range-separator="至"
+              start-placeholder="开始时间"
+              end-placeholder="结束时间"
               style="width: 100%"
             />
-            <el-button type="primary" @click="searchSystemConfigLogs">Search</el-button>
-            <el-button @click="resetSystemConfigFilters">Reset</el-button>
+            <el-button type="primary" @click="searchSystemConfigLogs">查询</el-button>
+            <el-button @click="resetSystemConfigFilters">重置</el-button>
             <el-button type="success" plain :icon="Download" :loading="systemConfigExporting" @click="exportSystemConfigLogs">
-              Export
+              导出
             </el-button>
           </div>
 
           <el-table v-loading="loading" :data="systemConfigLogs" border max-height="620">
-            <el-table-column label="Log ID" width="150">
+            <el-table-column label="日志 ID" width="150">
               <template #default="scope">
                 <div class="system-config-id-cell">
                   <span>#{{ scope.row.id }}</span>
@@ -761,73 +761,73 @@
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy system config audit ID"
-                    aria-label="Copy system config audit ID"
+                    title="复制系统配置审计 ID"
+                    aria-label="复制系统配置审计 ID"
                     @click="copySystemConfigAuditId(scope.row.id)"
                   />
                   <el-button
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy system config audit link"
-                    aria-label="Copy system config audit link"
+                    title="复制系统配置审计链接"
+                    aria-label="复制系统配置审计链接"
                     @click="copySystemConfigAuditLink(scope.row.id)"
                   />
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="Time" width="180">
+            <el-table-column label="时间" width="180">
               <template #default="scope">{{ formatDateTime(scope.row.createdAt) }}</template>
             </el-table-column>
-            <el-table-column prop="configKey" label="Config key" min-width="220" show-overflow-tooltip />
-            <el-table-column label="Category" width="120">
+            <el-table-column prop="configKey" label="配置键" min-width="220" show-overflow-tooltip />
+            <el-table-column label="类别" width="120">
               <template #default="scope">
                 <el-tag size="small" type="info">{{ scope.row.category || '-' }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="valueType" label="Type" width="100" />
-            <el-table-column prop="oldValue" label="Old value" min-width="160" show-overflow-tooltip>
+            <el-table-column prop="valueType" label="类型" width="100" />
+            <el-table-column prop="oldValue" label="旧值" min-width="160" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.oldValue ?? '-' }}</template>
             </el-table-column>
-            <el-table-column prop="newValue" label="New value" min-width="160" show-overflow-tooltip />
-            <el-table-column label="Actor" width="150">
+            <el-table-column prop="newValue" label="新值" min-width="160" show-overflow-tooltip />
+            <el-table-column label="操作人" width="150">
               <template #default="scope">{{ scope.row.actorName || scope.row.actorUsername || scope.row.actorId || '-' }}</template>
             </el-table-column>
             <template #empty>
-              <el-empty description="No system config audit records" />
+              <el-empty description="暂无系统配置审计记录" />
             </template>
           </el-table>
         </el-tab-pane>
-        <el-tab-pane label="Notification Audit" name="notification">
+        <el-tab-pane label="通知审计" name="notification">
           <div class="notification-log-toolbar">
             <el-input
               v-model="notificationQuery.notificationId"
-              placeholder="Notification ID"
+              placeholder="通知 ID"
               clearable
               @blur="normalizeNotificationAuditIdField"
               @keyup.enter="searchNotificationLogs"
             />
-            <el-input v-model="notificationQuery.keyword" placeholder="Recipient, title, content, type" clearable @keyup.enter="searchNotificationLogs" />
-            <el-input v-model="notificationQuery.type" placeholder="Type" clearable @keyup.enter="searchNotificationLogs" />
-            <el-input v-model="notificationQuery.relatedType" placeholder="Related type" clearable @keyup.enter="searchNotificationLogs" />
-            <el-input v-model="notificationQuery.relatedId" placeholder="Related ID" clearable @keyup.enter="searchNotificationLogs" />
-            <el-select v-model="notificationQuery.read" placeholder="Read status" clearable>
-              <el-option label="Unread" :value="false" />
-              <el-option label="Read" :value="true" />
+            <el-input v-model="notificationQuery.keyword" placeholder="接收人、标题、内容或类型" clearable @keyup.enter="searchNotificationLogs" />
+            <el-input v-model="notificationQuery.type" placeholder="类型" clearable @keyup.enter="searchNotificationLogs" />
+            <el-input v-model="notificationQuery.relatedType" placeholder="关联类型" clearable @keyup.enter="searchNotificationLogs" />
+            <el-input v-model="notificationQuery.relatedId" placeholder="关联 ID" clearable @keyup.enter="searchNotificationLogs" />
+            <el-select v-model="notificationQuery.read" placeholder="已读状态" clearable>
+              <el-option label="未读" :value="false" />
+              <el-option label="已读" :value="true" />
             </el-select>
             <el-date-picker
               v-model="notificationDateRange"
               type="datetimerange"
               value-format="YYYY-MM-DDTHH:mm:ss"
-              range-separator="to"
-              start-placeholder="Start"
-              end-placeholder="End"
+              range-separator="至"
+              start-placeholder="开始时间"
+              end-placeholder="结束时间"
               style="width: 100%"
             />
-            <el-button type="primary" @click="searchNotificationLogs">Search</el-button>
-            <el-button @click="resetNotificationFilters">Reset</el-button>
+            <el-button type="primary" @click="searchNotificationLogs">查询</el-button>
+            <el-button @click="resetNotificationFilters">重置</el-button>
             <el-button type="success" plain :icon="Download" :loading="notificationExporting" @click="exportNotificationLogs">
-              Export
+              导出
             </el-button>
           </div>
 
@@ -840,42 +840,42 @@
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy notification audit ID"
-                    aria-label="Copy notification audit ID"
+                    title="复制通知审计 ID"
+                    aria-label="复制通知审计 ID"
                     @click="copyNotificationAuditId(scope.row.id)"
                   />
                   <el-button
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy notification audit link"
-                    aria-label="Copy notification audit link"
+                    title="复制通知审计链接"
+                    aria-label="复制通知审计链接"
                     @click="copyNotificationAuditLink(scope.row.id)"
                   />
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="Time" width="180">
+            <el-table-column label="时间" width="180">
               <template #default="scope">{{ formatDateTime(scope.row.createdAt) }}</template>
             </el-table-column>
-            <el-table-column label="Recipient" width="150">
+            <el-table-column label="接收人" width="150">
               <template #default="scope">{{ scope.row.realName || scope.row.username || scope.row.userId || '-' }}</template>
             </el-table-column>
-            <el-table-column label="Type" width="150">
+            <el-table-column label="类型" width="150">
               <template #default="scope">
                 <el-tag size="small" type="info">{{ scope.row.type || '-' }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="title" label="Title" min-width="180" show-overflow-tooltip />
-            <el-table-column prop="content" label="Content" min-width="240" show-overflow-tooltip />
-            <el-table-column label="Read" width="90">
+            <el-table-column prop="title" label="标题" min-width="180" show-overflow-tooltip />
+            <el-table-column prop="content" label="内容" min-width="240" show-overflow-tooltip />
+            <el-table-column label="已读" width="90">
               <template #default="scope">
                 <el-tag size="small" :type="notificationReadTag(scope.row.isRead)">
                   {{ notificationReadText(scope.row.isRead) }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="Related" min-width="180">
+            <el-table-column label="关联" min-width="180">
               <template #default="scope">
                 <div class="notification-related-cell">
                   <span>{{ scope.row.relatedType || '-' }} / {{ scope.row.relatedId || '-' }}</span>
@@ -884,16 +884,16 @@
                     link
                     type="primary"
                     :icon="DocumentCopy"
-                    title="Copy related notification audit link"
-                    aria-label="Copy related notification audit link"
+                    title="复制关联通知审计链接"
+                    aria-label="复制关联通知审计链接"
                     @click="copyNotificationRelatedAuditLink(scope.row.relatedType, scope.row.relatedId)"
                   />
                 </div>
               </template>
             </el-table-column>
-            <el-table-column prop="link" label="Link" min-width="160" show-overflow-tooltip />
+            <el-table-column prop="link" label="链接" min-width="160" show-overflow-tooltip />
             <template #empty>
-              <el-empty description="No notification audit records" />
+              <el-empty description="暂无通知审计记录" />
             </template>
           </el-table>
         </el-tab-pane>
@@ -993,20 +993,20 @@ const sceneOptions = [
 ];
 const systemConfigCategories = ['EXAM', 'APPROVAL', 'MONITOR', 'SCORE', 'SYSTEM', 'GENERAL'];
 const questionReviewActionOptions = [
-  { label: 'Create', value: 'CREATE' },
-  { label: 'Edit', value: 'EDIT' },
-  { label: 'Submit review', value: 'SUBMIT_REVIEW' },
-  { label: 'Approve', value: 'APPROVE' },
-  { label: 'Reject', value: 'REJECT' },
-  { label: 'Online', value: 'ONLINE' },
-  { label: 'Offline', value: 'OFFLINE' },
-  { label: 'Delete', value: 'DELETE' }
+  { label: '创建', value: 'CREATE' },
+  { label: '编辑', value: 'EDIT' },
+  { label: '提交审核', value: 'SUBMIT_REVIEW' },
+  { label: '通过', value: 'APPROVE' },
+  { label: '驳回', value: 'REJECT' },
+  { label: '上线', value: 'ONLINE' },
+  { label: '下线', value: 'OFFLINE' },
+  { label: '删除', value: 'DELETE' }
 ];
 const questionReviewStatusOptions = [
-  { label: 'Draft', value: 'DRAFT' },
-  { label: 'Pending', value: 'PENDING' },
-  { label: 'Approved', value: 'APPROVED' },
-  { label: 'Rejected', value: 'REJECTED' }
+  { label: '草稿', value: 'DRAFT' },
+  { label: '待审核', value: 'PENDING' },
+  { label: '已通过', value: 'APPROVED' },
+  { label: '已驳回', value: 'REJECTED' }
 ];
 
 const activeTab = ref<LogTab>('operation');
@@ -1165,15 +1165,15 @@ const notificationDateRange = ref<[string, string] | null>(null);
 
 const logSubtitle = computed(() => {
   if (activeTab.value === 'operation') return '后台操作记录';
-  if (activeTab.value === 'login') return 'Login and authentication security audit';
+  if (activeTab.value === 'login') return '登录与认证安全审计';
   if (activeTab.value === 'ai') return 'AI 调用审计';
-  if (activeTab.value === 'approvalReminder') return 'Approval reminder scheduler audit';
-  if (activeTab.value === 'examApproval') return 'Exam approval lifecycle audit';
+  if (activeTab.value === 'approvalReminder') return '审批提醒调度审计';
+  if (activeTab.value === 'examApproval') return '考试审批生命周期审计';
   if (activeTab.value === 'scoreRelease') return '成绩发布与撤回审计';
-  if (activeTab.value === 'reviewScore') return 'Review grading score audit';
-  if (activeTab.value === 'questionReview') return 'Question review lifecycle audit';
-  if (activeTab.value === 'systemConfig') return 'System configuration change audit';
-  if (activeTab.value === 'notification') return 'Notification delivery audit';
+  if (activeTab.value === 'reviewScore') return '阅卷评分审计';
+  if (activeTab.value === 'questionReview') return '题目审核生命周期审计';
+  if (activeTab.value === 'systemConfig') return '系统配置变更审计';
+  if (activeTab.value === 'notification') return '通知投递审计';
   return '成绩申诉生命周期审计';
 });
 const currentPage = computed(() => {
@@ -1544,9 +1544,9 @@ async function exportLoginLogs() {
       startFrom: loginDateRange.value?.[0],
       startTo: loginDateRange.value?.[1]
     });
-    ElMessage.success('Login audit export started');
+    ElMessage.success('登录审计导出已开始');
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : 'Export failed');
+    ElMessage.error(error instanceof Error ? error.message : '导出失败');
   } finally {
     loginExporting.value = false;
   }
@@ -1593,9 +1593,9 @@ async function exportApprovalReminderLogs() {
       startFrom: approvalReminderDateRange.value?.[0],
       startTo: approvalReminderDateRange.value?.[1]
     });
-    ElMessage.success('Approval reminder audit export started');
+    ElMessage.success('审批提醒审计导出已开始');
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : 'Export failed');
+    ElMessage.error(error instanceof Error ? error.message : '导出失败');
   } finally {
     approvalReminderExporting.value = false;
   }
@@ -1640,9 +1640,9 @@ async function exportExamApprovalLogs() {
       startFrom: examApprovalDateRange.value?.[0],
       startTo: examApprovalDateRange.value?.[1]
     });
-    ElMessage.success('Exam approval audit export started');
+    ElMessage.success('考试审批审计导出已开始');
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : 'Export failed');
+    ElMessage.error(error instanceof Error ? error.message : '导出失败');
   } finally {
     examApprovalExporting.value = false;
   }
@@ -1800,9 +1800,9 @@ async function exportReviewScoreLogs() {
       startFrom: reviewScoreDateRange.value?.[0],
       startTo: reviewScoreDateRange.value?.[1]
     });
-    ElMessage.success('Review score audit export started');
+    ElMessage.success('阅卷评分审计导出已开始');
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : 'Export failed');
+    ElMessage.error(error instanceof Error ? error.message : '导出失败');
   } finally {
     reviewScoreExporting.value = false;
   }
@@ -1842,9 +1842,9 @@ async function exportQuestionReviewLogs() {
       startFrom: questionReviewDateRange.value?.[0],
       startTo: questionReviewDateRange.value?.[1]
     });
-    ElMessage.success('Question review audit export started');
+    ElMessage.success('题目审核审计导出已开始');
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : 'Export failed');
+    ElMessage.error(error instanceof Error ? error.message : '导出失败');
   } finally {
     questionReviewExporting.value = false;
   }
@@ -1895,9 +1895,9 @@ async function exportSystemConfigLogs() {
       startFrom: systemConfigDateRange.value?.[0],
       startTo: systemConfigDateRange.value?.[1]
     });
-    ElMessage.success('System config audit export started');
+    ElMessage.success('系统配置审计导出已开始');
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : 'Export failed');
+    ElMessage.error(error instanceof Error ? error.message : '导出失败');
   } finally {
     systemConfigExporting.value = false;
   }
@@ -1950,9 +1950,9 @@ async function exportNotificationLogs() {
       startFrom: notificationDateRange.value?.[0],
       startTo: notificationDateRange.value?.[1]
     });
-    ElMessage.success('Notification audit export started');
+    ElMessage.success('通知审计导出已开始');
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : 'Export failed');
+    ElMessage.error(error instanceof Error ? error.message : '导出失败');
   } finally {
     notificationExporting.value = false;
   }
@@ -2257,9 +2257,9 @@ async function copyOperationLogId(logId?: number | string | null) {
   try {
     const value = await copyOperationLogIdToClipboard(logId);
     if (!value) return;
-    ElMessage.success(`Operation log ID copied: ${value}`);
+    ElMessage.success(`操作日志 ID 已复制：${value}`);
   } catch {
-    ElMessage.error('Failed to copy operation log ID');
+    ElMessage.error('复制操作日志 ID 失败');
   }
 }
 
@@ -2267,9 +2267,9 @@ async function copyOperationLogLink(logId?: number | string | null) {
   try {
     const link = await copyOperationLogLinkToClipboard(logId);
     if (!link) return;
-    ElMessage.success('Operation log link copied');
+    ElMessage.success('操作日志链接已复制');
   } catch {
-    ElMessage.error('Failed to copy operation log link');
+    ElMessage.error('复制操作日志链接失败');
   }
 }
 
@@ -2277,9 +2277,9 @@ async function copyLoginAuditId(logId?: number | string | null) {
   try {
     const value = await copyLoginAuditIdToClipboard(logId);
     if (!value) return;
-    ElMessage.success(`Login audit ID copied: ${value}`);
+    ElMessage.success(`登录审计 ID 已复制：${value}`);
   } catch {
-    ElMessage.error('Failed to copy login audit ID');
+    ElMessage.error('复制登录审计 ID 失败');
   }
 }
 
@@ -2287,9 +2287,9 @@ async function copyLoginAuditLink(logId?: number | string | null) {
   try {
     const link = await copyLoginAuditLinkToClipboard(logId);
     if (!link) return;
-    ElMessage.success('Login audit link copied');
+    ElMessage.success('登录审计链接已复制');
   } catch {
-    ElMessage.error('Failed to copy login audit link');
+    ElMessage.error('复制登录审计链接失败');
   }
 }
 
@@ -2297,9 +2297,9 @@ async function copyApprovalReminderAuditId(logId?: number | string | null) {
   try {
     const value = await copyApprovalReminderLogIdToClipboard(logId);
     if (!value) return;
-    ElMessage.success(`Approval reminder audit ID copied: ${value}`);
+    ElMessage.success(`审批提醒审计 ID 已复制：${value}`);
   } catch {
-    ElMessage.error('Failed to copy approval reminder audit ID');
+    ElMessage.error('复制审批提醒审计 ID 失败');
   }
 }
 
@@ -2307,9 +2307,9 @@ async function copyApprovalReminderAuditLink(logId?: number | string | null) {
   try {
     const link = await copyApprovalReminderAuditLinkToClipboard(logId);
     if (!link) return;
-    ElMessage.success('Approval reminder audit link copied');
+    ElMessage.success('审批提醒审计链接已复制');
   } catch {
-    ElMessage.error('Failed to copy approval reminder audit link');
+    ElMessage.error('复制审批提醒审计链接失败');
   }
 }
 
@@ -2317,9 +2317,9 @@ async function copyExamApprovalAuditId(logId?: number | string | null) {
   try {
     const value = await copyExamApprovalAuditIdToClipboard(logId);
     if (!value) return;
-    ElMessage.success(`Exam approval audit ID copied: ${value}`);
+    ElMessage.success(`考试审批审计 ID 已复制：${value}`);
   } catch {
-    ElMessage.error('Failed to copy exam approval audit ID');
+    ElMessage.error('复制考试审批审计 ID 失败');
   }
 }
 
@@ -2327,9 +2327,9 @@ async function copyExamApprovalAuditLink(logId?: number | string | null) {
   try {
     const link = await copyExamApprovalAuditLinkToClipboard(logId);
     if (!link) return;
-    ElMessage.success('Exam approval audit link copied');
+    ElMessage.success('考试审批审计链接已复制');
   } catch {
-    ElMessage.error('Failed to copy exam approval audit link');
+    ElMessage.error('复制考试审批审计链接失败');
   }
 }
 
@@ -2337,9 +2337,9 @@ async function copyScoreReleaseAuditId(logId?: number | string | null) {
   try {
     const value = await copyScoreReleaseAuditIdToClipboard(logId);
     if (!value) return;
-    ElMessage.success(`Score release audit ID copied: ${value}`);
+    ElMessage.success(`成绩发布审计 ID 已复制：${value}`);
   } catch {
-    ElMessage.error('Failed to copy score release audit ID');
+    ElMessage.error('复制成绩发布审计 ID 失败');
   }
 }
 
@@ -2347,9 +2347,9 @@ async function copyScoreReleaseAuditLink(logId?: number | string | null) {
   try {
     const link = await copyScoreReleaseAuditLinkToClipboard(logId);
     if (!link) return;
-    ElMessage.success('Score release audit link copied');
+    ElMessage.success('成绩发布审计链接已复制');
   } catch {
-    ElMessage.error('Failed to copy score release audit link');
+    ElMessage.error('复制成绩发布审计链接失败');
   }
 }
 
@@ -2357,9 +2357,9 @@ async function copyScoreAppealAuditId(logId?: number | string | null) {
   try {
     const value = await copyScoreAppealAuditIdToClipboard(logId);
     if (!value) return;
-    ElMessage.success(`Score appeal audit ID copied: ${value}`);
+    ElMessage.success(`成绩申诉审计 ID 已复制：${value}`);
   } catch {
-    ElMessage.error('Failed to copy score appeal audit ID');
+    ElMessage.error('复制成绩申诉审计 ID 失败');
   }
 }
 
@@ -2367,9 +2367,9 @@ async function copyScoreAppealAuditLink(logId?: number | string | null) {
   try {
     const link = await copyScoreAppealAuditLinkToClipboard(logId);
     if (!link) return;
-    ElMessage.success('Score appeal audit link copied');
+    ElMessage.success('成绩申诉审计链接已复制');
   } catch {
-    ElMessage.error('Failed to copy score appeal audit link');
+    ElMessage.error('复制成绩申诉审计链接失败');
   }
 }
 
@@ -2377,9 +2377,9 @@ async function copyReviewScoreAuditId(logId?: number | string | null) {
   try {
     const value = await copyReviewScoreAuditIdToClipboard(logId);
     if (!value) return;
-    ElMessage.success(`Review score audit ID copied: ${value}`);
+    ElMessage.success(`阅卷评分审计 ID 已复制：${value}`);
   } catch {
-    ElMessage.error('Failed to copy review score audit ID');
+    ElMessage.error('复制阅卷评分审计 ID 失败');
   }
 }
 
@@ -2387,9 +2387,9 @@ async function copyReviewScoreAuditLink(logId?: number | string | null) {
   try {
     const link = await copyReviewScoreAuditLinkToClipboard(logId);
     if (!link) return;
-    ElMessage.success('Review score audit link copied');
+    ElMessage.success('阅卷评分审计链接已复制');
   } catch {
-    ElMessage.error('Failed to copy review score audit link');
+    ElMessage.error('复制阅卷评分审计链接失败');
   }
 }
 
@@ -2397,9 +2397,9 @@ async function copyQuestionReviewAuditId(logId?: number | string | null) {
   try {
     const value = await copyQuestionReviewAuditIdToClipboard(logId);
     if (!value) return;
-    ElMessage.success(`Question review audit ID copied: ${value}`);
+    ElMessage.success(`题目审核审计 ID 已复制：${value}`);
   } catch {
-    ElMessage.error('Failed to copy question review audit ID');
+    ElMessage.error('复制题目审核审计 ID 失败');
   }
 }
 
@@ -2407,9 +2407,9 @@ async function copyQuestionReviewAuditLink(logId?: number | string | null) {
   try {
     const link = await copyQuestionReviewAuditLinkToClipboard(logId);
     if (!link) return;
-    ElMessage.success('Question review audit link copied');
+    ElMessage.success('题目审核审计链接已复制');
   } catch {
-    ElMessage.error('Failed to copy question review audit link');
+    ElMessage.error('复制题目审核审计链接失败');
   }
 }
 
@@ -2417,9 +2417,9 @@ async function copySystemConfigAuditId(logId?: number | string | null) {
   try {
     const value = await copySystemConfigAuditIdToClipboard(logId);
     if (!value) return;
-    ElMessage.success(`System config audit ID copied: ${value}`);
+    ElMessage.success(`系统配置审计 ID 已复制：${value}`);
   } catch {
-    ElMessage.error('Failed to copy system config audit ID');
+    ElMessage.error('复制系统配置审计 ID 失败');
   }
 }
 
@@ -2427,9 +2427,9 @@ async function copySystemConfigAuditLink(logId?: number | string | null) {
   try {
     const link = await copySystemConfigAuditLinkToClipboard(logId);
     if (!link) return;
-    ElMessage.success('System config audit link copied');
+    ElMessage.success('系统配置审计链接已复制');
   } catch {
-    ElMessage.error('Failed to copy system config audit link');
+    ElMessage.error('复制系统配置审计链接失败');
   }
 }
 
@@ -2437,9 +2437,9 @@ async function copyNotificationAuditId(notificationId?: number | string | null) 
   try {
     const value = await copyNotificationAuditIdToClipboard(notificationId);
     if (!value) return;
-    ElMessage.success(`Notification audit ID copied: ${value}`);
+    ElMessage.success(`通知审计 ID 已复制：${value}`);
   } catch {
-    ElMessage.error('Failed to copy notification audit ID');
+    ElMessage.error('复制通知审计 ID 失败');
   }
 }
 
@@ -2447,9 +2447,9 @@ async function copyNotificationAuditLink(notificationId?: number | string | null
   try {
     const link = await copyNotificationAuditLinkToClipboard(notificationId);
     if (!link) return;
-    ElMessage.success('Notification audit link copied');
+    ElMessage.success('通知审计链接已复制');
   } catch {
-    ElMessage.error('Failed to copy notification audit link');
+    ElMessage.error('复制通知审计链接失败');
   }
 }
 
@@ -2457,9 +2457,9 @@ async function copyNotificationRelatedAuditLink(relatedType?: string | null, rel
   try {
     const link = await copyNotificationRelatedAuditLinkToClipboard(relatedType, relatedId);
     if (!link) return;
-    ElMessage.success('Related notification audit link copied');
+    ElMessage.success('关联通知审计链接已复制');
   } catch {
-    ElMessage.error('Failed to copy related notification audit link');
+    ElMessage.error('复制关联通知审计链接失败');
   }
 }
 
@@ -2472,7 +2472,7 @@ function loginSuccess(value?: boolean | number | null) {
 }
 
 function notificationReadText(value: number | boolean) {
-  return value === true || value === 1 ? 'Read' : 'Unread';
+  return value === true || value === 1 ? '已读' : '未读';
 }
 
 function notificationReadTag(value: number | boolean) {
@@ -2485,13 +2485,13 @@ function sceneText(scene?: string) {
 
 function approvalReminderStatusText(status?: string | null) {
   const map: Record<string, string> = {
-    SENT: 'Sent',
-    SKIPPED_DISABLED: 'Disabled',
-    SKIPPED_EMPTY: 'No overdue',
-    SKIPPED_NO_RECIPIENT: 'No recipient',
-    SKIPPED_COOLDOWN: 'Cooldown',
-    SKIPPED_SCHEDULE_DISABLED: 'Schedule disabled',
-    SKIPPED_SCHEDULE_INTERVAL: 'Waiting interval'
+    SENT: '已发送',
+    SKIPPED_DISABLED: '已禁用',
+    SKIPPED_EMPTY: '无超期',
+    SKIPPED_NO_RECIPIENT: '无接收人',
+    SKIPPED_COOLDOWN: '冷却期',
+    SKIPPED_SCHEDULE_DISABLED: '计划已禁用',
+    SKIPPED_SCHEDULE_INTERVAL: '等待间隔'
   };
   return status ? map[status] || status : '-';
 }
@@ -2505,8 +2505,8 @@ function approvalReminderStatusTag(status?: string | null) {
 
 function approvalReminderSourceText(source?: string | null) {
   const map: Record<string, string> = {
-    MANUAL: 'Manual',
-    SCHEDULE: 'Scheduled'
+    MANUAL: '手动',
+    SCHEDULE: '计划任务'
   };
   return source ? map[source] || source : '-';
 }
@@ -2519,14 +2519,14 @@ function durationText(value?: number | null) {
 
 function questionReviewActionText(action?: string | null) {
   const map: Record<string, string> = {
-    CREATE: 'Create',
-    EDIT: 'Edit',
-    SUBMIT_REVIEW: 'Submit review',
-    APPROVE: 'Approve',
-    REJECT: 'Reject',
-    ONLINE: 'Online',
-    OFFLINE: 'Offline',
-    DELETE: 'Delete'
+    CREATE: '创建',
+    EDIT: '编辑',
+    SUBMIT_REVIEW: '提交审核',
+    APPROVE: '通过',
+    REJECT: '驳回',
+    ONLINE: '上线',
+    OFFLINE: '下线',
+    DELETE: '删除'
   };
   return action ? map[action] || action : '-';
 }
@@ -2540,26 +2540,26 @@ function questionReviewActionTag(action?: string | null) {
 
 function questionReviewStatusText(status?: string | null) {
   const map: Record<string, string> = {
-    DRAFT: 'Draft',
-    PENDING: 'Pending',
-    APPROVED: 'Approved',
-    REJECTED: 'Rejected'
+    DRAFT: '草稿',
+    PENDING: '待审核',
+    APPROVED: '已通过',
+    REJECTED: '已驳回'
   };
   return status ? map[status] || status : '-';
 }
 
 function questionPublishStatusText(status?: number | null) {
   if (status === null || status === undefined) return '-';
-  return status === 1 ? 'Online' : 'Offline';
+  return status === 1 ? '已上线' : '已下线';
 }
 
 function examApprovalActionText(action: string) {
   const map: Record<string, string> = {
-    SUBMIT: 'Submit approval',
-    RESUBMIT: 'Resubmit',
-    APPROVE: 'Approve',
-    REJECT: 'Reject',
-    DIRECT_PUBLISH: 'Direct publish'
+    SUBMIT: '提交审批',
+    RESUBMIT: '重新提交',
+    APPROVE: '通过',
+    REJECT: '驳回',
+    DIRECT_PUBLISH: '直接发布'
   };
   return map[action] || action;
 }
@@ -2574,10 +2574,10 @@ function examApprovalActionTag(action: string) {
 function examApprovalStatusText(status?: number | null) {
   if (status === null || status === undefined) return '-';
   const map: Record<number, string> = {
-    0: 'Pending',
-    1: 'Published',
-    2: 'Closed',
-    3: 'Rejected'
+    0: '待审批',
+    1: '已发布',
+    2: '已结束',
+    3: '已驳回'
   };
   return map[status] || String(status);
 }
