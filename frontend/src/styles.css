@@ -41,9 +41,9 @@
 }
 
 .mp-stat-card {
-  flex: 0 0 calc((100% - 48px) / 4);
-  max-width: calc((100% - 48px) / 4);
+  flex: 1 1 200px;
   min-width: 200px;
+  max-width: 280px;
   background: var(--mp-bg-card);
   border-radius: var(--mp-radius-md);
   padding: 20px;
@@ -122,9 +122,9 @@
 }
 
 .dashboard .mp-stat-card {
-  flex: 0 0 calc((100% - 60px) / 4);
-  max-width: calc((100% - 60px) / 4);
+  flex: 1 1 220px;
   min-width: 220px;
+  max-width: 300px;
   min-height: 152px;
   padding: 26px;
   border-radius: 10px;
@@ -155,21 +155,10 @@
   line-height: 1.1;
 }
 
-@media (max-width: 1180px) {
-  .mp-stat-card {
-    flex-basis: calc((100% - 16px) / 2);
-    max-width: calc((100% - 16px) / 2);
-  }
-  .dashboard .mp-stat-card {
-    flex-basis: calc((100% - 20px) / 2);
-    max-width: calc((100% - 20px) / 2);
-  }
-}
-
 @media (max-width: 560px) {
   .mp-stat-card,
   .dashboard .mp-stat-card {
-    flex-basis: 100%;
+    flex: 1 1 100%;
     max-width: 100%;
   }
 }
