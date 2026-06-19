@@ -259,9 +259,10 @@ onMounted(async () => {
 });
 
 watch(sidebarCollapsed, () => {
-  nextTick(() => {
+  // 等待侧边栏过渡动画完成后再重新计算表格布局（CSS transition: 0.25s）
+  setTimeout(() => {
     tableRef.value?.doLayout();
-  });
+  }, 300);
 });
 
 async function loadConfigs() {
