@@ -200,6 +200,7 @@ public class ExamService {
     }
 
     public PageResult<Map<String, Object>> listApprovalQueue(String keyword, String creatorKeyword, Integer status,
+                                                             String statusGroup,
                                                              String startFrom, String startTo, String risk,
                                                              Long examId, int page, int size, AuthUser user) {
         if (!user.hasRole("ADMIN")) {
@@ -211,7 +212,7 @@ public class ExamService {
         int offset = (safePage - 1) * safeSize;
 
         List<Object> params = new ArrayList<>();
-        String whereSql = approvalQueueWhere(keyword, creatorKeyword, status, startFrom, startTo, risk, examId, params);
+        String whereSql = approvalQueueWhere(keyword, creatorKeyword, status, statusGroup, startFrom, startTo, risk, examId, params);
         Long total = jt.queryForObject("""
                 SELECT COUNT(*)
                 FROM exam e
@@ -539,7 +540,7 @@ public class ExamService {
         return PageResult.of(list, total == null ? 0 : total, safePage, safeSize);
     }
 
-    private String approvalQueueWhere(String keyword, String creatorKeyword, Integer status,
+    private String approvalQueueWhere(String keyword, String creatorKeyword, Integer status, String statusGroup,
                                       String startFrom, String startTo, String risk, Long examId, List<Object> params) {
         StringBuilder where = new StringBuilder(" WHERE e.deleted = 0");
         if (examId != null) {
@@ -568,6 +569,14 @@ public class ExamService {
         if (status != null) {
             where.append(" AND e.status = ?");
             params.add(status);
+        } else if (statusGroup != null) {
+            // 归档视图：待审批(status=0) 或 已处理(status IN 1,3)，用于分页正确地分离待办与历史
+            String group = statusGroup.trim().toUpperCase(Locale.ROOT);
+            if ("PENDING".equals(group)) {
+                where.append(" AND e.status = 0");
+            } else if ("PROCESSED".equals(group)) {
+                where.append(" AND e.status IN (1, 3)");
+            }
         }
         String from = blankToNull(startFrom);
         if (from != null) {

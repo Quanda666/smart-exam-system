@@ -538,6 +538,7 @@ export function listExamApprovalQueue(query?: {
   keyword?: string;
   creatorKeyword?: string;
   status?: number | null;
+  statusGroup?: 'PENDING' | 'PROCESSED' | null;
   startFrom?: string;
   startTo?: string;
   risk?: string;
@@ -549,10 +550,11 @@ export function listExamApprovalQueue(query?: {
   if (query?.keyword) params.set('keyword', query.keyword);
   if (query?.creatorKeyword) params.set('creatorKeyword', query.creatorKeyword);
   if (query?.status !== undefined && query.status !== null) params.set('status', String(query.status));
+  if (query?.statusGroup) params.set('statusGroup', query.statusGroup);
   if (query?.startFrom) params.set('startFrom', query.startFrom);
   if (query?.startTo) params.set('startTo', query.startTo);
   if (query?.risk) params.set('risk', query.risk);
-  if (query?.examId !== undefined && query.examId !== null) params.set('examId', String(query.examId));
+  if (query?.examId !== undefined && query?.examId !== null) params.set('examId', String(query.examId));
   if (query?.page !== undefined) params.set('page', String(query.page));
   if (query?.size !== undefined) params.set('size', String(query.size));
   const value = params.toString();

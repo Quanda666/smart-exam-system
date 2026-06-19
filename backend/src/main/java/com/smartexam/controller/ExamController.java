@@ -63,13 +63,14 @@ public class ExamController {
     public ApiResponse<PageResult<Map<String, Object>>> listApprovalQueue(@RequestParam(required = false) String keyword,
                                                                            @RequestParam(required = false) String creatorKeyword,
                                                                            @RequestParam(required = false) Integer status,
+                                                                           @RequestParam(required = false) String statusGroup,
                                                                            @RequestParam(required = false) String startFrom,
                                                                            @RequestParam(required = false) String startTo,
                                                                            @RequestParam(required = false) String risk,
                                                                            @RequestParam(required = false) Long examId,
                                                                            @RequestParam(defaultValue = "1") int page,
                                                                            @RequestParam(defaultValue = "10") int size) {
-        return ApiResponse.ok(examService.listApprovalQueue(keyword, creatorKeyword, status, startFrom, startTo, risk,
+        return ApiResponse.ok(examService.listApprovalQueue(keyword, creatorKeyword, status, statusGroup, startFrom, startTo, risk,
                 examId, page, size, currentUser()));
     }
 

@@ -10,6 +10,11 @@
           <el-button :icon="Refresh" circle :loading="examLoading" @click="loadExams" />
         </div>
 
+        <el-tabs v-model="examStatusTab" class="exam-status-tabs" @tab-change="loadExams">
+          <el-tab-pane label="进行中" name="ACTIVE" />
+          <el-tab-pane label="历史记录" name="ARCHIVED" />
+        </el-tabs>
+
         <el-input
           v-model="keyword"
           placeholder="搜索考试"
@@ -32,7 +37,10 @@
             <span>{{ exam.paperName || '未关联试卷' }}</span>
             <small>{{ phaseText(exam) }} · {{ exam.submittedCount || 0 }}/{{ exam.attemptCount || 0 }} 已交卷</small>
           </button>
-          <el-empty v-if="!examLoading && filteredExams.length === 0" description="暂无可监考考试" />
+          <el-empty
+            v-if="!examLoading && filteredExams.length === 0"
+            :description="examStatusTab === 'ARCHIVED' ? '暂无已结束考试' : '暂无可监考考试'"
+          />
         </div>
       </aside>
 
@@ -617,6 +625,7 @@ const activeSession = ref<MonitorSession | null>(null);
 const actionTarget = ref<MonitorSession | null>(null);
 const drawerTab = ref<'health' | 'events' | 'actions'>('health');
 const keyword = ref('');
+const examStatusTab = ref<'ACTIVE' | 'ARCHIVED'>('ACTIVE');
 const examLoading = ref(false);
 const sessionLoading = ref(false);
 const eventLoading = ref(false);
@@ -667,10 +676,14 @@ const monitorEventTypeOptions = [
 
 const filteredExams = computed(() => {
   const value = keyword.value.trim().toLowerCase();
-  if (!value) return exams.value;
-  return exams.value.filter((exam) =>
-    [exam.examName, exam.paperName || '', exam.subjectName || ''].some((item) => item.toLowerCase().includes(value))
-  );
+  return exams.value.filter((exam) => {
+    const phase = phaseText(exam);
+    const isEnded = phase === '已结束';
+    if (examStatusTab.value === 'ACTIVE' && isEnded) return false;
+    if (examStatusTab.value === 'ARCHIVED' && !isEnded) return false;
+    if (!value) return true;
+    return [exam.examName, exam.paperName || '', exam.subjectName || ''].some((item) => item.toLowerCase().includes(value));
+  });
 });
 
 const selectedExam = computed(() => exams.value.find((exam) => exam.id === selectedExamId.value) || null);
@@ -825,10 +838,9 @@ async function loadExams() {
   try {
     const response = await listTeacherExams({ keyword: keyword.value, page: 1, size: 100 });
     exams.value = response.data.list;
-    if (!selectedExamId.value && exams.value.length > 0) {
-      selectedExamId.value = exams.value[0].id;
-    } else if (selectedExamId.value && !exams.value.some((exam) => exam.id === selectedExamId.value)) {
-      selectedExamId.value = exams.value[0]?.id || null;
+    const visible = filteredExams.value;
+    if (!selectedExamId.value || !visible.some((exam) => exam.id === selectedExamId.value)) {
+      selectedExamId.value = visible[0]?.id || null;
     }
     await loadSessions();
   } catch (error) {
@@ -1485,6 +1497,14 @@ function prettyExtra(value?: string | null) {
 
 .exam-list-panel {
   padding: 14px;
+}
+
+.exam-status-tabs {
+  margin-bottom: 4px;
+}
+
+.exam-status-tabs :deep(.el-tabs__header) {
+  margin: 0 0 10px;
 }
 
 .panel-head,

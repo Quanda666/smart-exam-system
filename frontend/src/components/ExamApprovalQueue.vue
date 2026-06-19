@@ -48,11 +48,22 @@
       </div>
     </div>
 
+    <el-tabs v-model="approvalTab" class="approval-status-tabs" @tab-change="switchApprovalTab">
+      <el-tab-pane label="待审批" name="PENDING" />
+      <el-tab-pane label="审批历史" name="PROCESSED" />
+    </el-tabs>
+
     <div class="mp-toolbar approval-filters">
       <el-input v-model="query.keyword" placeholder="考试/试卷/科目" clearable style="width: 210px" @keyup.enter="search" />
       <el-input v-model="query.creatorKeyword" placeholder="教师姓名/账号" clearable style="width: 180px" @keyup.enter="search" />
-      <el-select v-model="query.status" clearable placeholder="状态" style="width: 140px" @change="search">
-        <el-option label="待审批" :value="0" />
+      <el-select
+        v-if="approvalTab === 'PROCESSED'"
+        v-model="query.status"
+        clearable
+        placeholder="状态"
+        style="width: 140px"
+        @change="search"
+      >
         <el-option label="已发布" :value="1" />
         <el-option label="已驳回" :value="3" />
       </el-select>
@@ -318,9 +329,10 @@ const query = reactive<{
 }>({
   keyword: '',
   creatorKeyword: '',
-  status: 0,
+  status: null,
   risk: ''
 });
+const approvalTab = ref<'PENDING' | 'PROCESSED'>('PENDING');
 
 const logVisible = ref(false);
 const logLoading = ref(false);
@@ -368,6 +380,7 @@ async function loadQueue() {
       keyword: query.keyword.trim(),
       creatorKeyword: query.creatorKeyword.trim(),
       status: typeof query.status === 'number' ? query.status : null,
+      statusGroup: approvalTab.value,
       risk: query.risk,
       examId: focusedApprovalExamId.value,
       startFrom: startRange.value?.[0],
@@ -504,6 +517,12 @@ async function copyReminderAuditLink(logId?: number | null) {
 }
 
 function search() {
+  page.value = 1;
+  loadQueue();
+}
+
+function switchApprovalTab() {
+  query.status = null;
   page.value = 1;
   loadQueue();
 }
@@ -790,6 +809,14 @@ function scoreText(value?: number | null) {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
+}
+
+.approval-status-tabs {
+  margin-bottom: 4px;
+}
+
+.approval-status-tabs :deep(.el-tabs__header) {
+  margin: 0 0 12px;
 }
 
 .approval-metrics > div {
