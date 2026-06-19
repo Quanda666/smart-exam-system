@@ -235,6 +235,19 @@ class SmartExamApplicationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
 
+        // 提交审核
+        mockMvc.perform(post("/api/questions/" + questionId + "/review/submit")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+
+        // 管理员批准审核
+        String adminToken = loginAndExtractToken("admin", "admin123");
+        mockMvc.perform(post("/api/questions/" + questionId + "/review/approve")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("comment", "测试批准"))))
+                .andExpect(status().isOk());
+
         mockMvc.perform(put("/api/questions/" + questionId + "/status")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -374,6 +387,7 @@ class SmartExamApplicationTests {
     }
 
     private Long createPublishedQuestion(String token, String stem, String questionType) throws Exception {
+        // 创建题目（草稿状态）
         MvcResult result = mockMvc.perform(post("/api/questions")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -386,7 +400,7 @@ class SmartExamApplicationTests {
                                 "correctAnswer", "B",
                                 "analysis", "阶段5试卷测试题目。",
                                 "defaultScore", 5,
-                                "status", 1,
+                                "status", 0,
                                 "options", List.of(
                                         Map.of("optionLabel", "A", "optionContent", "错误项", "correct", false),
                                         Map.of("optionLabel", "B", "optionContent", "正确项", "correct", true)
@@ -395,7 +409,29 @@ class SmartExamApplicationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andReturn();
-        return objectMapper.readTree(result.getResponse().getContentAsString()).path("data").path("id").asLong();
+        Long questionId = objectMapper.readTree(result.getResponse().getContentAsString()).path("data").path("id").asLong();
+
+        // 提交审核
+        mockMvc.perform(post("/api/questions/" + questionId + "/review/submit")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+
+        // 管理员批准审核
+        String adminToken = loginAndExtractToken("admin", "admin123");
+        mockMvc.perform(post("/api/questions/" + questionId + "/review/approve")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("comment", "测试自动批准"))))
+                .andExpect(status().isOk());
+
+        // 设为可用
+        mockMvc.perform(put("/api/questions/" + questionId + "/status")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("status", 1))))
+                .andExpect(status().isOk());
+
+        return questionId;
     }
 
     private String registerTeacherAndExtractToken() throws Exception {
