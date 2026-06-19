@@ -40,8 +40,8 @@
 }
 
 .mp-stat-card {
-  flex: 0 0 calc(25% - 12px);
-  max-width: calc(25% - 12px);
+  flex: 0 1 calc((100% - 48px) / 4);
+  max-width: calc((100% - 48px) / 4);
   min-width: 200px;
   background: var(--mp-bg-card);
   border-radius: var(--mp-radius-md);
@@ -121,8 +121,8 @@
 }
 
 .dashboard .mp-stat-card {
-  flex: 0 0 calc(25% - 15px);
-  max-width: calc(25% - 15px);
+  flex: 0 1 calc((100% - 60px) / 4);
+  max-width: calc((100% - 60px) / 4);
   min-width: 220px;
   min-height: 152px;
   padding: 26px;
@@ -156,12 +156,12 @@
 
 @media (max-width: 1180px) {
   .mp-stat-card {
-    flex-basis: calc(50% - 8px);
-    max-width: calc(50% - 8px);
+    flex-basis: calc((100% - 16px) / 2);
+    max-width: calc((100% - 16px) / 2);
   }
   .dashboard .mp-stat-card {
-    flex-basis: calc(50% - 10px);
-    max-width: calc(50% - 10px);
+    flex-basis: calc((100% - 20px) / 2);
+    max-width: calc((100% - 20px) / 2);
   }
 }
 
