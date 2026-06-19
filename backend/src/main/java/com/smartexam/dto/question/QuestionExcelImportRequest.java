@@ -1,6 +1,5 @@
 package com.smartexam.dto.question;
 
-import com.smartexam.dto.validation.ValidDifficulty;
 import jakarta.validation.constraints.NotNull;
 
 public class QuestionExcelImportRequest {
@@ -15,7 +14,6 @@ public class QuestionExcelImportRequest {
 
     private String knowledgePointName;
 
-    @ValidDifficulty
     private String difficulty = "MEDIUM";
 
     public Long getSubjectId() {

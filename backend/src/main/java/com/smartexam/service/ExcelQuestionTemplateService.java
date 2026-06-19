@@ -24,20 +24,23 @@ public class ExcelQuestionTemplateService {
     private static final int HEADER_ROW = 0;
     private static final int DATA_START_ROW = 2;
 
-    private static final Map<String, String> TYPE_ALIASES = Map.of(
-            "单选", "SINGLE_CHOICE",
-            "单选题", "SINGLE_CHOICE",
-            "多选", "MULTIPLE_CHOICE",
-            "多选题", "MULTIPLE_CHOICE",
-            "判断", "TRUE_FALSE",
-            "判断题", "TRUE_FALSE",
-            "填空", "FILL_BLANK",
-            "填空题", "FILL_BLANK",
-            "主观", "SUBJECTIVE",
-            "主观题", "SUBJECTIVE",
-            "简答", "SUBJECTIVE",
-            "简答题", "SUBJECTIVE"
-    );
+    private static final Map<String, String> TYPE_ALIASES;
+    static {
+        Map<String, String> aliases = new HashMap<>();
+        aliases.put("单选", "SINGLE_CHOICE");
+        aliases.put("单选题", "SINGLE_CHOICE");
+        aliases.put("多选", "MULTIPLE_CHOICE");
+        aliases.put("多选题", "MULTIPLE_CHOICE");
+        aliases.put("判断", "TRUE_FALSE");
+        aliases.put("判断题", "TRUE_FALSE");
+        aliases.put("填空", "FILL_BLANK");
+        aliases.put("填空题", "FILL_BLANK");
+        aliases.put("主观", "SUBJECTIVE");
+        aliases.put("主观题", "SUBJECTIVE");
+        aliases.put("简答", "SUBJECTIVE");
+        aliases.put("简答题", "SUBJECTIVE");
+        TYPE_ALIASES = Collections.unmodifiableMap(aliases);
+    }
 
     private static final List<String> VALID_TYPES = List.of(
             "SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE", "FILL_BLANK", "SUBJECTIVE"
