@@ -1,0 +1,197 @@
+# Docker Compose for Smart Exam System Local Development
+# This configuration is optimized for local testing with all services containerized
+
+services:
+  # MySQL Database Service
+  mysql:
+    image: mysql:8.4
+    container_name: smart-exam-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-smart_exam_system}
+      MYSQL_USER: ${MYSQL_USER:-smartexam}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-smartexam123}
+      TZ: Asia/Shanghai
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=caching_sha2_password
+      - --max-connections=200
+      - --innodb-buffer-pool-size=256M
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./backend/src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./backend/src/main/resources/db/data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u${MYSQL_USER:-smartexam}", "-p${MYSQL_PASSWORD:-smartexam123}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - smart-exam-network
+
+  # Redis Service (draft cache, recovery and future session/cache workloads)
+  redis:
+    image: redis:7.2-alpine
+    container_name: smart-exam-redis
+    restart: unless-stopped
+    command: >
+      sh -c 'if [ -n "$$REDIS_PASSWORD" ]; then
+        redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD";
+      else
+        redis-server --appendonly yes;
+      fi'
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      TZ: Asia/Shanghai
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "if [ -n \"$${REDIS_PASSWORD}\" ]; then redis-cli -a \"$${REDIS_PASSWORD}\" ping; else redis-cli ping; fi"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - smart-exam-network
+
+  # Backend Service (Spring Boot)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smart-exam-backend
+    restart: unless-stopped
+    environment:
+      # Server Configuration
+      PORT: ${SERVER_PORT:-8080}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      
+      # Database Configuration
+      MYSQL_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-smart_exam_system}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      MYSQL_USERNAME: ${MYSQL_USER:-smartexam}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-smartexam123}
+      DB_INIT_MODE: ${DB_INIT_MODE:-always}
+      DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-2}
+      DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-20}
+      DB_CONNECTION_TIMEOUT: ${DB_CONNECTION_TIMEOUT:-30000}
+      DB_IDLE_TIMEOUT: ${DB_IDLE_TIMEOUT:-600000}
+      DB_MAX_LIFETIME: ${DB_MAX_LIFETIME:-1800000}
+      DB_LEAK_DETECTION: ${DB_LEAK_DETECTION:-60000}
+
+      # Redis / Draft Cache Configuration
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DATABASE: ${REDIS_DATABASE:-0}
+      REDIS_TIMEOUT: ${REDIS_TIMEOUT:-2s}
+      REDIS_HEALTH_ENABLED: ${REDIS_HEALTH_ENABLED:-true}
+      EXAM_DRAFT_REDIS_ENABLED: ${EXAM_DRAFT_REDIS_ENABLED:-true}
+      EXAM_DRAFT_REDIS_TTL_SECONDS: ${EXAM_DRAFT_REDIS_TTL_SECONDS:-21600}
+      EXAM_DRAFT_FLUSH_DELAY_MS: ${EXAM_DRAFT_FLUSH_DELAY_MS:-60000}
+      EXAM_DRAFT_FLUSH_INITIAL_DELAY_MS: ${EXAM_DRAFT_FLUSH_INITIAL_DELAY_MS:-180000}
+      
+      # CORS Configuration
+      CORS_ALLOWED_ORIGIN_PATTERNS: ${CORS_ALLOWED_ORIGIN_PATTERNS:-http://localhost:*,http://127.0.0.1:*}
+      
+      # AI Configuration
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      AI_MOCK_ENABLED: ${AI_MOCK_ENABLED:-true}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-30}
+
+      # Observability
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-INFO}
+      SPRING_WEB_LOG_LEVEL: ${SPRING_WEB_LOG_LEVEL:-INFO}
+      SPRING_JDBC_LOG_LEVEL: ${SPRING_JDBC_LOG_LEVEL:-INFO}
+      HEALTH_SHOW_DETAILS: ${HEALTH_SHOW_DETAILS:-when-authorized}
+      REQUEST_SLOW_WARNING_MS: ${REQUEST_SLOW_WARNING_MS:-1000}
+      PROMETHEUS_METRICS_ENABLED: ${PROMETHEUS_METRICS_ENABLED:-true}
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - smart-exam-network
+
+  # Frontend Service (Nginx serving Vue.js SPA)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: smart-exam-frontend
+    restart: unless-stopped
+    environment:
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-}
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - smart-exam-network
+
+  # Prometheus Service (local metrics scraping)
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: smart-exam-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - smart-exam-network
+
+# Volumes for persistent data
+volumes:
+  mysql-data:
+    name: smart-exam-mysql-data
+    driver: local
+  redis-data:
+    name: smart-exam-redis-data
+    driver: local
+  prometheus-data:
+    name: smart-exam-prometheus-data
+    driver: local
+
+# Network configuration
+networks:
+  smart-exam-network:
+    name: smart-exam-network
+    driver: bridge

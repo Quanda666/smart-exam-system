@@ -1,0 +1,130 @@
+name: Cloud verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: smart_exam_system
+          MYSQL_USER: smartexam
+          MYSQL_PASSWORD: smartexam123
+          TZ: Asia/Shanghai
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -usmartexam -psmartexam123"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      MYSQL_URL: jdbc:mysql://127.0.0.1:3306/smart_exam_system?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      MYSQL_USERNAME: smartexam
+      MYSQL_PASSWORD: smartexam123
+      DB_INIT_MODE: always
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+      REDIS_HEALTH_ENABLED: true
+      EXAM_DRAFT_REDIS_ENABLED: true
+      AI_MOCK_ENABLED: true
+      PROMETHEUS_METRICS_ENABLED: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Validate PowerShell scripts
+        shell: pwsh
+        run: |
+          $files = @(
+            'scripts/backup-compose-data.ps1',
+            'scripts/restore-mysql-backup.ps1',
+            'scripts/run-exam-load-smoke.ps1',
+            'scripts/check-deploy-config.ps1',
+            'scripts/check-ops-health.ps1',
+            'scripts/verify-attempt-resilience.ps1',
+            'scripts/prepare-attempt-resilience-fixture.ps1',
+            'scripts/run-attempt-resilience-acceptance.ps1',
+            'scripts/cleanup-attempt-resilience-fixtures.ps1'
+          )
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              Write-Host $file
+              $errors | ForEach-Object { Write-Host $_.Message }
+              exit 1
+            }
+          }
+
+      - name: Validate deployment config
+        shell: pwsh
+        run: ./scripts/check-deploy-config.ps1 -UseExample
+
+      - name: Backend tests
+        working-directory: backend
+        run: mvn -B test
+
+      - name: Frontend build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Start backend and verify health
+        working-directory: backend
+        run: |
+          nohup mvn -B spring-boot:run > backend.log 2>&1 &
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:8080/api/health > /tmp/health.json; then
+              break
+            fi
+            sleep 3
+          done
+          cat /tmp/health.json
+          grep '"success":true' /tmp/health.json
+          curl -fsS http://127.0.0.1:8080/actuator/health/liveness | grep '"status":"UP"'
+          curl -fsS http://127.0.0.1:8080/actuator/health/readiness | grep '"status":"UP"'
+          curl -fsS http://127.0.0.1:8080/actuator/prometheus > /tmp/prometheus.txt
+          grep -E '# HELP|# TYPE' /tmp/prometheus.txt
+
+      - name: Ops health script smoke
+        shell: pwsh
+        run: ./scripts/check-ops-health.ps1 -BaseUrl http://127.0.0.1:8080 -ExpectPrometheus

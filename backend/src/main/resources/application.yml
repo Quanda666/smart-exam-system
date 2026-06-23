@@ -1,0 +1,126 @@
+server:
+  port: ${PORT:${SERVER_PORT:8080}}
+  shutdown: graceful
+  tomcat:
+    mbeanregistry:
+      enabled: true
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
+    min-response-size: 1024
+
+spring:
+  application:
+    name: smart-exam-backend
+  servlet:
+    multipart:
+      max-file-size: ${UPLOAD_MAX_FILE_SIZE:25MB}
+      max-request-size: ${UPLOAD_MAX_REQUEST_SIZE:28MB}
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  sql:
+    init:
+      mode: ${DB_INIT_MODE:always}
+      encoding: UTF-8
+      # 新库由 schema.sql 建表（自带 avatar/email_verified 列）；旧库缺列由 DatabaseMigrationRunner 启动时幂等补齐
+      schema-locations: classpath:db/schema.sql
+      data-locations: classpath:db/data.sql
+      continue-on-error: false
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/smart_exam_system?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:root}
+    hikari:
+      pool-name: smart-exam-hikari
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${DB_IDLE_TIMEOUT:600000}
+      max-lifetime: ${DB_MAX_LIFETIME:1800000}
+      leak-detection-threshold: ${DB_LEAK_DETECTION:60000}
+      connection-test-query: SELECT 1
+      auto-commit: true
+      # 每个新连接把会话时区设为 +08:00，使 CURRENT_TIMESTAMP/NOW() 产出北京时间（操作日志等）。
+      # 用数值偏移而非 'Asia/Shanghai' 命名时区，避免依赖 MySQL 时区表（云端 MySQL 常未加载）。
+      connection-init-sql: "${DB_SESSION_TIME_ZONE:SET time_zone = '+08:00'}"
+      # Optimizations for cloud database connections
+      keepalive-time: 300000
+      validation-timeout: 5000
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: ${REDIS_TIMEOUT:2s}
+
+app:
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*}
+  ai:
+    base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+    api-key: ${OPENAI_API_KEY:}
+    model: ${OPENAI_MODEL:gpt-4o-mini}
+    mock-enabled: ${AI_MOCK_ENABLED:true}
+    timeout-seconds: ${AI_TIMEOUT_SECONDS:30}
+  exam:
+    draft-cache:
+      redis-enabled: ${EXAM_DRAFT_REDIS_ENABLED:false}
+      ttl-seconds: ${EXAM_DRAFT_REDIS_TTL_SECONDS:21600}
+
+smart-exam:
+  draft-flush-delay-ms: ${EXAM_DRAFT_FLUSH_DELAY_MS:60000}
+  draft-flush-initial-delay-ms: ${EXAM_DRAFT_FLUSH_INITIAL_DELAY_MS:180000}
+  request-tracing:
+    slow-warning-ms: ${REQUEST_SLOW_WARNING_MS:1000}
+
+# Logging configuration
+logging:
+  level:
+    root: ${LOG_LEVEL:INFO}
+    com.smartexam: ${APP_LOG_LEVEL:INFO}
+    org.springframework.web: ${SPRING_WEB_LOG_LEVEL:INFO}
+    org.springframework.jdbc: ${SPRING_JDBC_LOG_LEVEL:INFO}
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level traceId=%X{traceId} %logger{36} - %msg%n"
+
+# Management endpoints for health checks
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: ${HEALTH_SHOW_DETAILS:when-authorized}
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db,diskSpace
+        liveness:
+          include: livenessState,ping
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+    db:
+      enabled: true
+    redis:
+      enabled: ${REDIS_HEALTH_ENABLED:false}
+  metrics:
+    tags:
+      application: smart-exam-backend
+  prometheus:
+    metrics:
+      export:
+        enabled: ${PROMETHEUS_METRICS_ENABLED:true}
+
+info:
+  app:
+    name: smart-exam-backend
+    description: Smart Exam System backend
+    version: 0.1.0-SNAPSHOT

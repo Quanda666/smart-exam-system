@@ -1,0 +1,206 @@
+package com.smartexam.service;
+
+import com.smartexam.exception.DatabaseUnavailableException;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+@Service
+public class AnalysisService {
+
+    private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
+
+    public AnalysisService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+        this.jdbcTemplateProvider = jdbcTemplateProvider;
+    }
+
+    public Map<String, Object> overview() {
+        JdbcTemplate jt = requireJdbcTemplate();
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("userCount", count(jt, "SELECT COUNT(*) FROM sys_user WHERE deleted = 0"));
+        data.put("questionCount", count(jt, "SELECT COUNT(*) FROM question WHERE deleted = 0"));
+        data.put("paperCount", count(jt, "SELECT COUNT(*) FROM paper WHERE deleted = 0"));
+        data.put("examCount", count(jt, "SELECT COUNT(*) FROM exam WHERE deleted = 0"));
+        data.put("attemptCount", count(jt, "SELECT COUNT(*) FROM exam_attempt"));
+        data.put("completedCount", count(jt, """
+                SELECT COUNT(*)
+                FROM exam_attempt ea
+                JOIN exam e ON e.id = ea.exam_id AND e.deleted = 0
+                JOIN score_release sr ON sr.exam_id = e.id AND sr.status = 1
+                WHERE ea.status = 5 AND ea.score IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM score_appeal sa
+                    WHERE sa.attempt_id = ea.id
+                      AND sa.status = 1
+                      AND sa.handling_result = 'RECHECK_REQUIRED'
+                  )
+                """));
+
+        Double avg = jt.queryForObject("""
+                SELECT COALESCE(AVG(ea.score), 0)
+                FROM exam_attempt ea
+                JOIN exam e ON e.id = ea.exam_id AND e.deleted = 0
+                JOIN score_release sr ON sr.exam_id = e.id AND sr.status = 1
+                WHERE ea.status = 5 AND ea.score IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM score_appeal sa
+                    WHERE sa.attempt_id = ea.id
+                      AND sa.status = 1
+                      AND sa.handling_result = 'RECHECK_REQUIRED'
+                  )
+                """, Double.class);
+        data.put("averageScore", avg == null ? 0d : Math.round(avg * 100.0) / 100.0);
+
+        data.put("roleDistribution", jt.queryForList("""
+                SELECT r.role_code AS roleCode, r.role_name AS roleName, COUNT(u.id) AS userCount
+                FROM sys_role r
+                LEFT JOIN sys_user_role ur ON ur.role_id = r.id
+                LEFT JOIN sys_user u ON u.id = ur.user_id AND u.deleted = 0
+                WHERE r.deleted = 0
+                GROUP BY r.id, r.role_code, r.role_name
+                ORDER BY r.id
+                """));
+
+        data.put("subjectStats", jt.queryForList("""
+                SELECT s.subject_name AS subjectName,
+                       COUNT(DISTINCT e.id) AS examCount,
+                       COUNT(ea.id) AS attemptCount,
+                       COALESCE(ROUND(AVG(ea.score), 2), 0) AS avgScore
+                FROM edu_subject s
+                LEFT JOIN paper p ON p.subject_id = s.id AND p.deleted = 0
+                LEFT JOIN exam e ON e.paper_id = p.id AND e.deleted = 0
+                LEFT JOIN score_release sr ON sr.exam_id = e.id AND sr.status = 1
+                LEFT JOIN exam_attempt ea ON ea.exam_id = e.id AND ea.status = 5 AND ea.score IS NOT NULL AND sr.exam_id IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM score_appeal sa
+                    WHERE sa.attempt_id = ea.id
+                      AND sa.status = 1
+                      AND sa.handling_result = 'RECHECK_REQUIRED'
+                  )
+                WHERE s.deleted = 0
+                GROUP BY s.id, s.subject_name
+                ORDER BY s.id
+                """));
+
+        data.put("scoreDistribution", jt.queryForMap("""
+                SELECT COALESCE(SUM(CASE WHEN ea.score < 60 THEN 1 ELSE 0 END), 0) AS belowSixty,
+                       COALESCE(SUM(CASE WHEN ea.score >= 60 AND ea.score < 70 THEN 1 ELSE 0 END), 0) AS sixtyToSeventy,
+                       COALESCE(SUM(CASE WHEN ea.score >= 70 AND ea.score < 80 THEN 1 ELSE 0 END), 0) AS seventyToEighty,
+                       COALESCE(SUM(CASE WHEN ea.score >= 80 AND ea.score < 90 THEN 1 ELSE 0 END), 0) AS eightyToNinety,
+                       COALESCE(SUM(CASE WHEN ea.score >= 90 THEN 1 ELSE 0 END), 0) AS ninetyToHundred
+                FROM exam_attempt ea
+                JOIN exam e ON e.id = ea.exam_id AND e.deleted = 0
+                JOIN score_release sr ON sr.exam_id = e.id AND sr.status = 1
+                WHERE ea.status = 5 AND ea.score IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM score_appeal sa
+                    WHERE sa.attempt_id = ea.id
+                      AND sa.status = 1
+                      AND sa.handling_result = 'RECHECK_REQUIRED'
+                  )
+                """));
+
+        return data;
+    }
+
+    public Map<String, Object> teacherOverview(Long teacherId) {
+        JdbcTemplate jt = requireJdbcTemplate();
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("examCount", longValue(jt.queryForObject(
+                "SELECT COUNT(*) FROM exam WHERE deleted = 0 AND created_by = ?", Long.class, teacherId)));
+        data.put("paperCount", longValue(jt.queryForObject(
+                "SELECT COUNT(*) FROM paper WHERE deleted = 0 AND created_by = ?", Long.class, teacherId)));
+        data.put("questionCount", longValue(jt.queryForObject(
+                "SELECT COUNT(*) FROM question WHERE deleted = 0 AND created_by = ?", Long.class, teacherId)));
+        data.put("attemptCount", longValue(jt.queryForObject(
+                "SELECT COUNT(*) FROM exam_attempt ea JOIN exam e ON e.id = ea.exam_id WHERE e.created_by = ? AND e.deleted = 0",
+                Long.class, teacherId)));
+        data.put("completedCount", count(jt, """
+                SELECT COUNT(*)
+                FROM exam_attempt ea
+                JOIN exam e ON e.id = ea.exam_id
+                JOIN score_release sr ON sr.exam_id = e.id AND sr.status = 1
+                WHERE e.created_by = ? AND e.deleted = 0 AND ea.status = 5 AND ea.score IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM score_appeal sa
+                    WHERE sa.attempt_id = ea.id
+                      AND sa.status = 1
+                      AND sa.handling_result = 'RECHECK_REQUIRED'
+                  )
+                """, teacherId));
+
+        Double avg = jt.queryForObject("""
+                SELECT COALESCE(AVG(ea.score), 0)
+                FROM exam_attempt ea
+                JOIN exam e ON e.id = ea.exam_id
+                JOIN score_release sr ON sr.exam_id = e.id AND sr.status = 1
+                WHERE e.created_by = ? AND e.deleted = 0 AND ea.status = 5 AND ea.score IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM score_appeal sa
+                    WHERE sa.attempt_id = ea.id
+                      AND sa.status = 1
+                      AND sa.handling_result = 'RECHECK_REQUIRED'
+                  )
+                """, Double.class, teacherId);
+        data.put("averageScore", avg == null ? 0d : Math.round(avg * 100.0) / 100.0);
+
+        data.put("subjectStats", jt.queryForList("""
+                SELECT s.subject_name AS subjectName, COUNT(DISTINCT e.id) AS examCount,
+                       COUNT(ea.id) AS attemptCount, COALESCE(ROUND(AVG(ea.score), 2), 0) AS avgScore
+                FROM exam e
+                JOIN paper p ON p.id = e.paper_id
+                JOIN edu_subject s ON s.id = p.subject_id
+                LEFT JOIN score_release sr ON sr.exam_id = e.id AND sr.status = 1
+                LEFT JOIN exam_attempt ea ON ea.exam_id = e.id AND ea.status = 5 AND ea.score IS NOT NULL AND sr.exam_id IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM score_appeal sa
+                    WHERE sa.attempt_id = ea.id
+                      AND sa.status = 1
+                      AND sa.handling_result = 'RECHECK_REQUIRED'
+                  )
+                WHERE e.created_by = ? AND e.deleted = 0
+                GROUP BY s.id, s.subject_name
+                ORDER BY s.id
+                """, teacherId));
+
+        data.put("scoreDistribution", jt.queryForMap("""
+                SELECT COALESCE(SUM(CASE WHEN ea.score < 60 THEN 1 ELSE 0 END), 0) AS belowSixty,
+                       COALESCE(SUM(CASE WHEN ea.score >= 60 AND ea.score < 70 THEN 1 ELSE 0 END), 0) AS sixtyToSeventy,
+                       COALESCE(SUM(CASE WHEN ea.score >= 70 AND ea.score < 80 THEN 1 ELSE 0 END), 0) AS seventyToEighty,
+                       COALESCE(SUM(CASE WHEN ea.score >= 80 AND ea.score < 90 THEN 1 ELSE 0 END), 0) AS eightyToNinety,
+                       COALESCE(SUM(CASE WHEN ea.score >= 90 THEN 1 ELSE 0 END), 0) AS ninetyToHundred
+                FROM exam_attempt ea
+                JOIN exam e ON e.id = ea.exam_id
+                JOIN score_release sr ON sr.exam_id = e.id AND sr.status = 1
+                WHERE e.created_by = ? AND e.deleted = 0 AND ea.status = 5 AND ea.score IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM score_appeal sa
+                    WHERE sa.attempt_id = ea.id
+                      AND sa.status = 1
+                      AND sa.handling_result = 'RECHECK_REQUIRED'
+                  )
+                """, teacherId));
+
+        return data;
+    }
+
+    private long longValue(Long value) {
+        return value == null ? 0L : value;
+    }
+
+    private long count(JdbcTemplate jt, String sql, Object... args) {
+        Long value = jt.queryForObject(sql, Long.class, args);
+        return value == null ? 0L : value;
+    }
+
+    private JdbcTemplate requireJdbcTemplate() {
+        JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+        if (jdbcTemplate == null) {
+            throw new DatabaseUnavailableException("数据库连接不可用，请检查本地或云端数据源配置");
+        }
+        return jdbcTemplate;
+    }
+}

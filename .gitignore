@@ -1,0 +1,75 @@
+# Java / Spring Boot
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+*.war
+*.ear
+
+# Node / Vue
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.output/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Docker compose local state
+mysql-data/
+
+# Environment and local config
+.env
+.env.*
+!.env.example
+application-local.yml
+application-local.yaml
+*.local
+
+# Logs
+logs/
+*.log
+backups/
+artifacts/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.project
+.classpath
+.settings/
+
+# Claude Code 本地工具配置（个人/会话级，不入库）
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+# Windows 保留设备名，误用 `> nul`（应为 /dev/null）会生成此真实文件
+nul
+
+# Build and temporary files
+*.zip
+*.rar
+*.7z
+*.tmp
+*.bak
+
+# Database local files
+*.sql.bak
+*.db
+*.sqlite
+*.sqlite3
+
+# Course source materials in workspace root
+*.docx
+*.pdf
+*.xlsx
+/image.png
+
+# Report generated files
+~$*.docx
+metapi-main/
+ck/
