@@ -71,14 +71,14 @@
         <el-button link type="primary" :icon="Refresh" :loading="progressLoading" @click="loadReviewProgress">Refresh</el-button>
       </div>
       <el-table v-loading="progressLoading" :data="reviewProgress" :row-class-name="reviewProgressRowClassName">
-        <el-table-column prop="examName" label="考试" min-width="180" />
-        <el-table-column label="答题次数" width="160">
+        <el-table-column prop="examName" label="Exam" min-width="180" />
+        <el-table-column label="Attempts" width="160">
           <template #default="scope">
             {{ numberText((scope.row as ReviewProgress).pendingAttemptCount) }} pending /
             {{ numberText((scope.row as ReviewProgress).attemptCount) }} total
           </template>
         </el-table-column>
-        <el-table-column label="答案数" width="170">
+        <el-table-column label="Answers" width="170">
           <template #default="scope">
             {{ numberText((scope.row as ReviewProgress).pendingAnswerCount) }} pending /
             {{ numberText((scope.row as ReviewProgress).reviewableAnswerCount) }} total
@@ -87,7 +87,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="进度" min-width="180">
+        <el-table-column label="Progress" min-width="180">
           <template #default="scope">
             <el-progress
               :percentage="reviewProgressPercent(scope.row as ReviewProgress)"
@@ -95,14 +95,14 @@
             />
           </template>
         </el-table-column>
-        <el-table-column label="发布门控" width="130">
+        <el-table-column label="Release gate" width="130">
           <template #default="scope">
             <el-tag :type="reviewBlocksRelease(scope.row as ReviewProgress) ? 'warning' : 'success'">
               {{ reviewBlocksRelease(scope.row as ReviewProgress) ? 'Blocked' : 'Clear' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="250" fixed="right">
+        <el-table-column label="Action" width="250" fixed="right">
           <template #default="scope">
             <el-button link type="primary" @click="focusReviewExam(scope.row as ReviewProgress)">
               Focus
@@ -134,9 +134,9 @@
         <h3>Pending reviews</h3>
         <div class="pending-review-filter">
           <el-radio-group v-model="reviewTaskTypeFilter" size="small" @change="updateReviewTaskTypeFilter">
-            <el-radio-button label="全部">All</el-radio-button>
-            <el-radio-button label="复查">Recheck</el-radio-button>
-            <el-radio-button label="标准">Standard</el-radio-button>
+            <el-radio-button label="ALL">All</el-radio-button>
+            <el-radio-button label="RECHECK">Recheck</el-radio-button>
+            <el-radio-button label="STANDARD">Standard</el-radio-button>
           </el-radio-group>
           <el-tag v-if="focusedReviewExamId" type="warning">
             Exam #{{ focusedReviewExamId }}
@@ -145,20 +145,20 @@
         </div>
       </div>
       <el-table v-loading="loading" :data="pendingReviews" :row-class-name="pendingReviewRowClassName">
-        <el-table-column label="类型" width="110">
+        <el-table-column label="Type" width="110">
           <template #default="scope">
             <el-tag :type="isRecheckReview(scope.row as PendingReview) ? 'warning' : 'info'">
               {{ isRecheckReview(scope.row as PendingReview) ? 'Recheck' : 'Standard' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="examName" label="考试名称" min-width="180" />
-        <el-table-column prop="studentName" label="学生" width="120" />
-        <el-table-column prop="pendingCount" label="待阅答案" width="120" />
-        <el-table-column label="答题统计" min-width="180">
+        <el-table-column prop="examName" label="Exam Name" min-width="180" />
+        <el-table-column prop="studentName" label="Student" width="120" />
+        <el-table-column prop="pendingCount" label="Pending Answers" width="120" />
+        <el-table-column label="Answer stats" min-width="180">
           <template #default="scope">{{ reviewAnswerStatsText(scope.row as PendingReview) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="190" fixed="right">
+        <el-table-column label="Action" width="190" fixed="right">
           <template #default="scope">
             <el-button link type="primary" @click="startReview(scope.row.attemptId)">Review</el-button>
             <el-button
@@ -189,10 +189,10 @@
             style="width: 150px"
             @change="loadAppeals"
           >
-            <el-option label="所有结果" value="" />
-            <el-option label="维持成绩" value="MAINTAINED" />
-            <el-option label="需要复查" value="RECHECK_REQUIRED" />
-            <el-option label="线下调整" value="ADJUSTED_OFFLINE" />
+            <el-option label="All Results" value="" />
+            <el-option label="Maintain Score" value="MAINTAINED" />
+            <el-option label="Recheck Required" value="RECHECK_REQUIRED" />
+            <el-option label="Adjusted Offline" value="ADJUSTED_OFFLINE" />
           </el-select>
           <el-tag v-if="focusedAppealExamId" type="warning">
             Exam #{{ focusedAppealExamId }}
@@ -201,18 +201,18 @@
         </div>
       </div>
       <el-table v-loading="appealLoading" :data="appeals" :row-class-name="appealRowClassName">
-        <el-table-column prop="examName" label="考试名称" min-width="180" />
-        <el-table-column prop="studentName" label="学生" width="120" />
-        <el-table-column label="申诉对象" min-width="180">
+        <el-table-column prop="examName" label="Exam Name" min-width="180" />
+        <el-table-column prop="studentName" label="Student" width="120" />
+        <el-table-column label="Appeal Target" min-width="180">
           <template #default="scope">{{ scope.row.questionStem || 'Whole paper' }}</template>
         </el-table-column>
-        <el-table-column prop="reason" label="原因" min-width="220" show-overflow-tooltip />
-        <el-table-column label="状态" width="90">
+        <el-table-column prop="reason" label="Reason" min-width="220" show-overflow-tooltip />
+        <el-table-column label="Status" width="90">
           <template #default="scope">
             <el-tag :type="appealStatusType(scope.row.status)">{{ appealStatusText(scope.row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="处理结果" width="130">
+        <el-table-column label="Handling Result" width="130">
           <template #default="scope">
             <el-tag v-if="scope.row.handlingResult" type="info">
               {{ appealHandlingResultText(scope.row.handlingResult) }}
@@ -220,16 +220,16 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="handlerName" label="处理人" width="110">
+        <el-table-column prop="handlerName" label="Handler" width="110">
           <template #default="scope">{{ scope.row.handlerName || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="handledAt" label="处理时间" min-width="150">
+        <el-table-column prop="handledAt" label="Handled At" min-width="150">
           <template #default="scope">{{ scope.row.handledAt || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="recheckedAt" label="复查时间" min-width="150">
+        <el-table-column prop="recheckedAt" label="Rechecked At" min-width="150">
           <template #default="scope">{{ scope.row.recheckedAt || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="Action" width="220" fixed="right">
           <template #default="scope">
             <el-button v-if="scope.row.status === 0" link type="primary" @click="openReply(scope.row as ScoreAppeal)">Handle</el-button>
             <el-button v-if="canCloseRecheck(scope.row as ScoreAppeal)" link type="primary" @click="openRecheckReview(scope.row as ScoreAppeal)">Recheck Review</el-button>
@@ -309,7 +309,7 @@
                   v-model="reviewComments[answer.answerRecordId]"
                   type="textarea"
                   :rows="2"
-                  placeholder="输入阅卷评语，例如部分正确、遗漏关键点等"
+                  placeholder="Enter review comments, such as partially correct answer or missing key points."
                   maxlength="200"
                   show-word-limit
                 />
@@ -335,14 +335,14 @@
         <p v-if="activeAppeal.recheckNote"><strong>Recheck Note:</strong> {{ activeAppeal.recheckNote }}</p>
         <p v-if="activeAppeal.recheckerName || activeAppeal.recheckedAt"><strong>Recheck Record:</strong> {{ activeAppeal.recheckerName || '-' }} {{ activeAppeal.recheckedAt || '' }}</p>
         <el-form label-position="top">
-          <el-form-item label="处理结果" required>
+          <el-form-item label="Handling Result" required>
             <el-select v-model="appealHandlingResult" :disabled="activeAppeal.status !== 0" style="width: 100%">
-              <el-option label="维持成绩" value="MAINTAINED" />
-              <el-option label="需要复查" value="RECHECK_REQUIRED" />
-              <el-option label="线下调整" value="ADJUSTED_OFFLINE" />
+              <el-option label="Maintain Score" value="MAINTAINED" />
+              <el-option label="Recheck Required" value="RECHECK_REQUIRED" />
+              <el-option label="Adjusted Offline" value="ADJUSTED_OFFLINE" />
             </el-select>
           </el-form-item>
-          <el-form-item label="处理意见" required>
+          <el-form-item label="Handling Opinion" required>
             <el-input
               v-model="appealReply"
               type="textarea"
@@ -369,7 +369,7 @@
         <el-button type="success" plain :loading="appealLogExporting" @click="exportAppealLogs">Export</el-button>
       </div>
       <el-table v-loading="appealLogLoading" :data="appealLogs" border>
-        <el-table-column label="日志ID" width="145">
+        <el-table-column label="Log ID" width="145">
           <template #default="scope">
             <div class="appeal-log-id-cell">
               <span>#{{ scope.row.id }}</span>
@@ -378,7 +378,7 @@
                 type="primary"
                 :icon="DocumentCopy"
                 title="Copy score appeal audit ID"
-                aria-label="复制成绩申诉审计ID"
+                aria-label="Copy score appeal audit ID"
                 @click="copyScoreAppealAuditId(scope.row.id)"
               />
               <el-button
@@ -386,26 +386,26 @@
                 type="primary"
                 :icon="DocumentCopy"
                 title="Copy score appeal audit link"
-                aria-label="复制成绩申诉审计链接"
+                aria-label="Copy score appeal audit link"
                 @click="copyScoreAppealAuditLink(scope.row.id)"
               />
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120">
+        <el-table-column label="Action" width="120">
           <template #default="scope">{{ appealLogActionText(scope.row.action) }}</template>
         </el-table-column>
-        <el-table-column label="状态变更" width="120">
+        <el-table-column label="Status Change" width="120">
           <template #default="scope">
             {{ appealLogStatusText(scope.row.statusFrom) }} -> {{ appealLogStatusText(scope.row.statusTo) }}
           </template>
         </el-table-column>
-        <el-table-column label="处理结果" width="120">
+        <el-table-column label="Handling Result" width="120">
           <template #default="scope">{{ appealHandlingResultText(scope.row.handlingResult) }}</template>
         </el-table-column>
-        <el-table-column prop="note" label="备注" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="actorName" label="操作人" width="120" />
-        <el-table-column prop="createdAt" label="时间" min-width="150" />
+        <el-table-column prop="note" label="Note" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="actorName" label="Actor" width="120" />
+        <el-table-column prop="createdAt" label="Time" min-width="150" />
       </el-table>
       <el-empty v-if="!appealLogLoading && appealLogs.length === 0" description="No appeal logs" />
     </el-drawer>
@@ -459,32 +459,32 @@
           </el-alert>
 
           <el-table :data="activeRecheckReadiness.answers || []" border>
-            <el-table-column prop="questionId" label="题目" width="100" />
-            <el-table-column label="状态" width="100">
+            <el-table-column prop="questionId" label="Question" width="100" />
+            <el-table-column label="Status" width="100">
               <template #default="scope">{{ recheckAnswerStatusText(scope.row as ScoreAppealRecheckAnswer) }}</template>
             </el-table-column>
-            <el-table-column label="分数" width="160">
+            <el-table-column label="Score" width="160">
               <template #default="scope">
                 {{ scope.row.oldScore ?? '-' }} -> {{ scope.row.newScore ?? scope.row.currentScore ?? '-' }} / {{ scope.row.maxScore ?? '-' }}
               </template>
             </el-table-column>
-            <el-table-column label="审计" width="110">
+            <el-table-column label="Audit" width="110">
               <template #default="scope">
                 <span v-if="scope.row.reviewScoreLogId">#{{ scope.row.reviewScoreLogId }}</span>
                 <span v-else>-</span>
               </template>
             </el-table-column>
-            <el-table-column prop="reviewerName" label="阅卷人" width="130">
+            <el-table-column prop="reviewerName" label="Reviewer" width="130">
               <template #default="scope">{{ scope.row.reviewerName || scope.row.reviewerId || '-' }}</template>
             </el-table-column>
-            <el-table-column prop="reviewedAt" label="阅卷时间" min-width="150">
+            <el-table-column prop="reviewedAt" label="Reviewed At" min-width="150">
               <template #default="scope">{{ scope.row.reviewedAt || '-' }}</template>
             </el-table-column>
-            <el-table-column prop="stem" label="题干" min-width="240" show-overflow-tooltip />
+            <el-table-column prop="stem" label="Stem" min-width="240" show-overflow-tooltip />
           </el-table>
 
           <el-form label-position="top" class="recheck-close-form">
-            <el-form-item label="关闭备注" required>
+            <el-form-item label="Close note" required>
               <el-input
                 v-model="recheckCloseNote"
                 type="textarea"
@@ -492,7 +492,7 @@
                 maxlength="1000"
                 show-word-limit
                 :disabled="!isRecheckCloseAllowed(activeRecheckReadiness)"
-                placeholder="确认复查结果、评分依据和最终结论"
+                placeholder="Confirm the recheck result, scoring evidence, and final conclusion."
               />
             </el-form-item>
           </el-form>
@@ -521,7 +521,7 @@
         <el-button type="success" plain :loading="scoreLogExporting" @click="exportScoreLogs">Export</el-button>
       </div>
       <el-table v-loading="scoreLogLoading" :data="scoreLogs" border>
-        <el-table-column label="日志ID" width="145">
+        <el-table-column label="Log ID" width="145">
           <template #default="scope">
             <div class="review-score-log-id-cell">
               <span>#{{ scope.row.id }}</span>
@@ -530,7 +530,7 @@
                 type="primary"
                 :icon="DocumentCopy"
                 title="Copy review score audit ID"
-                aria-label="复制阅卷审计ID"
+                aria-label="Copy review score audit ID"
                 @click="copyReviewScoreAuditId(scope.row.id)"
               />
               <el-button
@@ -538,24 +538,24 @@
                 type="primary"
                 :icon="DocumentCopy"
                 title="Copy review score audit link"
-                aria-label="复制阅卷审计链接"
+                aria-label="Copy review score audit link"
                 @click="copyReviewScoreAuditLink(scope.row.id)"
               />
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="createdAt" label="时间" min-width="150" />
-        <el-table-column prop="questionId" label="题目" width="100" />
-        <el-table-column prop="answerRecordId" label="答案" width="100" />
-        <el-table-column label="分数" width="150">
+        <el-table-column prop="createdAt" label="Time" min-width="150" />
+        <el-table-column prop="questionId" label="Question" width="100" />
+        <el-table-column prop="answerRecordId" label="Answer" width="100" />
+        <el-table-column label="Score" width="150">
           <template #default="scope">
             {{ scope.row.oldScore ?? 0 }} -> {{ scope.row.newScore }} / {{ scope.row.maxScore }}
           </template>
         </el-table-column>
-        <el-table-column prop="reviewerName" label="阅卷人" width="120">
+        <el-table-column prop="reviewerName" label="Reviewer" width="120">
           <template #default="scope">{{ scope.row.reviewerName || scope.row.reviewerId || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="comment" label="评语" min-width="220" show-overflow-tooltip />
+        <el-table-column prop="comment" label="Comment" min-width="220" show-overflow-tooltip />
       </el-table>
       <el-empty v-if="!scoreLogLoading && scoreLogs.length === 0" description="No review score logs" />
     </el-drawer>

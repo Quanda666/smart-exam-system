@@ -163,7 +163,7 @@
       <div class="section-title">最近登录记录</div>
       <el-table :data="loginLogs" v-loading="loginLogsLoading" size="small" max-height="220" empty-text="暂无登录记录">
         <el-table-column prop="action" label="方式" width="110" />
-        <el-table-column label="IP 地址" min-width="120">
+        <el-table-column label="IP地址" min-width="120">
           <template #default="scope">{{ scope.row.ip || '—' }}</template>
         </el-table-column>
         <el-table-column label="登录时间" min-width="170">

@@ -52,7 +52,7 @@
 - `docs/database-design.md`
 - `docs/deploy-local.md`
 - `docs/test-records.md`
-- `第七组-在线考试系统项目主控文档.md`
+- `第二组-在线考试系统项目主控文档.md`
 
 云部署文档中的旧 SMTP 配置也已改为 Resend HTTP API 方案。
 

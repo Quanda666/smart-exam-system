@@ -9,8 +9,8 @@
         <el-option label="已驳回" :value="3" />
       </el-select>
       <el-button type="primary" :icon="Search" @click="loadExams">查询</el-button>
-      <el-button type="info" plain :icon="Warning" @click="openLifecycleHealth">生命周期健康</el-button>
-      <el-button type="warning" plain :icon="Check" @click="openScoreReleaseSafety">成绩安全</el-button>
+      <el-button type="info" plain :icon="Warning" @click="openLifecycleHealth">Lifecycle Health</el-button>
+      <el-button type="warning" plain :icon="Check" @click="openScoreReleaseSafety">Score Safety</el-button>
       <span class="mp-toolbar-spacer"></span>
       <el-button type="success" :icon="Plus" @click="openCreate">{{ createButtonText }}</el-button>
     </div>
@@ -26,8 +26,8 @@
       <template #title>
         <div class="exam-operation-audit-content">
           <span>{{ lastExamOperationAudit.action }} audit recorded: {{ examOperationAuditText(lastExamOperationAudit.operationLogIds) }}</span>
-          <el-button link type="primary" :icon="DocumentCopy" @click="copyLatestExamOperationAuditId">复制审计ID</el-button>
-          <el-button link type="primary" :icon="DocumentCopy" @click="copyLatestExamOperationAuditLink">复制审计链接</el-button>
+          <el-button link type="primary" :icon="DocumentCopy" @click="copyLatestExamOperationAuditId">Copy audit ID</el-button>
+          <el-button link type="primary" :icon="DocumentCopy" @click="copyLatestExamOperationAuditLink">Copy audit link</el-button>
         </div>
       </template>
     </el-alert>
@@ -43,8 +43,8 @@
       <template #title>
         <div class="score-release-audit-content">
           <span>{{ lastScoreReleaseAudit.action }} audit recorded: {{ scoreReleaseAuditText(lastScoreReleaseAudit.scoreReleaseLogIds) }}</span>
-          <el-button link type="primary" :icon="DocumentCopy" @click="copyLatestScoreReleaseAuditId">复制审计ID</el-button>
-          <el-button link type="primary" :icon="DocumentCopy" @click="copyLatestScoreReleaseAuditLink">复制审计链接</el-button>
+          <el-button link type="primary" :icon="DocumentCopy" @click="copyLatestScoreReleaseAuditId">Copy audit ID</el-button>
+          <el-button link type="primary" :icon="DocumentCopy" @click="copyLatestScoreReleaseAuditLink">Copy audit link</el-button>
         </div>
       </template>
     </el-alert>
@@ -59,7 +59,7 @@
 
       <el-table ref="tableRef" v-loading="loading" :data="exams" :row-class-name="examRowClassName" @selection-change="onSelectionChange">
         <el-table-column type="selection" width="46" :selectable="canDeleteExam" />
-        <el-table-column prop="id" label="编号" width="70" />
+        <el-table-column prop="id" label="ID" width="70" />
         <el-table-column prop="examName" label="考试名称" min-width="180" />
         <el-table-column prop="subjectName" label="科目" width="120" />
         <el-table-column prop="paperName" label="试卷" min-width="150" />
@@ -83,7 +83,7 @@
             <el-tag :type="phaseType(scope.row as ExamInfo)">{{ phaseText(scope.row as ExamInfo) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="健康状态" width="150">
+        <el-table-column label="Health" width="150">
           <template #default="scope">
             <el-tooltip :content="(scope.row as ExamInfo).lifecycleNextAction || lifecycleStateText((scope.row as ExamInfo).lifecycleState)" placement="top">
               <el-tag :type="lifecycleSeverityType((scope.row as ExamInfo).lifecycleSeverity)">
@@ -232,11 +232,11 @@
         />
 
         <el-table :data="scoreReleaseReadinessDetailRows" border>
-          <el-table-column prop="code" label="阻塞项" width="180" />
-          <el-table-column label="数量" width="90">
+          <el-table-column prop="code" label="Blocker" width="180" />
+          <el-table-column label="Count" width="90">
             <template #default="scope">{{ readinessCountText(scope.row.count) }}</template>
           </el-table-column>
-          <el-table-column label="详情" min-width="260">
+          <el-table-column label="Detail" min-width="260">
             <template #default="scope">
               <div class="readiness-blocker-detail">
                 <strong>{{ scope.row.message || scoreReleaseBlockerText(scope.row.code) }}</strong>
@@ -244,7 +244,7 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="180" fixed="right">
+          <el-table-column label="Action" width="180" fixed="right">
             <template #default="scope">
               <el-button
                 v-if="canResolveScoreReleaseBlocker(scope.row.code)"
@@ -290,24 +290,24 @@
       <div class="score-safety-toolbar">
         <el-input
           v-model="lifecycleHealthQuery.keyword"
-          placeholder="按考试或试卷搜索"
+          placeholder="Search exam or paper"
           clearable
           :prefix-icon="Search"
           @keyup.enter="reloadLifecycleHealth"
           @clear="reloadLifecycleHealth"
         />
         <el-select v-model="lifecycleHealthQuery.state" @change="handleLifecycleHealthStateChange">
-          <el-option label="全部" value="ALL" />
-          <el-option label="需要处理" value="ACTION_REQUIRED" />
-          <el-option label="待审批" value="APPROVAL" />
-          <el-option label="等待中" value="WAITING" />
-          <el-option label="进行中" value="RUNNING" />
-          <el-option label="待阅卷" value="REVIEW" />
-          <el-option label="成绩就绪" value="SCORE_READY" />
-          <el-option label="已发布" value="RELEASED" />
-          <el-option label="风险" value="RISK" />
+          <el-option label="All" value="ALL" />
+          <el-option label="Action Required" value="ACTION_REQUIRED" />
+          <el-option label="Approval" value="APPROVAL" />
+          <el-option label="Waiting" value="WAITING" />
+          <el-option label="Running" value="RUNNING" />
+          <el-option label="Review" value="REVIEW" />
+          <el-option label="Score Ready" value="SCORE_READY" />
+          <el-option label="Released" value="RELEASED" />
+          <el-option label="Risk" value="RISK" />
         </el-select>
-        <el-button type="primary" :icon="Search" @click="reloadLifecycleHealth">搜索</el-button>
+        <el-button type="primary" :icon="Search" @click="reloadLifecycleHealth">Search</el-button>
         <span class="mp-toolbar-spacer"></span>
         <el-button type="success" plain :loading="lifecycleHealthExporting" @click="exportLifecycleHealthRows">
           Export
@@ -367,7 +367,7 @@
       </div>
 
       <el-table v-loading="lifecycleHealthLoading" :data="lifecycleHealthRows" border>
-        <el-table-column label="考试" min-width="220" show-overflow-tooltip>
+        <el-table-column label="Exam" min-width="220" show-overflow-tooltip>
           <template #default="scope">
             <div class="score-safety-exam-cell">
               <strong>{{ scope.row.examName || '-' }}</strong>
@@ -375,15 +375,15 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="subjectName" label="科目" width="130" show-overflow-tooltip />
-        <el-table-column label="状态" width="145">
+        <el-table-column prop="subjectName" label="Subject" width="130" show-overflow-tooltip />
+        <el-table-column label="State" width="145">
           <template #default="scope">
             <el-tag :type="lifecycleSeverityType(scope.row.lifecycleSeverity)">
               {{ lifecycleStateText(scope.row.lifecycleState) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="答题次数" width="155">
+        <el-table-column label="Attempts" width="155">
           <template #default="scope">
             <div class="score-safety-counts">
               <strong>{{ readinessNumberText(scope.row.completedAttemptCount) }} / {{ readinessNumberText(scope.row.attemptCount) }}</strong>
@@ -391,7 +391,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="监控" width="150">
+        <el-table-column label="Monitor" width="150">
           <template #default="scope">
             <div class="score-safety-counts">
               <strong>{{ readinessNumberText(scope.row.monitorSessionCount) }} sessions</strong>
@@ -399,7 +399,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="阻塞项" min-width="230">
+        <el-table-column label="Blockers" min-width="230">
           <template #default="scope">
             <div v-if="lifecycleBlockers(scope.row).length > 0" class="score-safety-blocker-list">
               <el-tooltip
@@ -417,10 +417,10 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="lifecycleNextAction" label="下一步操作" min-width="220" show-overflow-tooltip>
+        <el-table-column prop="lifecycleNextAction" label="Next Action" min-width="220" show-overflow-tooltip>
           <template #default="scope">{{ scope.row.lifecycleNextAction || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="430" fixed="right">
+        <el-table-column label="Actions" width="430" fixed="right">
           <template #default="scope">
             <el-button link type="primary" @click="openLifecycleHealthNextAction(scope.row as ExamLifecycleHealthExam)">
               Next
@@ -554,7 +554,7 @@
         />
 
         <el-table :data="lifecycleHandoff.actionRows" border class="mp-table-gap">
-          <el-table-column label="考试" min-width="220" show-overflow-tooltip>
+          <el-table-column label="Exam" min-width="220" show-overflow-tooltip>
             <template #default="scope">
               <div class="score-safety-exam-cell">
                 <strong>{{ scope.row.examName || '-' }}</strong>
@@ -562,18 +562,18 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="状态" width="145">
+          <el-table-column label="State" width="145">
             <template #default="scope">
               <el-tag :type="lifecycleSeverityType(scope.row.lifecycleSeverity)">
                 {{ lifecycleStateText(scope.row.lifecycleState) }}
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="lifecycleNextAction" label="下一步操作" min-width="220" show-overflow-tooltip />
-          <el-table-column prop="lifecycleBlockerCodes" label="阻塞项" min-width="190" show-overflow-tooltip>
+          <el-table-column prop="lifecycleNextAction" label="Next Action" min-width="220" show-overflow-tooltip />
+          <el-table-column prop="lifecycleBlockerCodes" label="Blockers" min-width="190" show-overflow-tooltip>
             <template #default="scope">{{ scope.row.lifecycleBlockerCodes || '-' }}</template>
           </el-table-column>
-          <el-table-column label="打开" width="90" fixed="right">
+          <el-table-column label="Open" width="90" fixed="right">
             <template #default="scope">
               <el-button link type="primary" @click="openLifecycleHandoffTarget(scope.row as ExamLifecycleHandoffAction)">
                 Open
@@ -594,21 +594,21 @@
       <div class="score-safety-toolbar">
         <el-input
           v-model="scoreReleaseSafetyQuery.keyword"
-          placeholder="按考试或试卷搜索"
+          placeholder="Search exam or paper"
           clearable
           :prefix-icon="Search"
           @keyup.enter="reloadScoreReleaseSafety"
           @clear="reloadScoreReleaseSafety"
         />
         <el-select v-model="scoreReleaseSafetyQuery.state" @change="handleScoreReleaseSafetyStateChange">
-          <el-option label="全部" value="ALL" />
-          <el-option label="需要处理" value="ACTION_REQUIRED" />
-          <el-option label="就绪" value="READY" />
-          <el-option label="受阻" value="BLOCKED" />
-          <el-option label="已发布" value="RELEASED" />
-          <el-option label="已撤销" value="REVOKED" />
+          <el-option label="All" value="ALL" />
+          <el-option label="Action Required" value="ACTION_REQUIRED" />
+          <el-option label="Ready" value="READY" />
+          <el-option label="Blocked" value="BLOCKED" />
+          <el-option label="Released" value="RELEASED" />
+          <el-option label="Revoked" value="REVOKED" />
         </el-select>
-        <el-button type="primary" :icon="Search" @click="reloadScoreReleaseSafety">搜索</el-button>
+        <el-button type="primary" :icon="Search" @click="reloadScoreReleaseSafety">Search</el-button>
         <span class="mp-toolbar-spacer"></span>
         <el-button type="success" plain :loading="scoreReleaseSafetyExporting" @click="exportScoreReleaseSafetyRows">
           Export
@@ -635,7 +635,7 @@
       </div>
 
       <el-table v-loading="scoreReleaseSafetyLoading" :data="scoreReleaseSafetyRows" border>
-        <el-table-column label="考试" min-width="220" show-overflow-tooltip>
+        <el-table-column label="Exam" min-width="220" show-overflow-tooltip>
           <template #default="scope">
             <div class="score-safety-exam-cell">
               <strong>{{ scope.row.examName || '-' }}</strong>
@@ -643,20 +643,20 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="subjectName" label="科目" width="130" show-overflow-tooltip />
-        <el-table-column label="状态" width="120">
+        <el-table-column prop="subjectName" label="Subject" width="130" show-overflow-tooltip />
+        <el-table-column label="State" width="120">
           <template #default="scope">
             <el-tag :type="scoreReleaseSafetyStateType(scope.row.scoreSafetyState)">
               {{ scoreReleaseSafetyStateText(scope.row.scoreSafetyState) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="发布" width="110">
+        <el-table-column label="Release" width="110">
           <template #default="scope">
             <el-tag :type="scoreReleaseType(scope.row as ExamInfo)">{{ scoreReleaseText(scope.row as ExamInfo) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="答题次数" width="150">
+        <el-table-column label="Attempts" width="150">
           <template #default="scope">
             <div class="score-safety-counts">
               <strong>{{ readinessNumberText(scope.row.completedAttemptCount) }} / {{ readinessNumberText(scope.row.attemptCount) }}</strong>
@@ -664,7 +664,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="阻塞项" min-width="230">
+        <el-table-column label="Blockers" min-width="230">
           <template #default="scope">
             <div v-if="scoreReleaseBlockers(scope.row as ExamInfo).length > 0" class="score-safety-blocker-list">
               <el-tooltip
@@ -682,10 +682,10 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="nextAction" label="下一步操作" min-width="200" show-overflow-tooltip>
+        <el-table-column prop="nextAction" label="Next Action" min-width="200" show-overflow-tooltip>
           <template #default="scope">{{ scope.row.nextAction || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="370" fixed="right">
+        <el-table-column label="Actions" width="370" fixed="right">
           <template #default="scope">
             <el-button link type="primary" @click="openScoreReleaseReadiness(scope.row as ScoreReleaseSafetyExam)">
               Readiness
@@ -848,10 +848,10 @@
           <el-tag :type="phaseType(approvalExam)">{{ phaseText(approvalExam) }}</el-tag>
         </div>
         <div class="approval-log-toolbar">
-          <el-button type="success" plain :loading="approvalLogExporting" @click="exportApprovalLogRows">导出</el-button>
+          <el-button type="success" plain :loading="approvalLogExporting" @click="exportApprovalLogRows">Export</el-button>
         </div>
         <el-table v-loading="approvalLogLoading" :data="approvalLogs" border>
-          <el-table-column prop="id" label="日志ID" width="90" />
+          <el-table-column prop="id" label="Log ID" width="90" />
           <el-table-column label="动作" width="110">
             <template #default="scope">{{ approvalActionText(scope.row.action) }}</template>
           </el-table-column>
@@ -870,7 +870,7 @@
           <el-table-column prop="note" label="备注/原因" min-width="220" show-overflow-tooltip>
             <template #default="scope">{{ scope.row.note || '-' }}</template>
           </el-table-column>
-          <el-table-column v-if="props.role === 'ADMIN'" label="审计" width="150" fixed="right">
+          <el-table-column v-if="props.role === 'ADMIN'" label="Audit" width="150" fixed="right">
             <template #default="scope">
               <el-button link type="primary" :icon="Search" @click="openApprovalAudit(scope.row.id)">Audit</el-button>
               <el-button link type="primary" :icon="DocumentCopy" @click="copyApprovalAuditLink(scope.row.id)">Copy</el-button>
@@ -888,7 +888,7 @@
           <el-tag :type="scoreReleaseType(scoreReleaseExam)">{{ scoreReleaseText(scoreReleaseExam) }}</el-tag>
         </div>
         <div class="score-release-log-toolbar">
-          <el-button type="success" plain :loading="scoreReleaseLogExporting" @click="exportScoreReleaseLogRows">导出</el-button>
+          <el-button type="success" plain :loading="scoreReleaseLogExporting" @click="exportScoreReleaseLogRows">Export</el-button>
         </div>
         <el-table v-loading="scoreReleaseLogLoading" :data="scoreReleaseLogs" border>
           <el-table-column prop="id" label="日志ID" width="92" />

@@ -1,6 +1,7 @@
 {
   "name": "smart-exam-frontend",
   "version": "0.1.0",
+  "description": "Smart Exam System frontend - Web程序设计课程设计 第二组",
   "private": true,
   "type": "module",
   "scripts": {

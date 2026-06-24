@@ -47,7 +47,7 @@
             <strong>{{ scoreText(scope.row as GradeInfo) }}</strong>
           </template>
         </el-table-column>
-        <el-table-column label="答题统计" min-width="180">
+        <el-table-column label="Answer stats" min-width="180">
           <template #default="scope">{{ answerStatsText(scope.row as GradeInfo) }}</template>
         </el-table-column>
         <el-table-column label="成绩状态" min-width="190">
@@ -94,7 +94,7 @@
           <el-descriptions-item label="状态">{{ statusText(examResult.gradeInfo.status) }}</el-descriptions-item>
           <el-descriptions-item label="科目">{{ examResult.gradeInfo.subjectName }}</el-descriptions-item>
           <el-descriptions-item label="交卷时间">{{ formatDateTime(examResult.gradeInfo.submitTime) }}</el-descriptions-item>
-          <el-descriptions-item label="答题统计">{{ answerStatsText(examResult.gradeInfo) }}</el-descriptions-item>
+          <el-descriptions-item label="Answer stats">{{ answerStatsText(examResult.gradeInfo) }}</el-descriptions-item>
         </el-descriptions>
         <el-divider />
         <div class="appeal-summary">
@@ -133,7 +133,7 @@
           <el-table-column prop="recheckNote" label="复核说明" min-width="180">
             <template #default="scope">{{ scope.row.recheckNote || '-' }}</template>
           </el-table-column>
-          <el-table-column label="审计" width="130">
+          <el-table-column label="Audit" width="130">
             <template #default="scope">
               <div v-if="scope.row.scoreAppealLogId" class="student-appeal-audit-id-cell">
                 <span>#{{ scope.row.scoreAppealLogId }}</span>
@@ -142,7 +142,7 @@
                   type="primary"
                   :icon="DocumentCopy"
                   title="Copy score appeal audit ID"
-                  aria-label="复制成绩申诉审计ID"
+                  aria-label="Copy score appeal audit ID"
                   @click="copyStudentAppealRowAuditId(scope.row.scoreAppealLogId)"
                 />
                 <el-button
@@ -150,14 +150,14 @@
                   type="primary"
                   :icon="DocumentCopy"
                   title="Copy score appeal audit link"
-                  aria-label="复制成绩申诉审计链接"
+                  aria-label="Copy score appeal audit link"
                   @click="copyStudentAppealRowAuditLink(scope.row.scoreAppealLogId)"
                 />
               </div>
               <span v-else>-</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="166">
+          <el-table-column label="Actions" width="166">
             <template #default="scope">
               <el-button link type="primary" :icon="View" @click="openStudentAppealLogs(scope.row as ScoreAppeal)">Logs</el-button>
               <el-button
@@ -238,7 +238,7 @@
         <el-button type="success" plain :loading="appealLogExporting" :disabled="!activeLogAppeal" @click="exportStudentAppealLogs">Export</el-button>
       </div>
       <el-table v-loading="appealLogLoading" :data="appealLogs" border>
-        <el-table-column label="日志ID" width="116">
+        <el-table-column label="Log ID" width="116">
           <template #default="scope">
             <div class="student-appeal-audit-id-cell">
               <span>#{{ scope.row.id }}</span>
@@ -247,7 +247,7 @@
                 type="primary"
                 :icon="DocumentCopy"
                 title="Copy score appeal audit ID"
-                aria-label="复制成绩申诉审计ID"
+                aria-label="Copy score appeal audit ID"
                 @click="copyStudentAppealRowAuditId(scope.row.id)"
               />
               <el-button
@@ -255,23 +255,23 @@
                 type="primary"
                 :icon="DocumentCopy"
                 title="Copy score appeal audit link"
-                aria-label="复制成绩申诉审计链接"
+                aria-label="Copy score appeal audit link"
                 @click="copyStudentAppealRowAuditLink(scope.row.id)"
               />
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="126">
+        <el-table-column label="Action" width="126">
           <template #default="scope">{{ appealLogActionText(scope.row.action) }}</template>
         </el-table-column>
-        <el-table-column label="状态" width="128">
+        <el-table-column label="Status" width="128">
           <template #default="scope">{{ appealLogStatusText(scope.row.statusFrom) }} -> {{ appealLogStatusText(scope.row.statusTo) }}</template>
         </el-table-column>
-        <el-table-column label="结果" width="132">
+        <el-table-column label="Result" width="132">
           <template #default="scope">{{ appealHandlingResultText(scope.row.handlingResult) }}</template>
         </el-table-column>
-        <el-table-column prop="note" label="备注" min-width="180" show-overflow-tooltip />
-        <el-table-column label="时间" width="170">
+        <el-table-column prop="note" label="Note" min-width="180" show-overflow-tooltip />
+        <el-table-column label="Time" width="170">
           <template #default="scope">{{ formatDateTime(scope.row.createdAt) }}</template>
         </el-table-column>
       </el-table>
@@ -309,36 +309,36 @@
           </div>
 
           <el-descriptions :column="1" border class="student-appeal-evidence-summary">
-            <el-descriptions-item label="处理结果">{{ appealHandlingResultText(appealEvidence.handlingResult) }}</el-descriptions-item>
-            <el-descriptions-item label="教师回复">{{ appealEvidence.teacherReply || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="复查备注">{{ appealEvidence.recheckNote || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="复查开启时间">{{ formatDateTime(appealEvidence.recheckOpenedAt) }}</el-descriptions-item>
-            <el-descriptions-item label="复查完成时间">{{ formatDateTime(appealEvidence.recheckedAt) }}</el-descriptions-item>
+            <el-descriptions-item label="Handling Result">{{ appealHandlingResultText(appealEvidence.handlingResult) }}</el-descriptions-item>
+            <el-descriptions-item label="Teacher Reply">{{ appealEvidence.teacherReply || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="Recheck Note">{{ appealEvidence.recheckNote || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="Recheck Opened">{{ formatDateTime(appealEvidence.recheckOpenedAt) }}</el-descriptions-item>
+            <el-descriptions-item label="Rechecked At">{{ formatDateTime(appealEvidence.recheckedAt) }}</el-descriptions-item>
           </el-descriptions>
 
           <el-table :data="appealEvidence.answers || []" border class="student-appeal-evidence-table">
-            <el-table-column prop="questionId" label="题目" width="92" />
-            <el-table-column label="状态" width="100">
+            <el-table-column prop="questionId" label="Question" width="92" />
+            <el-table-column label="Status" width="100">
               <template #default="scope">{{ appealEvidenceAnswerStatusText(scope.row as ScoreAppealEvidenceAnswer) }}</template>
             </el-table-column>
-            <el-table-column label="分数" width="160">
+            <el-table-column label="Score" width="160">
               <template #default="scope">
                 {{ scope.row.oldScore ?? '-' }} -> {{ scope.row.newScore ?? scope.row.currentScore ?? '-' }} / {{ scope.row.maxScore ?? '-' }}
               </template>
             </el-table-column>
-            <el-table-column label="审计" width="100">
+            <el-table-column label="Audit" width="100">
               <template #default="scope">
                 <span v-if="scope.row.reviewScoreLogId">#{{ scope.row.reviewScoreLogId }}</span>
                 <span v-else>-</span>
               </template>
             </el-table-column>
-            <el-table-column prop="reviewerName" label="阅卷人" width="120">
+            <el-table-column prop="reviewerName" label="Reviewer" width="120">
               <template #default="scope">{{ scope.row.reviewerName || scope.row.reviewerId || '-' }}</template>
             </el-table-column>
-            <el-table-column label="阅卷时间" min-width="150">
+            <el-table-column label="Reviewed At" min-width="150">
               <template #default="scope">{{ formatDateTime(scope.row.reviewedAt) }}</template>
             </el-table-column>
-            <el-table-column prop="stem" label="题干" min-width="220" show-overflow-tooltip />
+            <el-table-column prop="stem" label="Stem" min-width="220" show-overflow-tooltip />
           </el-table>
         </template>
         <el-empty v-else-if="!appealEvidenceLoading" description="No recheck evidence" />

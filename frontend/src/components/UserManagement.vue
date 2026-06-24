@@ -178,7 +178,7 @@
         @selection-change="onSelectionChange"
       >
         <el-table-column type="selection" width="46" />
-        <el-table-column prop="id" label="ID" width="70" />
+        <el-table-column prop="id" label="编号" width="70" />
         <el-table-column prop="username" label="用户名" min-width="120" />
         <el-table-column prop="realName" label="姓名" min-width="100" />
         <el-table-column label="角色" width="100">

@@ -1,5 +1,8 @@
 # 数据库说明
 
+**课程**：Web程序设计课程设计（S3048I）  
+**项目**：第二组 - 在线考试系统
+
 数据库初始化脚本以后端资源目录为唯一权威来源：
 
 - [backend/src/main/resources/db/schema.sql](../backend/src/main/resources/db/schema.sql)
